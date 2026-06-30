@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type {
   WhoIsItGuessResponse,
   WhoIsItHintType,
   WhoIsItRoundState,
 } from '@pokegames/shared-types';
 import { AppHeader } from '@/components/layout/app-header';
+import { DotBackground } from '@/components/backgrounds/dot-background';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { API_ORIGIN } from '@/lib/env';
 import { getApiErrorMessage } from '@/lib/errors';
-import { requestHint, startRound, submitGuess } from './game-api';
+import { getPokemonNames, requestHint, startRound, submitGuess } from './game-api';
+import { GuessAutocomplete } from './components/guess-autocomplete';
 import { HintLadder } from './components/hint-ladder';
 import { RoundResult } from './components/round-result';
 import { ScorePill } from './components/score-pill';
@@ -26,6 +28,12 @@ export function WhoIsItPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [spriteVersion, setSpriteVersion] = useState(0);
+
+  const { data: names = [] } = useQuery({
+    queryKey: ['pokemon-names'],
+    queryFn: getPokemonNames,
+    staleTime: Infinity,
+  });
 
   const newRound = useCallback(async () => {
     setLoading(true);
@@ -97,9 +105,10 @@ export function WhoIsItPage() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      <AppHeader />
-      <main className="flex flex-1 items-center justify-center overflow-auto px-4 py-6">
+    <DotBackground>
+      <div className="flex h-screen flex-col">
+        <AppHeader />
+        <main className="flex flex-1 items-center justify-center overflow-auto px-4 py-6">
         {loading ? (
           <Spinner className="h-7 w-7 text-primary" />
         ) : !round ? (
@@ -129,12 +138,11 @@ export function WhoIsItPage() {
                   <SilhouetteStage src={spriteUrl} revealed={false} />
                   <form onSubmit={onGuess} className="flex flex-col gap-2">
                     <div className="flex gap-2">
-                      <Input
+                      <GuessAutocomplete
                         value={guess}
-                        onChange={(event) => setGuess(event.target.value)}
-                        placeholder="Nom du Pokémon"
-                        autoComplete="off"
+                        names={names}
                         disabled={busy}
+                        onChange={setGuess}
                       />
                       <Button type="submit" disabled={busy || !guess.trim()}>
                         {busy ? <Spinner className="h-4 w-4" /> : 'Valider'}
@@ -159,7 +167,8 @@ export function WhoIsItPage() {
             )}
           </div>
         )}
-      </main>
-    </div>
+        </main>
+      </div>
+    </DotBackground>
   );
 }

@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
-import { BookMarked, LogOut, Settings } from 'lucide-react';
+import { LogOut } from 'lucide-react';
+import { FolderKanbanIcon } from '@/components/ui/icons/folder-kanban-icon';
+import { SettingsIcon } from '@/components/ui/icons/settings-icon';
 import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-context';
@@ -28,10 +30,10 @@ export function AppHeader() {
 
       <div className="flex items-center gap-1">
         <button type="button" className={iconButtonClass} title="Pokédex (bientôt)" aria-label="Pokédex">
-          <BookMarked className="h-5 w-5" />
+          <FolderKanbanIcon size={20} />
         </button>
         <button type="button" className={iconButtonClass} title="Paramètres (bientôt)" aria-label="Paramètres">
-          <Settings className="h-5 w-5" />
+          <SettingsIcon size={20} />
         </button>
         {user ? (
           <div className="flex items-center gap-2 pl-2">
@@ -57,3 +59,4 @@ export function AppHeader() {
     </header>
   );
 }
+

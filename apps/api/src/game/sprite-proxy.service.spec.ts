@@ -11,6 +11,7 @@ jest.mock('sharp', () => {
   const makeChain = (state: { blurred: boolean }) => ({
     ensureAlpha: () => makeChain(state),
     modulate: () => makeChain(state),
+    linear: () => makeChain(state),
     blur: () => makeChain({ blurred: true }),
     png: () => makeChain(state),
     toBuffer: async (): Promise<Buffer> => Buffer.from(state.blurred ? 'blurred-buffer' : 'silhouetted-buffer'),

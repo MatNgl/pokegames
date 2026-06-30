@@ -98,8 +98,14 @@ export class SpriteProxyService {
       return { buffer, contentType: 'image/png' };
     }
 
-    // Silhouette noire absolue : impossible d'extraire l'image couleur via F12
-    buffer = await sharp(buffer).ensureAlpha().modulate({ brightness: 0 }).png().toBuffer();
+    // Silhouette pleine : on garde la forme via le canal alpha et on force le RGB en blanc.
+    // (modulate({ brightness: 0 }) est ignore par sharp quand la valeur vaut 0, d'ou le passage par linear.)
+    // Blanc adapte au theme sombre ; le mode clair inversera la couleur cote client le moment venu.
+    buffer = await sharp(buffer)
+      .ensureAlpha()
+      .linear([0, 0, 0, 1], [255, 255, 255, 0])
+      .png()
+      .toBuffer();
     return { buffer, contentType: 'image/png' };
   }
 }

@@ -23,3 +23,8 @@ export async function submitGuess(roundId: string, guess: string): Promise<WhoIs
   const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/guess', { roundId, guess });
   return res.data;
 }
+
+export async function getPokemonNames(): Promise<string[]> {
+  const res = await api.get<string[]>('/pokemon/names');
+  return res.data;
+}
