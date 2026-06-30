@@ -7,11 +7,14 @@ import { Card } from '@/components/ui/card';
 import { Logo } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
 import { whoIsItDailyStatus, type WhoIsItDailyStatus } from '@/features/game/daily-storage';
+import { motusDailyStatus } from '@/features/game/motus-storage';
 import whoIsItImg from '@/assets/games/who-is-it.png';
 import pokeMotusImg from '@/assets/games/poke-motus.png';
 import plusMinusImg from '@/assets/games/plus-minus.png';
 import intrusImg from '@/assets/games/intrus.png';
 import quiEstCeImg from '@/assets/games/quiestce.png';
+
+type DailyKey = 'who-is-it' | 'motus';
 
 interface GameEntry {
   title: string;
@@ -19,7 +22,7 @@ interface GameEntry {
   to?: string;
   iconImg: string;
   available: boolean;
-  dailyGame?: boolean;
+  dailyKey?: DailyKey;
 }
 
 const games: GameEntry[] = [
@@ -29,9 +32,16 @@ const games: GameEntry[] = [
     to: '/jouer',
     iconImg: whoIsItImg,
     available: true,
-    dailyGame: true,
+    dailyKey: 'who-is-it',
   },
-  { title: 'Motus', description: 'Trouve le nom en 6 essais', iconImg: pokeMotusImg, available: false },
+  {
+    title: 'Motus',
+    description: 'Trouve le nom en 6 essais',
+    to: '/motus',
+    iconImg: pokeMotusImg,
+    available: true,
+    dailyKey: 'motus',
+  },
   {
     title: 'Plus ou Moins',
     description: 'Compare les statistiques',
@@ -53,7 +63,10 @@ function StatusBadge({ status }: { status: WhoIsItDailyStatus }) {
 }
 
 export function GamesPage() {
-  const [dailyStatus] = useState<WhoIsItDailyStatus>(() => whoIsItDailyStatus());
+  const [statuses] = useState<Record<DailyKey, WhoIsItDailyStatus>>(() => ({
+    'who-is-it': whoIsItDailyStatus(),
+    motus: motusDailyStatus(),
+  }));
 
   return (
     <AppBackground>
@@ -84,7 +97,7 @@ export function GamesPage() {
                     <h2 className="font-display text-[11px] uppercase leading-relaxed text-foreground sm:text-xs">
                       {game.title}
                     </h2>
-                    {game.dailyGame && <StatusBadge status={dailyStatus} />}
+                    {game.dailyKey && <StatusBadge status={statuses[game.dailyKey]} />}
                   </div>
                   <div
                     className={cn(

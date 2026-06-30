@@ -128,6 +128,44 @@ export interface WhoIsItGuessResponse {
 }
 
 /* ==========================================================================
+ * JEU 2 : POKÉ-MOTUS (WORDLE POKÉMON)
+ * ========================================================================== */
+
+export type MotusLetterState = 'CORRECT' | 'PRESENT' | 'ABSENT';
+
+export interface MotusLetterResult {
+  letter: string;
+  state: MotusLetterState;
+}
+
+export interface MotusGuessRow {
+  guess: string;
+  letters: MotusLetterResult[];
+}
+
+export interface MotusRoundState {
+  roundId: string;
+  length: number;
+  maxAttempts: number;
+  attempts: MotusGuessRow[];
+  status: 'PLAYING' | 'WON' | 'LOST';
+  // Renseigne uniquement lorsque la partie est terminee (WON ou LOST).
+  answer: string | null;
+}
+
+export interface MotusGuessRequest {
+  roundId: string;
+  guess: string;
+}
+
+export interface MotusGuessResponse {
+  // false si la proposition n'est pas un Pokemon valide de la bonne longueur (rejetee, aucun essai consomme).
+  accepted: boolean;
+  message?: string;
+  state: MotusRoundState;
+}
+
+/* ==========================================================================
  * AUTHENTIFICATION & UTILISATEURS (AUTH / USERS)
  * ========================================================================== */
 

@@ -119,15 +119,20 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * **Anti-Triche :** l'URL `/api/sprites/:sessionHash` ne révèle ni nom ni `pokedexId`. L'identité du Pokémon, l'état masqué et la validation vivent exclusivement côté serveur (state machine + Redis). Le client n'émet que des actions (`SUBMIT_GUESS`, `REVEAL_HINT`) et rend les états renvoyés. À la résolution, le serveur renvoie l'état final et le sprite couleur démasqué.
 
 ### 2. Poké-Motus (*Wordle Pokémon*)
-* **Concept :** Deviner le nom d'un Pokémon en 6 essais maximum, avec des retours colorés par lettre.
-* **Mécanique :**
-  * Le mot cible (ex: `RONFLEX`) est tiré côté serveur. La longueur du mot est envoyée au client.
-  * À chaque tentative soumise (`POST /api/games/motus/guess`), le serveur compare le mot soumis avec le mot secret sans jamais renvoyer ce dernier.
-  * **Code couleur retourné par le serveur :**
-    * **Vert :** Lettre correcte et bien placée.
-    * **Jaune :** Lettre présente dans le nom mais mal placée.
-    * **Gris :** Lettre absente du nom du Pokémon.
-* **Anti-Triche :** Le mot mystère reste strictement dans Redis côté serveur jusqu'à la victoire ou l'épuisement des 6 essais.
+* **Concept :** deviner le nom d'un Pokémon en **6 essais**, avec un retour coloré par lettre, à la Wordle.
+* **Mot du jour :** **un seul mot par jour** (défi quotidien, série déterministe identique pour tous via la graine de la date). La cible est un Pokémon dont le nom (accents retirés, lettres A à Z uniquement, un seul mot) fait **entre 5 et 9 lettres**.
+* **Indices de départ :** style Wordle, **aucune lettre donnée**. Seule la **longueur** est connue (le nombre de cases de la grille).
+* **Saisie :**
+  * On tape les lettres. **Auto-soumission dès que la ligne est pleine** (tous les caractères remplis).
+  * La proposition doit **obligatoirement être un vrai Pokémon** de la même longueur (comparaison **sans accents**, lettres seules). Sinon la ligne est **rejetée sans consommer d'essai** (petite secousse) et le joueur corrige.
+* **Code couleur (calculé côté serveur, gestion correcte des lettres en double) :**
+  * **Vert :** lettre correcte et bien placée.
+  * **Jaune/orange :** lettre présente dans le nom mais mal placée.
+  * **Noir :** lettre absente du nom.
+* **Clavier virtuel :** clavier à l'écran (AZERTY) dont les touches se colorent (vert/jaune/noir) selon les lettres déjà jouées.
+* **Fin :** victoire si trouvé en 6 essais ou moins, sinon défaite (la réponse est alors révélée). Comme tous les jeux solo, **une seule session par jour** ; en fin de partie, retour à l'accueil.
+* **Endpoints :** `POST /api/games/motus/start` (récupère le mot du jour), `GET /api/games/motus/round/:roundId` (état), `POST /api/games/motus/guess` (soumet une proposition).
+* **Anti-Triche :** le mot mystère reste **exclusivement dans Redis** côté serveur jusqu'à la victoire ou l'épuisement des essais. Le client ne reçoit que la longueur, le patron de couleurs par tentative et le statut ; jamais le mot tant que la partie n'est pas finie. La validité d'une proposition (est-ce un Pokémon de la bonne longueur) est vérifiée côté serveur.
 
 ### 3. Plus ou Moins (*Poké-Stats & Caractéristiques*)
 * **Concept :** Deviner une caractéristique d'un Pokémon mystère ou comparer deux Pokémon successifs en mode survie.
