@@ -52,17 +52,18 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * Aucun texte au ton "IA générée" : pas de formules creuses, de remplissage, de phrases d'introduction ou de conclusion automatiques, ni de commentaires de code qui paraphrasent l'évidence. On écrit comme un humain : court, direct, utile.
 * Aucun tiret long (le tiret cadratin et le tiret demi-cadratin sont proscrits), ni dans le code, ni dans les commentaires, ni dans l'interface. On utilise le point, la virgule, les deux-points, les parenthèses ou un tiret simple selon le cas.
 * Aucun emoji nulle part : code, commentaires, logs, messages d'erreur, libellés d'interface, et documentation comprise.
-* Aucune palette "explosive" ni dégradé criard typiques des rendus IA. La couleur reste sobre et maîtrisée, conforme au guide UI/UX. Les dégradés, s'ils existent, sont discrets et justifiés. Seule exception sanctionnée et cadrée : le fond `LightPillar` des pages vitrines (accueil, connexion, inscription), gardé avec ses couleurs d'origine comme touche de couleur assumée (voir le guide UI/UX, section Fonds par contexte).
+* Pas de dégradé criard ni de palette « IA » (violet/rose génériques). Les couleurs sont vives et joyeuses mais **issues de la marque Pokémon** et cadrées par le guide UI/UX (bleu/vert/jaune/rouge sur surfaces crème). On vise un rendu de fan-game soigné, pas un thème générique d'IA.
 * Le style visuel et le code s'appuient sur des références humaines existantes (bibliothèques et patterns reconnus), jamais sur une esthétique inventée au fil de l'eau. Objectif constant : pro, simple, lisible.
 * **Orthographe irréprochable et accents français :** Toujours écrire correctement les mots français avec leurs accents dans tout le projet (textes d'interface, messages d'erreur, commentaires, documentation). Par exemple : "Vérifiez que l'API est démarrée." et non "Verifiez que l'API est demarree." Une attention stricte doit être portée à chaque écran front pour proscrire tout mot sans accent.
 
 ---
 
-## 4. Guide UI/UX (Esthétique E-Sport Sombre)
-* **Inspiration :** `dialed.gg` / interfaces gaming e-sport de compétition.
-* **Thème :** Dark mode profond (`#0B0E14`, `#121721`), contrastes subtils de gris, légers effets de lueur (`glow` indigo/violet/cyan lors des interactions).
-* **Typographie :** **Outfit** (sans-serif géométrique, nette et lisible), chargée localement. Pas d'autre famille par défaut.
-* **Mise en valeur :** Artworks officiels HD (sprites réguliers et shinies de haute qualité, pas de pixel art par défaut).
+## 4. Guide UI/UX (Style Rétro Pokémon, vivant et coloré)
+* **Inspiration :** `Pokédle` et les fan-games Pokémon rétro (esthétique Game Boy / Pokémon). Objectif : un rendu **ludique, coloré et vivant** qui donne envie de jouer, jamais un rendu sérieux ou générique qui sent l'IA.
+* **Thème :** **thème unique** (pas de dark/light), clair et coloré. Fond « monde Pokémon » : ciel dégradé bleu, nuages doux, bande d'herbe verte en bas. Surfaces en **carte crème** (`#F7F3D7`) à **bordure olive épaisse** et légère ombre portée, façon boîte de jeu.
+* **Palette :** bleu Pokémon `#3B4CCA` (actions principales), vert `#5FB24A` (pastilles et états positifs), jaune `#FFCB05` (marque et accents), rouge `#EE1515` (erreur), texte sombre `#2B2A24` sur les surfaces crème. Couleurs vives mais maîtrisées et issues de la marque Pokémon (référence humaine assumée, pas un dégradé criard d'IA).
+* **Typographie :** **Press Start 2P** (police pixel) pour le logo, les titres et les libellés courts ; **Nunito** (sans-serif ronde et lisible) pour le corps, les champs et les textes longs. Chargées en local via `@fontsource`.
+* **Mise en valeur :** Artworks officiels HD (sprites réguliers et shinies de haute qualité). La silhouette à deviner est rendue en **noir plein** sur l'écran clair de la carte (classique « Quel est ce Pokémon »).
 * **Disposition (`100vh`, un seul écran, pas de scroll global) :** centre dominant. Tout le reste de l'écran est dédié au jeu, aéré, et tient sans scroll.
   * **Header haut, à gauche :** accès aux autres mini-jeux (navigation principale).
   * **Header haut, à droite :** paramètres, Pokédex et autres outils, sous forme d'icônes discrètes. Le Pokédex s'ouvre à la demande (drawer ou modale), il n'occupe pas de colonne permanente.
@@ -76,38 +77,27 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
   * Paramètres : `pnpm dlx shadcn@latest add "https://lucide-animated.com/r/settings.json"`
   * Défi quotidien (Daily) : `pnpm dlx shadcn@latest add "https://lucide-animated.com/r/calendar-days.json"`
   * Pokédex : `pnpm dlx shadcn@latest add "https://lucide-animated.com/r/folder-kanban.json"`
-* **Police :** **Outfit**, chargée en local (woff2), exposée via une variable CSS `--font-sans` et le thème Tailwind.
-* **Couleur d'accent :** **`#2596be`** (`hsl(196, 67%, 45%)`, bleu-cyan), accent unique de l'application. Pas de seconde couleur d'accent, pas de dégradé criard ni de glow saturé (cf. Règle 6). Décliné en nuances (hover, actif, fond d'accent à faible opacité) via les tokens.
+* **Polices :** **Press Start 2P** (pixel, `--font-display`) pour logo/titres/libellés courts et **Nunito** (`--font-sans`) pour le corps. Chargées en local via `@fontsource/press-start-2p` et `@fontsource-variable/nunito`.
+* **Couleurs (tokens) :** voir la palette ci-dessus, exposée en variables CSS via `@theme` Tailwind v4 (`--color-primary`, `--color-go`, `--color-accent`, `--color-surface`, `--color-border`...). Boutons épais à ombre basse (effet 3D façon jeu), cartes crème à bordure olive. Couleurs vives mais cadrées par la marque, jamais de dégradé criard d'IA (cf. Règle 6).
 * **État serveur :** **TanStack Query** pour le cache HTTP, les états de chargement et l'invalidation.
 * **Formulaires :** **react-hook-form** couplé à **zod** pour la validation (schémas zod partagés depuis `packages/shared-types` quand c'est pertinent).
 * **Animations :** Framer Motion pour les transitions de manche, dosées et fonctionnelles, jamais décoratives à l'excès.
 * **Navigation & Performance (Bonnes Pratiques Front) :**
   * **Lazy Loading :** Chargement différé (`React.lazy` + `Suspense`) systématique sur les routes et écrans de jeux afin de réduire le bundle initial.
   * **Skeletons (États de chargement) :** Affichage de composants Skeletons élégants et fluides (`Skeleton` shadcn) pendant les requêtes TanStack Query ou le chargement initial des sprites/données afin d'éviter tout saut visuel (CLS) ou écran vide.
-* **Thème :** sombre d'abord. Tokens sémantiques (variables CSS via shadcn) prévus dès le départ pour un mode clair ultérieur, mais seul le dark est soigné en v1.
+* **Thème :** **thème unique** clair et coloré (pas de bascule dark/light). Tokens sémantiques centralisés dans `index.css` (`@theme`).
 * **Tests front :** **Vitest** pour l'unitaire et les composants. Objectif zéro erreur `typecheck` et zéro erreur de lint avant toute fin de tâche.
 * **Skill UI/UX obligatoire :** tout le travail front s'appuie sur le skill **ui-ux-pro-max** (`https://github.com/nextlevelbuilder/ui-ux-pro-max-skill`). Il est activé pour chaque écran et chaque composant afin de garantir un rendu de niveau pro, sans tomber dans les travers listés à la Règle 6.
 
-### Fonds par contexte (décisions actées)
-* **Pages vitrines (accueil, connexion, inscription) :** composant **`LightPillar`** de React Bits (variante TypeScript + Tailwind, dépendance `three`). Source copiée dans `apps/web/src/components/backgrounds/LightPillar.tsx`. On **garde le prompt et ses couleurs d'origine** (`topColor` violet `#5227FF`, `bottomColor` rose `#FF9FFC`, et les autres props par défaut) : c'est une touche de couleur assumée et validée, réservée aux pages vitrines. C'est la **seule exception sanctionnée** à la sobriété chromatique de la Règle 6, justement parce qu'elle est cadrée à ces écrans et n'envahit jamais l'arène de jeu ni les surfaces applicatives.
-* **Écrans de jeu et zones applicatives :** motif de **points en grille** discret, adapté au dark. Base claire fournie, à transposer en dark :
+### Fond du site (décision actée)
+* **Fond unique « monde Pokémon »** sur toutes les pages (accueil, connexion, inscription, jeu) : composant `AppBackground` (`apps/web/src/components/backgrounds/app-background.tsx`). Ciel dégradé bleu, quelques nuages doux en dérive lente, bande d'herbe verte en bas. Aucune dépendance externe (CSS pur), léger.
+* Le fond reste en arrière-plan et ne concurrence jamais le contenu : le jeu se joue dans une carte crème lisible posée par-dessus.
+* L'ancien fond `LightPillar` (React Bits + `three`) et le motif à points sombre ont été retirés avec le pivot vers le thème rétro coloré.
 
-```css
-.app-surface {
-  width: 100%;
-  height: 100%;
-  background-color: #0B0E14;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 2px, transparent 0);
-  background-size: 30px 30px;
-  background-position: -5px -5px;
-}
-```
-
-* Le fond ne concurrence jamais le contenu : il reste en arrière-plan, faible contraste, sans animation distrayante pendant une manche.
-
-### Philosophie produit (cap dialé sur la simplicité)
-* Référence d'esprit : `dialed.gg`. Objectif : **peu de pages, peu d'informations par écran**, navigation immédiate. L'utilisateur sait toujours où aller.
+### Philosophie produit (simple et joueur)
+* Référence d'esprit : `Pokédle`. Objectif : **peu de pages, peu d'informations par écran**, navigation immédiate, ambiance ludique. L'utilisateur sait toujours où aller.
 * Pas de tableaux de bord surchargés, pas de menus profonds. Une action principale claire par écran.
+* Page d'accueil = sélection des jeux directement (pas de page marketing), en boîtes façon jeu (titre pixel + pastille verte décrivant le jeu).
 
 ---
 
@@ -117,15 +107,16 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * **Concept :** le joueur fait face à la silhouette masquée d'un Pokémon et doit deviner son nom français.
 * **Réponse :** saisie libre avec autocomplétion proposant des noms valides. La validation est faite côté serveur, jamais par comparaison côté client. Le nom saisi est normalisé avant comparaison au nom français canonique (minuscules, accents neutralisés, tirets et espaces normalisés ; cas particuliers comme les symboles de genre gérés).
 * **Tentatives :** illimitées par défaut. Il n'y a pas d'échec : la manche se termine quand le joueur trouve. Un plafond de tentatives optionnel peut être imposé en admin (au-delà, la manche se clôt et la réponse est révélée).
-* **Indices (échelle fixe) :** chaque mauvaise réponse ouvre le palier d'indice suivant. Au palier courant, le joueur choisit de révéler l'indice (ce qui coûte des points) ou de continuer à deviner sans le révéler. L'ordre des indices est fixe et réglable en admin. Ordre par défaut : couleur floutée, Type 1, Type 2, Génération, puis première lettre (l'indice le plus fort en dernier).
-* **Révélation de couleur (anti-triche) :** les niveaux de couleur ne dévoilent jamais le vrai sprite côté client. Le serveur génère des variantes intermédiaires masquées (silhouette, puis versions floutées colorées non identifiables), servies par le proxy `/api/sprites/:sessionHash`. Le sprite net n'est servi qu'après résolution de la manche.
-* **Score :** chaque manche part d'un capital de points. On retire une pénalité par mauvaise réponse et une pénalité par indice révélé. Pas de bonus de temps, pas de combo de série. Le score de manche a un plancher à 0, le score de partie est la somme des manches. Barème (capital et pénalités) réglable en admin. Valeurs par défaut : capital 100 par manche, pénalité 15 par mauvaise réponse, pénalité 10 par indice révélé, 5 manches en partie classique, série quotidienne de 10, plafond de tentatives illimité.
+* **Indices (échelle fixe) :** chaque mauvaise réponse ouvre le palier d'indice suivant. Au palier courant, le joueur choisit de révéler l'indice (pour s'aider) ou de continuer à deviner. L'ordre des indices est fixe et réglable en admin. Ordre par défaut : couleur floutée, Type 1, Type 2, Génération, puis première lettre (l'indice le plus fort en dernier). Côté front, les indices sont des **icônes compactes à droite de la silhouette**, verrouillées tant que non débloquées, cliquables une fois disponibles.
+* **Révélation de couleur (anti-triche) :** les niveaux de couleur ne dévoilent jamais le vrai sprite côté client. Le serveur génère des variantes intermédiaires masquées (silhouette noire, puis version floutée colorée non identifiable), servies par le proxy `/api/sprites/:sessionHash`. Le sprite net n'est servi qu'après résolution de la manche.
+* **Décompte (essais, pas de points) :** on ne compte **pas de points**, seulement le **nombre d'essais** (réponses soumises) cumulé sur les manches de la partie. Objectif : deviner les Pokémon en le moins d'essais possible. Les indices aident sans pénalité chiffrée. Le nombre de manches par partie est réglable en admin (défaut 5).
 * **Modes :**
-  * **Partie classique :** N manches enchaînées (défaut 5, réglable en admin), score cumulé affiché à la fin.
-  * **Défi quotidien :** série identique pour tous, déterminée par une graine du jour (la date), jouable une seule fois par jour et par compte (contrôle serveur). Classement du jour comparant les scores (départage : score le plus élevé, puis fin la plus précoce). Taille de la série réglable en admin.
-* **Paramètres admin :** nombre de manches (classique), plafond de tentatives par manche, barème de points et pénalités, ordre des indices, taille du défi quotidien. Toute modification est journalisée (audit admin).
-* **Endpoints indicatifs :** `POST /api/games/who/start` (démarre une partie classique ou récupère le défi du jour), `POST /api/games/who/guess` (soumet une réponse), `POST /api/games/who/hint` (révèle l'indice du palier courant).
-* **Anti-Triche :** l'URL `/api/sprites/:sessionHash` ne révèle ni nom ni `pokedexId`. L'identité du Pokémon, l'état masqué et le calcul du score vivent exclusivement côté serveur (state machine + Redis). Le client n'émet que des actions (`SUBMIT_GUESS`, `REVEAL_HINT`) et rend les états renvoyés. À la résolution, le serveur renvoie l'état final et le sprite couleur démasqué.
+  * **Partie classique :** N manches enchaînées (défaut 5, réglable en admin). À la fin, on affiche le **nombre d'essais total** puis on **ramène à l'accueil** (sélection des jeux), avec une option Rejouer.
+  * **Défi quotidien :** série identique pour tous, déterminée par une graine du jour (la date), jouable une seule fois par jour et par compte (contrôle serveur). Classement du jour comparant le **nombre d'essais** (le plus faible gagne, départage par fin la plus précoce). Taille de la série réglable en admin.
+* **Persistance :** la partie en cours est sauvegardée côté client (identifiant de manche + essais déjà tentés + total) et restaurée via `GET /api/games/who-is-it/round/:id` ; un refresh retrouve le même Pokémon, l'étape et les essais. L'autocomplétion exclut les mauvaises réponses déjà soumises pour la silhouette courante et se réinitialise à la manche suivante.
+* **Paramètres admin :** nombre de manches (classique), plafond de tentatives par manche, ordre des indices, taille du défi quotidien. Toute modification est journalisée (audit admin).
+* **Endpoints :** `POST /api/games/who-is-it/start` (démarre une manche, accepte `roundIndex`), `GET /api/games/who-is-it/round/:roundId` (état d'une manche), `POST /api/games/who-is-it/guess` (soumet une réponse), `POST /api/games/who-is-it/hint` (révèle l'indice du palier courant). `GET /api/pokemon/names` alimente l'autocomplétion.
+* **Anti-Triche :** l'URL `/api/sprites/:sessionHash` ne révèle ni nom ni `pokedexId`. L'identité du Pokémon, l'état masqué et la validation vivent exclusivement côté serveur (state machine + Redis). Le client n'émet que des actions (`SUBMIT_GUESS`, `REVEAL_HINT`) et rend les états renvoyés. À la résolution, le serveur renvoie l'état final et le sprite couleur démasqué.
 
 ### 2. Poké-Motus (*Wordle Pokémon*)
 * **Concept :** Deviner le nom d'un Pokémon en 6 essais maximum, avec des retours colorés par lettre.

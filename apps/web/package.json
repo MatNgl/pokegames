@@ -10,7 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource-variable/outfit": "^5.2.8",
+    "@fontsource-variable/nunito": "^5.2.7",
+    "@fontsource/press-start-2p": "^5.2.7",
     "@hookform/resolvers": "^5.4.0",
     "@tanstack/react-query": "^5.101.2",
     "axios": "^1.18.1",
@@ -24,7 +25,6 @@
     "react-hook-form": "^7.80.0",
     "react-router-dom": "^7.18.1",
     "tailwind-merge": "^3.6.0",
-    "three": "^0.185.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -32,7 +32,6 @@
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@types/three": "^0.185.0",
     "@vitejs/plugin-react": "^6.0.3",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",

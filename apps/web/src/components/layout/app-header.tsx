@@ -23,14 +23,6 @@ export function AppHeader() {
         >
           <Logo />
         </Link>
-        <nav className="hidden items-center gap-1 sm:flex">
-          <Link
-            to="/jouer"
-            className="rounded-control px-3 py-1.5 text-sm text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-foreground"
-          >
-            Quel est ce Pokémon
-          </Link>
-        </nav>
       </div>
 
       <div className="flex items-center gap-1">

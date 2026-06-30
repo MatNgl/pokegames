@@ -1,34 +1,37 @@
 @import 'tailwindcss';
 
-/* Tokens semantiques du design system PokeGames (dark e-sport, accent unique).
-   Le clair sera ajoute plus tard via les memes tokens (sombre d'abord). */
+/* Theme unique, style retro Pokemon / Game Boy : couleurs vives, surfaces creme, bordures olive.
+   Inspiration assumee facon Pokedle (plus jeu, vivant), referencee avec le porteur du projet. */
 @theme {
-  --font-sans: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Nunito Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Press Start 2P', ui-monospace, monospace;
 
-  --color-background: #0b0e14;
-  --color-surface: #121721;
-  --color-surface-2: #19202d;
-  --color-foreground: #e8ebf2;
-  --color-muted: #8b94a7;
-  --color-border: #232c3d;
+  --color-background: #57b9f2;
+  --color-surface: #f7f3d7;
+  --color-surface-2: #ece4ba;
+  --color-foreground: #2b2a24;
+  --color-muted: #6f6a52;
 
-  --color-primary: #2596be;
-  --color-primary-foreground: #04141a;
-  --color-primary-soft: rgba(37, 150, 190, 0.14);
+  --color-border: #6f9a32;
+  --color-border-strong: #3f5d1d;
 
-  --color-success: #2fd49a;
-  --color-danger: #f0616d;
-  --color-warning: #e7b14c;
+  --color-primary: #3b4cca;
+  --color-primary-foreground: #ffffff;
+  --color-primary-shadow: #28338c;
 
-  --radius-card: 14px;
+  --color-go: #5fb24a;
+  --color-go-foreground: #ffffff;
+  --color-go-shadow: #3d8a30;
+
+  --color-accent: #ffcb05;
+  --color-danger: #ee1515;
+  --color-success: #2e9e3f;
+
+  --radius-card: 18px;
   --radius-control: 12px;
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
-  }
-
   html,
   body,
   #root {
@@ -44,16 +47,14 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Chiffres tabulaires pour aligner scores et compteurs */
     font-variant-numeric: tabular-nums;
   }
 
   ::selection {
-    background-color: var(--color-primary);
-    color: var(--color-primary-foreground);
+    background-color: var(--color-accent);
+    color: var(--color-foreground);
   }
 
-  /* Accessibilite : respect du reglage systeme de reduction des animations */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -62,5 +63,15 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/* Derive lente des nuages du fond. */
+@keyframes cloud-drift {
+  from {
+    transform: translateX(-6%);
+  }
+  to {
+    transform: translateX(6%);
   }
 }

@@ -8,5 +8,6 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-// Import a effet de bord de la police variable (CSS embarque, pas de types fournis par le paquet).
-declare module '@fontsource-variable/outfit';
+// Imports a effet de bord des polices (CSS embarque, pas de types fournis par les paquets).
+declare module '@fontsource/*';
+declare module '@fontsource-variable/*';

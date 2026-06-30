@@ -98,12 +98,12 @@ export class SpriteProxyService {
       return { buffer, contentType: 'image/png' };
     }
 
-    // Silhouette pleine : on garde la forme via le canal alpha et on force le RGB en blanc.
+    // Silhouette pleine noire : on garde la forme via le canal alpha et on force le RGB a zero.
     // (modulate({ brightness: 0 }) est ignore par sharp quand la valeur vaut 0, d'ou le passage par linear.)
-    // Blanc adapte au theme sombre ; le mode clair inversera la couleur cote client le moment venu.
+    // Noir : classique "Quel est ce Pokemon" sur l'ecran clair du theme unique.
     buffer = await sharp(buffer)
       .ensureAlpha()
-      .linear([0, 0, 0, 1], [255, 255, 255, 0])
+      .linear([0, 0, 0, 1], [0, 0, 0, 0])
       .png()
       .toBuffer();
     return { buffer, contentType: 'image/png' };

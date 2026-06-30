@@ -17,7 +17,7 @@ interface HintIconsProps {
   onReveal: (type: WhoIsItHintType) => void;
 }
 
-// Indices compacts a droite de la silhouette : une icone par indice, revelee au clic quand elle est debloquee.
+// Indices compacts a droite de la silhouette : une icone par indice, revelee au clic une fois debloquee.
 export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
   return (
     <div className="flex flex-col gap-2">
@@ -29,8 +29,8 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
         if (hint.isRevealed) {
           return (
             <div key={hint.type} className="flex items-center justify-end gap-2" title={hint.label}>
-              <span className="text-xs font-medium text-foreground">{String(hint.value)}</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-control bg-primary-soft text-primary">
+              <span className="text-xs font-bold text-foreground">{String(hint.value)}</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-control border-2 border-go-shadow bg-go text-go-foreground">
                 <Icon className="h-4 w-4" />
               </span>
             </div>
@@ -44,7 +44,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
               className="flex justify-end"
               title={`${hint.label} : débloqué à ${hint.unlockedAtMistakeCount} erreur${plural}`}
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-control border border-border text-muted/40">
+              <span className="flex h-9 w-9 items-center justify-center rounded-control border-2 border-border-strong bg-surface-2 text-muted/60">
                 <Lock className="h-4 w-4" />
               </span>
             </div>
@@ -55,14 +55,14 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
           <div
             key={hint.type}
             className="flex justify-end"
-            title={`${hint.label} : révéler (coût ${hint.cost} pts)`}
+            title={`${hint.label} : révéler (coûte un peu de progression)`}
           >
             <button
               type="button"
               disabled={busy}
               onClick={() => onReveal(hint.type)}
               aria-label={`Révéler ${hint.label}`}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-control border border-primary/50 text-primary transition-colors duration-200 hover:bg-primary-soft disabled:opacity-50"
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-control border-2 border-go bg-white text-go-shadow transition-colors duration-200 hover:bg-go hover:text-white disabled:opacity-50"
             >
               <Icon className="h-4 w-4" />
             </button>
