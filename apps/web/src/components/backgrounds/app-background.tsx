@@ -5,8 +5,8 @@ import backgroundImg from '@/assets/background.png';
 export function AppBackground({ children }: { children: ReactNode }) {
   return (
     <div
-      className="relative min-h-screen w-full bg-cover bg-fixed bg-center bg-no-repeat"
-      style={{ backgroundImage: `url(${backgroundImg})` }}
+      className="relative min-h-screen w-full bg-contain bg-top bg-no-repeat"
+      style={{ backgroundImage: `url(${backgroundImg})`, backgroundColor: '#57b9f2' }}
     >
       <div className="relative z-10">{children}</div>
     </div>
