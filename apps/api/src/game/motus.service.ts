@@ -99,6 +99,8 @@ export class MotusService {
       maxAttempts: session.maxAttempts,
       attempts: session.attempts,
       status: session.status,
+      // Premiere lettre donnee comme indice de depart ; le reste du mot reste cache.
+      firstLetter: session.answer.charAt(0),
       answer: session.status === 'PLAYING' ? null : session.answer,
     };
   }

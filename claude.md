@@ -121,9 +121,9 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 ### 2. Poké-Motus (*Wordle Pokémon*)
 * **Concept :** deviner le nom d'un Pokémon en **6 essais**, avec un retour coloré par lettre, à la Wordle.
 * **Mot du jour :** **un seul mot par jour** (défi quotidien, série déterministe identique pour tous via la graine de la date). La cible est un Pokémon dont le nom (accents retirés, lettres A à Z uniquement, un seul mot) fait **entre 5 et 9 lettres**.
-* **Indices de départ :** style Wordle, **aucune lettre donnée**. Seule la **longueur** est connue (le nombre de cases de la grille).
+* **Indices de départ :** la **première lettre est donnée** (indice façon Motus) ainsi que la **longueur** (nombre de cases). La première lettre est fournie par le serveur dans l'état de la manche (`firstLetter`) : le client ne peut pas la deviner seul, et le reste du mot reste caché jusqu'à la fin.
 * **Saisie :**
-  * On tape les lettres. **Auto-soumission dès que la ligne est pleine** (tous les caractères remplis).
+  * La première case affiche la lettre donnée, fixe (non éditable). Le joueur tape les lettres suivantes. **Auto-soumission dès que la ligne est pleine** (la proposition envoyée inclut la première lettre).
   * La proposition doit **obligatoirement être un vrai Pokémon** de la même longueur (comparaison **sans accents**, lettres seules). Sinon la ligne est **rejetée sans consommer d'essai** (petite secousse) et le joueur corrige.
 * **Code couleur (calculé côté serveur, gestion correcte des lettres en double) :**
   * **Vert :** lettre correcte et bien placée.

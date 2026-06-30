@@ -149,6 +149,8 @@ export interface MotusRoundState {
   maxAttempts: number;
   attempts: MotusGuessRow[];
   status: 'PLAYING' | 'WON' | 'LOST';
+  // Premiere lettre du mot, donnee des le depart (indice facon Motus). Majuscule A-Z.
+  firstLetter: string;
   // Renseigne uniquement lorsque la partie est terminee (WON ou LOST).
   answer: string | null;
 }

@@ -67,6 +67,14 @@ describe('MotusService', () => {
       expect(state.length).toBeLessThanOrEqual(9);
       expect(mockSet).toHaveBeenCalled();
     });
+
+    it('donne la première lettre dès le départ sans révéler le mot complet', async () => {
+      const state = await service.startDaily();
+
+      expect(state.firstLetter).toMatch(/^[A-Z]$/);
+      expect(state.firstLetter).toHaveLength(1);
+      expect(state.answer).toBeNull();
+    });
   });
 
   describe('submitGuess', () => {
