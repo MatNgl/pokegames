@@ -7,7 +7,8 @@ export interface SpriteSessionData {
   pokemonId: number;
   spriteUrl: string;
   isRevealed: boolean;
-  colorRevealed: boolean;
+  // 0 : silhouette noire ; 1 : couleur tres floutee ; 2 : couleur defloutee. Le sprite net n'arrive qu'a la resolution.
+  colorLevel: number;
 }
 
 @Injectable()
@@ -17,9 +18,6 @@ export class SpriteProxyService {
 
   constructor(private readonly redisService: RedisService) {}
 
-  /**
-   * Enregistre un mapping temporaire entre un hash unique et le sprite d'un Pokémon.
-   */
   async registerSpriteSession(
     sessionHash: string,
     pokemonId: number,
@@ -30,7 +28,7 @@ export class SpriteProxyService {
       pokemonId,
       spriteUrl,
       isRevealed: false,
-      colorRevealed: false,
+      colorLevel: 0,
     };
     await this.redisService.set(`${this.REDIS_PREFIX}${sessionHash}`, JSON.stringify(data), ttlSeconds);
   }
@@ -59,17 +57,25 @@ export class SpriteProxyService {
   }
 
   /**
-   * Débloque le niveau de couleur flouté : le proxy sert une version colorée mais fortement floutée,
-   * non identifiable, sans jamais exposer le sprite net (anti-triche, Règle 2).
+   * Débloque un niveau de couleur (1 floutée, 2 défloutée) : le proxy sert une version colorée mais non
+   * identifiable, sans jamais exposer le sprite net (anti-triche, Règle 2). Ne redescend jamais le niveau.
    */
-  async revealColorSpriteSession(sessionHash: string): Promise<void> {
-    await this.patchSession(sessionHash, { colorRevealed: true });
+  async setColorLevel(sessionHash: string, level: number): Promise<void> {
+    const raw = await this.redisService.get(`${this.REDIS_PREFIX}${sessionHash}`);
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw) as SpriteSessionData;
+      const nextLevel = Math.max(data.colorLevel ?? 0, level);
+      await this.patchSession(sessionHash, { colorLevel: nextLevel });
+    } catch {
+      // Ignorer une session corrompue
+    }
   }
 
   /**
    * Récupère le buffer de l'image via le sessionHash, masqué selon l'état de la manche.
    * ANTI-TRICHE (Règle 2) : tant que la manche n'est pas résolue, le sprite net n'est jamais renvoyé.
-   * Trois états : silhouette noire, couleur floutée (indice), puis sprite net (résolution).
+   * États : silhouette noire, couleur très floutée, couleur défloutée, puis sprite net (résolution).
    */
   async getSpriteBuffer(sessionHash: string): Promise<{ buffer: Buffer; contentType: string }> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${sessionHash}`);
@@ -92,15 +98,20 @@ export class SpriteProxyService {
       return { buffer, contentType };
     }
 
-    if (data.colorRevealed) {
-      // Couleur conservée mais flou prononcé : la palette transparait, l'identité reste cachée
+    if (data.colorLevel >= 2) {
+      // Couleur défloutée : flou modéré, l'identité reste difficile mais la forme et les couleurs ressortent.
+      buffer = await sharp(buffer).ensureAlpha().blur(6).png().toBuffer();
+      return { buffer, contentType: 'image/png' };
+    }
+
+    if (data.colorLevel === 1) {
+      // Couleur très floutée : la palette transparait, l'identité reste cachée.
       buffer = await sharp(buffer).ensureAlpha().blur(14).png().toBuffer();
       return { buffer, contentType: 'image/png' };
     }
 
     // Silhouette pleine noire : on garde la forme via le canal alpha et on force le RGB a zero.
     // (modulate({ brightness: 0 }) est ignore par sharp quand la valeur vaut 0, d'ou le passage par linear.)
-    // Noir : classique "Quel est ce Pokemon" sur l'ecran clair du theme unique.
     buffer = await sharp(buffer)
       .ensureAlpha()
       .linear([0, 0, 0, 1], [0, 0, 0, 0])

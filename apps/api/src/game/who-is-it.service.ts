@@ -140,11 +140,19 @@ export class WhoIsItService {
         isRevealed: false,
       },
       {
+        type: 'COLOR_SHARPEN',
+        label: 'Couleur nette',
+        value: 'Couleur affinée',
+        cost: hintCost,
+        unlockedAtMistakeCount: 5,
+        isRevealed: false,
+      },
+      {
         type: 'FIRST_LETTER',
         label: 'Première lettre',
         value: target.nameFr.charAt(0) + '...',
         cost: hintCost,
-        unlockedAtMistakeCount: 5,
+        unlockedAtMistakeCount: 6,
         isRevealed: false,
       },
     ];
@@ -243,9 +251,11 @@ export class WhoIsItService {
     session.currentScore = Math.max(0, session.currentScore - hint.cost);
     session.hintsUsedCount++;
 
-    // L'indice de couleur passe par le proxy : la version floutée colorée devient servie, jamais le sprite net
+    // Les indices de couleur passent par le proxy : floutée (niveau 1) puis défloutée (niveau 2), jamais le sprite net.
     if (hint.type === 'BLURRED_COLOR') {
-      await this.spriteProxy.revealColorSpriteSession(session.sessionHash);
+      await this.spriteProxy.setColorLevel(session.sessionHash, 1);
+    } else if (hint.type === 'COLOR_SHARPEN') {
+      await this.spriteProxy.setColorLevel(session.sessionHash, 2);
     }
 
     await this.redisService.set(`${this.REDIS_PREFIX}${roundId}`, JSON.stringify(session), this.ROUND_TTL_SECONDS);
@@ -299,7 +309,7 @@ export class WhoIsItService {
         success: true,
         isCorrect: false,
         status: 'PLAYING',
-        message: 'Ce n’est pas le bon Pokémon ! (-15 points)',
+        message: 'Ce n’est pas le bon Pokémon !',
         currentScore: session.currentScore,
         mistakesCount: session.mistakesCount,
         hints: session.hints,
@@ -352,7 +362,7 @@ export class WhoIsItService {
       success: true,
       isCorrect: true,
       status: 'SOLVED',
-      message: `Bonne réponse ! Vous gagnez ${session.currentScore} points !`,
+      message: 'Bonne réponse !',
       currentScore: session.currentScore,
       mistakesCount: session.mistakesCount,
       hints: session.hints,

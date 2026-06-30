@@ -73,7 +73,7 @@ describe('WhoIsItService', () => {
     const mockSpriteProxyService: Partial<SpriteProxyService> = {
       registerSpriteSession: mockRegisterSpriteSession,
       revealSpriteSession: mockRevealSpriteSession,
-      revealColorSpriteSession: jest.fn().mockResolvedValue(undefined),
+      setColorLevel: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -101,7 +101,7 @@ describe('WhoIsItService', () => {
       expect(state.sessionHash).toBeDefined();
       expect(state.status).toBe('PLAYING');
       expect(state.currentScore).toBe(100);
-      expect(state.hints).toHaveLength(5);
+      expect(state.hints).toHaveLength(6);
       expect(state.hints.every((h) => !h.isRevealed)).toBe(true);
 
       expect(mockRegisterSpriteSession).toHaveBeenCalledWith(

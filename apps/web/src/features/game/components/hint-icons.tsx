@@ -1,14 +1,22 @@
 import type { ComponentType } from 'react';
 import type { WhoIsItHint, WhoIsItHintType } from '@pokegames/shared-types';
-import { Hash, Lock, Palette, Tag, Tags, Type } from 'lucide-react';
+import { Hash, Lock, Tag, Tags, Type } from 'lucide-react';
+import colorRevealIcon from '@/assets/games/couleur_reveal.png';
 
-const ICONS: Record<WhoIsItHintType, ComponentType<{ className?: string }>> = {
-  BLURRED_COLOR: Palette,
+const LUCIDE_ICONS: Partial<Record<WhoIsItHintType, ComponentType<{ className?: string }>>> = {
   TYPE_1: Tag,
   TYPE_2: Tags,
   GENERATION: Hash,
   FIRST_LETTER: Type,
 };
+
+function HintGlyph({ type }: { type: WhoIsItHintType }) {
+  if (type === 'BLURRED_COLOR' || type === 'COLOR_SHARPEN') {
+    return <img src={colorRevealIcon} alt="" className="h-5 w-5 object-contain" />;
+  }
+  const Icon = LUCIDE_ICONS[type];
+  return Icon ? <Icon className="h-4 w-4" /> : null;
+}
 
 interface HintIconsProps {
   hints: WhoIsItHint[];
@@ -17,21 +25,22 @@ interface HintIconsProps {
   onReveal: (type: WhoIsItHintType) => void;
 }
 
-// Indices compacts a droite de la silhouette : une icone par indice, revelee au clic une fois debloquee.
+// Largeur fixe : reveler la valeur d'un indice ne doit jamais decaler la silhouette voisine.
 export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex w-32 shrink-0 flex-col gap-2">
       {hints.map((hint) => {
-        const Icon = ICONS[hint.type];
         const unlocked = mistakes >= hint.unlockedAtMistakeCount;
         const plural = hint.unlockedAtMistakeCount > 1 ? 's' : '';
 
         if (hint.isRevealed) {
           return (
             <div key={hint.type} className="flex items-center justify-end gap-2" title={hint.label}>
-              <span className="text-xs font-bold text-foreground">{String(hint.value)}</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-control border-2 border-go-shadow bg-go text-go-foreground">
-                <Icon className="h-4 w-4" />
+              <span className="min-w-0 flex-1 truncate text-right text-xs font-bold text-foreground">
+                {String(hint.value)}
+              </span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border-2 border-go-shadow bg-go text-go-foreground">
+                <HintGlyph type={hint.type} />
               </span>
             </div>
           );
@@ -52,11 +61,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
         }
 
         return (
-          <div
-            key={hint.type}
-            className="flex justify-end"
-            title={`${hint.label} : révéler (coûte un peu de progression)`}
-          >
+          <div key={hint.type} className="flex justify-end" title={`${hint.label} : révéler`}>
             <button
               type="button"
               disabled={busy}
@@ -64,7 +69,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
               aria-label={`Révéler ${hint.label}`}
               className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-control border-2 border-go bg-white text-go-shadow transition-colors duration-200 hover:bg-go hover:text-white disabled:opacity-50"
             >
-              <Icon className="h-4 w-4" />
+              <HintGlyph type={hint.type} />
             </button>
           </div>
         );

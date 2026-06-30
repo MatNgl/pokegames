@@ -70,7 +70,13 @@ export interface WhoIsItConfig {
   hintCost?: number; // par défaut 10
 }
 
-export type WhoIsItHintType = 'GENERATION' | 'TYPE_1' | 'TYPE_2' | 'FIRST_LETTER' | 'BLURRED_COLOR';
+export type WhoIsItHintType =
+  | 'GENERATION'
+  | 'TYPE_1'
+  | 'TYPE_2'
+  | 'FIRST_LETTER'
+  | 'BLURRED_COLOR'
+  | 'COLOR_SHARPEN';
 
 export interface WhoIsItHint {
   type: WhoIsItHintType;

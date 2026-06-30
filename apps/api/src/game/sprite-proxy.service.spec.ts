@@ -52,7 +52,7 @@ describe('SpriteProxyService', () => {
         pokemonId: 25,
         spriteUrl: 'https://example.com/25.png',
         isRevealed: false,
-        colorRevealed: false,
+        colorLevel: 0,
       }),
       300,
     );
@@ -99,13 +99,33 @@ describe('SpriteProxyService', () => {
     expect(result.contentType).toBe('image/png');
   });
 
-  it('doit renvoyer une version floutée colorée si colorRevealed est true et isRevealed false', async () => {
+  it('doit renvoyer une version floutée colorée au niveau 1 (isRevealed false)', async () => {
     mockGet.mockResolvedValue(
       JSON.stringify({
         pokemonId: 25,
         spriteUrl: 'https://example.com/25.png',
         isRevealed: false,
-        colorRevealed: true,
+        colorLevel: 1,
+      }),
+    );
+
+    mockedAxios.get.mockResolvedValue({
+      data: Buffer.from('original-colored-buffer'),
+      headers: { 'content-type': 'image/png' },
+    });
+
+    const result = await service.getSpriteBuffer('hash-123');
+    expect(result.buffer.toString()).toBe('blurred-buffer');
+    expect(result.contentType).toBe('image/png');
+  });
+
+  it('doit renvoyer une version défloutée colorée au niveau 2 (isRevealed false)', async () => {
+    mockGet.mockResolvedValue(
+      JSON.stringify({
+        pokemonId: 25,
+        spriteUrl: 'https://example.com/25.png',
+        isRevealed: false,
+        colorLevel: 2,
       }),
     );
 
