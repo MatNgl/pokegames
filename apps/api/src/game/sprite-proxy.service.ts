@@ -11,10 +11,18 @@ export interface SpriteSessionData {
   colorLevel: number;
 }
 
+type SpriteState = 'silhouette' | 'color1' | 'color2' | 'full';
+
 @Injectable()
 export class SpriteProxyService {
   private readonly REDIS_PREFIX = 'sprite_session:';
   private readonly DEFAULT_TTL_SECONDS = 600;
+
+  // Caches en memoire : evite de re-telecharger le sprite externe et de relancer sharp a chaque requete.
+  private readonly originalCache = new Map<string, Buffer>();
+  private readonly variantCache = new Map<string, Buffer>();
+  private readonly ORIGINAL_CACHE_MAX = 1200;
+  private readonly VARIANT_CACHE_MAX = 2000;
 
   constructor(private readonly redisService: RedisService) {}
 
@@ -57,25 +65,63 @@ export class SpriteProxyService {
   }
 
   /**
-   * Débloque un niveau de couleur (1 floutée, 2 défloutée) : le proxy sert une version colorée mais non
-   * identifiable, sans jamais exposer le sprite net (anti-triche, Règle 2). Ne redescend jamais le niveau.
+   * Débloque un niveau de couleur (1 floutée, 2 défloutée). Ne redescend jamais le niveau.
    */
   async setColorLevel(sessionHash: string, level: number): Promise<void> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${sessionHash}`);
     if (!raw) return;
     try {
       const data = JSON.parse(raw) as SpriteSessionData;
-      const nextLevel = Math.max(data.colorLevel ?? 0, level);
-      await this.patchSession(sessionHash, { colorLevel: nextLevel });
+      await this.patchSession(sessionHash, { colorLevel: Math.max(data.colorLevel ?? 0, level) });
     } catch {
       // Ignorer une session corrompue
+    }
+  }
+
+  private capCache(cache: Map<string, Buffer>, max: number): void {
+    if (cache.size <= max) return;
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+
+  private async getOriginalBuffer(spriteUrl: string): Promise<Buffer> {
+    const cached = this.originalCache.get(spriteUrl);
+    if (cached) return cached;
+    const response = await axios.get<ArrayBuffer>(spriteUrl, { responseType: 'arraybuffer' });
+    const buffer: Buffer = Buffer.from(response.data);
+    this.originalCache.set(spriteUrl, buffer);
+    this.capCache(this.originalCache, this.ORIGINAL_CACHE_MAX);
+    return buffer;
+  }
+
+  private resolveState(data: SpriteSessionData): SpriteState {
+    if (data.isRevealed) return 'full';
+    if (data.colorLevel >= 2) return 'color2';
+    if (data.colorLevel === 1) return 'color1';
+    return 'silhouette';
+  }
+
+  private async renderVariant(state: SpriteState, original: Buffer): Promise<Buffer> {
+    switch (state) {
+      case 'full':
+        return original;
+      case 'color2':
+        // Couleur défloutée : flou modéré, la forme et les couleurs ressortent sans rendre l'identité évidente.
+        return sharp(original).ensureAlpha().blur(6).png().toBuffer();
+      case 'color1':
+        // Couleur très floutée : la palette transparait, l'identité reste cachée.
+        return sharp(original).ensureAlpha().blur(14).png().toBuffer();
+      case 'silhouette':
+      default:
+        // Silhouette pleine noire : forme via le canal alpha, RGB force a zero (linear, car modulate({brightness:0}) est ignore).
+        return sharp(original).ensureAlpha().linear([0, 0, 0, 1], [0, 0, 0, 0]).png().toBuffer();
     }
   }
 
   /**
    * Récupère le buffer de l'image via le sessionHash, masqué selon l'état de la manche.
    * ANTI-TRICHE (Règle 2) : tant que la manche n'est pas résolue, le sprite net n'est jamais renvoyé.
-   * États : silhouette noire, couleur très floutée, couleur défloutée, puis sprite net (résolution).
+   * Les variantes sont mises en cache (clé pokemonId + état) pour un rendu quasi instantané.
    */
   async getSpriteBuffer(sessionHash: string): Promise<{ buffer: Buffer; contentType: string }> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${sessionHash}`);
@@ -90,33 +136,19 @@ export class SpriteProxyService {
       throw new NotFoundException('Données de session de sprite corrompues');
     }
 
-    const response = await axios.get<ArrayBuffer>(data.spriteUrl, { responseType: 'arraybuffer' });
-    let buffer: Buffer = Buffer.from(response.data);
+    const state = this.resolveState(data);
+    const cacheKey = `${data.pokemonId}:${state}`;
 
-    if (data.isRevealed) {
-      const contentType = String(response.headers['content-type'] ?? 'image/png');
-      return { buffer, contentType };
+    const cachedVariant = this.variantCache.get(cacheKey);
+    if (cachedVariant) {
+      return { buffer: cachedVariant, contentType: 'image/png' };
     }
 
-    if (data.colorLevel >= 2) {
-      // Couleur défloutée : flou modéré, l'identité reste difficile mais la forme et les couleurs ressortent.
-      buffer = await sharp(buffer).ensureAlpha().blur(6).png().toBuffer();
-      return { buffer, contentType: 'image/png' };
-    }
+    const original = await this.getOriginalBuffer(data.spriteUrl);
+    const buffer = await this.renderVariant(state, original);
+    this.variantCache.set(cacheKey, buffer);
+    this.capCache(this.variantCache, this.VARIANT_CACHE_MAX);
 
-    if (data.colorLevel === 1) {
-      // Couleur très floutée : la palette transparait, l'identité reste cachée.
-      buffer = await sharp(buffer).ensureAlpha().blur(14).png().toBuffer();
-      return { buffer, contentType: 'image/png' };
-    }
-
-    // Silhouette pleine noire : on garde la forme via le canal alpha et on force le RGB a zero.
-    // (modulate({ brightness: 0 }) est ignore par sharp quand la valeur vaut 0, d'ou le passage par linear.)
-    buffer = await sharp(buffer)
-      .ensureAlpha()
-      .linear([0, 0, 0, 1], [0, 0, 0, 0])
-      .png()
-      .toBuffer();
     return { buffer, contentType: 'image/png' };
   }
 }

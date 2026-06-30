@@ -21,55 +21,20 @@ import {
   startRound,
   submitGuess,
 } from './game-api';
+import {
+  clearSavedGame,
+  loadDailyDone,
+  loadSavedGame,
+  saveDailyDone,
+  saveGame,
+  todayKey,
+} from './daily-storage';
 import { GuessAutocomplete } from './components/guess-autocomplete';
 import { HintIcons } from './components/hint-icons';
 import { RoundResult } from './components/round-result';
 import { SilhouetteStage } from './components/silhouette-stage';
 
 const TOTAL_ROUNDS = 5;
-const STORAGE_KEY = 'pokegames:who-is-it';
-const DONE_KEY = 'pokegames:who-is-it:done';
-
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-interface SavedGame {
-  date: string;
-  roundId: string;
-  tried: string[];
-  totalAttempts: number;
-}
-
-interface DailyDone {
-  date: string;
-  totalAttempts: number;
-}
-
-function readJson<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeJson(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Stockage indisponible : on continue sans persistance.
-  }
-}
-
-function clearSavedGame(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Rien a faire si le stockage est indisponible.
-  }
-}
 
 export function WhoIsItPage() {
   const navigate = useNavigate();
@@ -96,7 +61,7 @@ export function WhoIsItPage() {
     setGameOver(true);
     setResult(null);
     clearSavedGame();
-    writeJson(DONE_KEY, { date: todayKey(), totalAttempts: finalAttempts });
+    saveDailyDone({ date: todayKey(), totalAttempts: finalAttempts });
   }, []);
 
   const startManche = useCallback(async (roundIndex: number, carriedAttempts: number) => {
@@ -112,12 +77,7 @@ export function WhoIsItPage() {
       const state = await startRound({ mode: 'DAILY', roundsCount: TOTAL_ROUNDS, roundIndex });
       setRound(state);
       setTotalAttempts(carriedAttempts);
-      writeJson(STORAGE_KEY, {
-        date: todayKey(),
-        roundId: state.roundId,
-        tried: [],
-        totalAttempts: carriedAttempts,
-      });
+      saveGame({ date: todayKey(), roundId: state.roundId, tried: [], totalAttempts: carriedAttempts });
       setSpriteVersion((v) => v + 1);
     } catch (err) {
       clearSavedGame();
@@ -130,7 +90,7 @@ export function WhoIsItPage() {
   const restoreOrStart = useCallback(async () => {
     const today = todayKey();
 
-    const done = readJson<DailyDone>(DONE_KEY);
+    const done = loadDailyDone();
     if (done && done.date === today) {
       setTotalAttempts(done.totalAttempts);
       setGameOver(true);
@@ -138,8 +98,8 @@ export function WhoIsItPage() {
       return;
     }
 
-    const saved = readJson<SavedGame>(STORAGE_KEY);
-    if (!saved || saved.date !== today || typeof saved.roundId !== 'string') {
+    const saved = loadSavedGame();
+    if (!saved || saved.date !== today) {
       clearSavedGame();
       void startManche(1, 0);
       return;
@@ -154,13 +114,13 @@ export function WhoIsItPage() {
         setResult(null);
         setFeedback(null);
         setGuess('');
-        setTried(Array.isArray(saved.tried) ? saved.tried : []);
-        setTotalAttempts(saved.totalAttempts ?? 0);
+        setTried(saved.tried);
+        setTotalAttempts(saved.totalAttempts);
         setGameOver(false);
         setSpriteVersion((v) => v + 1);
         setLoading(false);
       } else {
-        const carried = (saved.totalAttempts ?? 0) + state.mistakesCount + 1;
+        const carried = saved.totalAttempts + state.mistakesCount + 1;
         if (state.roundIndex >= state.totalRounds) {
           finishGame(carried);
           setLoading(false);
@@ -204,12 +164,7 @@ export function WhoIsItPage() {
           mistakesCount: res.mistakesCount,
           hints: res.hints,
         });
-        writeJson(STORAGE_KEY, {
-          date: todayKey(),
-          roundId: round.roundId,
-          tried: nextTried,
-          totalAttempts,
-        });
+        saveGame({ date: todayKey(), roundId: round.roundId, tried: nextTried, totalAttempts });
         setFeedback(res.message ?? "Ce n'est pas le bon Pokémon.");
         setGuess('');
       }

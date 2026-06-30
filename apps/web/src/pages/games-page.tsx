@@ -1,18 +1,25 @@
-import type { ComponentType } from 'react';
+import { type ComponentType, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, Scale, Shuffle, Type, Users } from 'lucide-react';
+import { Shuffle, Users } from 'lucide-react';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
+import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Logo } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
+import { whoIsItDailyStatus, type WhoIsItDailyStatus } from '@/features/game/daily-storage';
+import whoIsItImg from '@/assets/games/who-is-it.png';
+import pokeMotusImg from '@/assets/games/poke-motus.png';
+import plusMinusImg from '@/assets/games/plus-minus.png';
 
 interface GameEntry {
   title: string;
   description: string;
   to?: string;
-  icon: ComponentType<{ className?: string }>;
+  iconImg?: string;
+  icon?: ComponentType<{ className?: string }>;
   available: boolean;
+  dailyGame?: boolean;
 }
 
 const games: GameEntry[] = [
@@ -20,16 +27,34 @@ const games: GameEntry[] = [
     title: 'Silhouette',
     description: 'Devine le Pokémon caché',
     to: '/jouer',
-    icon: Eye,
+    iconImg: whoIsItImg,
     available: true,
+    dailyGame: true,
   },
-  { title: 'Motus', description: 'Trouve le nom en 6 essais', icon: Type, available: false },
-  { title: 'Plus ou Moins', description: 'Compare les statistiques', icon: Scale, available: false },
+  { title: 'Motus', description: 'Trouve le nom en 6 essais', iconImg: pokeMotusImg, available: false },
+  {
+    title: 'Plus ou Moins',
+    description: 'Compare les statistiques',
+    iconImg: plusMinusImg,
+    available: false,
+  },
   { title: "L'Intrus", description: 'Repère celui qui ne va pas', icon: Shuffle, available: false },
   { title: 'Qui est-ce', description: 'Déduction en duel', icon: Users, available: false },
 ];
 
+function StatusBadge({ status }: { status: WhoIsItDailyStatus }) {
+  if (status === 'in-progress') {
+    return <Badge className="border-[#b8860b] bg-accent text-foreground">En cours</Badge>;
+  }
+  if (status === 'done') {
+    return <Badge className="border-go-shadow bg-go text-go-foreground">Terminé</Badge>;
+  }
+  return null;
+}
+
 export function GamesPage() {
+  const [dailyStatus] = useState<WhoIsItDailyStatus>(() => whoIsItDailyStatus());
+
   return (
     <AppBackground>
       <div className="flex min-h-screen flex-col">
@@ -56,9 +81,12 @@ export function GamesPage() {
                       : 'opacity-70',
                   )}
                 >
-                  <h2 className="font-display text-[11px] uppercase leading-relaxed text-foreground sm:text-xs">
-                    {game.title}
-                  </h2>
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="font-display text-[11px] uppercase leading-relaxed text-foreground sm:text-xs">
+                      {game.title}
+                    </h2>
+                    {game.dailyGame && <StatusBadge status={dailyStatus} />}
+                  </div>
                   <div
                     className={cn(
                       'flex items-center gap-2 rounded-full px-3 py-2',
@@ -67,7 +95,11 @@ export function GamesPage() {
                         : 'border-2 border-border-strong bg-surface-2 text-muted',
                     )}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    {game.iconImg ? (
+                      <img src={game.iconImg} alt="" className="h-7 w-7 shrink-0 object-contain" />
+                    ) : (
+                      Icon && <Icon className="h-5 w-5 shrink-0" />
+                    )}
                     <span className="text-sm font-bold">{game.description}</span>
                     {!game.available && (
                       <span className="ml-auto text-[10px] font-bold uppercase">Bientôt</span>
