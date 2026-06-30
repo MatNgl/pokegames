@@ -11,16 +11,23 @@ describe('TyradexEtlService', () => {
   let mockUpsertPokemon: jest.Mock;
   let mockUpsertType: jest.Mock;
   let mockUpsertPokemonType: jest.Mock;
+  let mockFindUniquePokemon: jest.Mock;
+  let mockFindFirstEvolution: jest.Mock;
+  let mockCreateEvolution: jest.Mock;
 
   beforeEach(async () => {
     mockUpsertPokemon = jest.fn().mockResolvedValue({ id: 25 });
     mockUpsertType = jest.fn().mockResolvedValue({ id: 1 });
     mockUpsertPokemonType = jest.fn().mockResolvedValue({});
+    mockFindUniquePokemon = jest.fn().mockResolvedValue({ id: 26 });
+    mockFindFirstEvolution = jest.fn().mockResolvedValue(null);
+    mockCreateEvolution = jest.fn().mockResolvedValue({});
 
     const mockPrismaService = {
-      pokemon: { upsert: mockUpsertPokemon },
+      pokemon: { upsert: mockUpsertPokemon, findUnique: mockFindUniquePokemon },
       type: { upsert: mockUpsertType },
       pokemonType: { upsert: mockUpsertPokemonType },
+      evolution: { findFirst: mockFindFirstEvolution, create: mockCreateEvolution },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -37,7 +44,7 @@ describe('TyradexEtlService', () => {
     expect(service).toBeDefined();
   });
 
-  it('doit importer les Pokémon depuis l’API Tyradex vers PostgreSQL', async () => {
+  it('doit importer les Pokémon depuis l’API Tyradex vers PostgreSQL en gérant la virgule décimale', async () => {
     mockedAxios.get.mockResolvedValue({
       data: [
         {
@@ -48,8 +55,11 @@ describe('TyradexEtlService', () => {
           sprites: { regular: 'https://example.com/25.png', shiny: null },
           types: [{ name: 'Électrik', image: 'https://example.com/elec.png' }],
           stats: { hp: 35, atk: 55, def: 40, spe_atk: 50, spe_def: 50, vit: 90 },
-          height: '0.4 m',
-          weight: '6.0 kg',
+          height: '0,7 m',
+          weight: '6,5 kg',
+          evolution: {
+            next: [{ pokedex_id: 26, name: 'Raichu', condition: 'Pierre Foudre' }],
+          },
         },
       ],
     });
@@ -57,8 +67,20 @@ describe('TyradexEtlService', () => {
     const res = await service.syncPokemons();
 
     expect(res.importedCount).toBe(1);
-    expect(mockUpsertPokemon).toHaveBeenCalled();
+    expect(mockUpsertPokemon).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          height: 0.7,
+          weight: 6.5,
+        }),
+      }),
+    );
     expect(mockUpsertType).toHaveBeenCalled();
-    expect(mockUpsertPokemonType).toHaveBeenCalled();
+    expect(mockUpsertPokemonType).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ slot: 1 }),
+      }),
+    );
+    expect(mockCreateEvolution).toHaveBeenCalled();
   });
 });

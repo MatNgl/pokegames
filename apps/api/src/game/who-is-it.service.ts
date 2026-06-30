@@ -2,206 +2,175 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { SpriteProxyService } from './sprite-proxy.service';
-import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
+import { RedisService } from '../redis/redis.service';
 import {
   WhoIsItConfig,
   WhoIsItRoundState,
   WhoIsItGuessResponse,
   WhoIsItHint,
+  WhoIsItHintType,
   PokemonDTO,
+  WhoIsItMode,
 } from '@pokegames/shared-types';
+import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 
-interface WhoIsItServerSession {
+interface InternalRoundSession {
   roundId: string;
   sessionHash: string;
-  pokemonId: number;
-  pokedexId: number;
-  nameFr: string;
-  generation: number;
-  types: string[];
+  targetPokemonId: number;
+  targetNameFr: string;
+  targetNameEn: string;
+  status: 'PLAYING' | 'SOLVED' | 'CANCELLED';
   startTime: number;
-  timeLimitSeconds: number;
-  status: 'PLAYING' | 'SOLVED' | 'TIMEOUT';
+  currentScore: number;
+  mistakesCount: number;
+  hintsUsedCount: number;
+  mode: WhoIsItMode;
+  roundIndex: number;
+  totalRounds: number;
+  hints: WhoIsItHint[];
+  userId?: string;
 }
 
 @Injectable()
 export class WhoIsItService {
-  private readonly ROUND_PREFIX = 'whoisit_round:';
+  private readonly REDIS_PREFIX = 'game_whoisit:';
+  private readonly ROUND_TTL_SECONDS = 3600; // 1 heure de validité session max
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly spriteProxy: SpriteProxyService,
     private readonly redisService: RedisService,
-    private readonly spriteProxyService: SpriteProxyService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
-   * Normalise une chaîne de caractères pour la comparaison (minuscules, sans accents, sans espaces superflus).
+   * Démarre une nouvelle manche avec capital 100 points, pas d'échec au temps et indices payants.
    */
-  private normalizeString(str: string): string {
-    return str
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '')
-      .trim();
-  }
+  async startRound(config: WhoIsItConfig = { generations: [] }, userId?: string, roundIndex = 1): Promise<WhoIsItRoundState> {
+    const mode = config.mode ?? 'CLASSIC';
+    const totalRounds = config.roundsCount ?? 5;
+    const startCapital = config.startCapital ?? 100;
 
-  /**
-   * Calcule les indices débloqués en fonction du temps écoulé depuis le début du round.
-   */
-  private calculateAvailableHints(session: WhoIsItServerSession, elapsedSeconds: number): WhoIsItHint[] {
-    const hints: WhoIsItHint[] = [];
-
-    // Indice 1 à partir de 5 secondes : Génération
-    if (elapsedSeconds >= 5) {
-      hints.push({
-        type: 'GENERATION',
-        label: 'Génération',
-        value: `Génération ${session.generation}`,
-        revealedAtSecond: 5,
-      });
+    const whereClause: { generation?: { in: number[] } } = {};
+    if (config.generations && config.generations.length > 0) {
+      whereClause.generation = { in: config.generations };
     }
 
-    // Indice 2 à partir de 12 secondes : Types
-    if (elapsedSeconds >= 12) {
-      hints.push({
-        type: 'TYPE_1',
-        label: 'Type(s)',
-        value: session.types.join(' / '),
-        revealedAtSecond: 12,
-      });
-    }
-
-    // Indice 3 à partir de 20 secondes : Première lettre du nom
-    if (elapsedSeconds >= 20) {
-      const firstChar = session.nameFr.charAt(0).toUpperCase();
-      hints.push({
-        type: 'FIRST_LETTER',
-        label: 'Première lettre',
-        value: `${firstChar}...`,
-        revealedAtSecond: 20,
-      });
-    }
-
-    return hints;
-  }
-
-  /**
-   * Construit le DTO complet du Pokémon pour la fin de partie.
-   */
-  private async getFullPokemonDTO(pokemonId: number): Promise<PokemonDTO> {
-    const p = await this.prisma.pokemon.findUnique({
-      where: { id: pokemonId },
-      include: {
-        types: { include: { type: true } },
-        evolutions: { include: { target: true } },
-        evolvedFrom: { include: { pokemon: true } },
-      },
-    });
-
-    if (!p) {
-      throw new NotFoundException(`Pokémon ID ${pokemonId} introuvable en base`);
-    }
-
-    return {
-      id: p.id,
-      pokedexId: p.pokedexId,
-      nameFr: p.nameFr,
-      nameEn: p.nameEn,
-      category: p.category,
-      generation: p.generation,
-      spriteRegular: p.spriteRegular,
-      spriteShiny: p.spriteShiny,
-      stats: {
-        hp: p.statsHp,
-        atk: p.statsAtk,
-        def: p.statsDef,
-        speAtk: p.statsSpeAtk,
-        speDef: p.statsSpeDef,
-        speed: p.statsSpeed,
-      },
-      weight: p.weight,
-      height: p.height,
-      types: p.types.map((pt) => ({
-        id: pt.type.id,
-        nameFr: pt.type.nameFr,
-        nameEn: pt.type.nameEn,
-        image: pt.type.image,
-      })),
-      evolutions: p.evolutions.map((ev) => ({
-        pokedexId: ev.target.pokedexId,
-        nameFr: ev.target.nameFr,
-        condition: ev.condition,
-      })),
-      evolvedFrom: p.evolvedFrom.map((ev) => ({
-        pokedexId: ev.pokemon.pokedexId,
-        nameFr: ev.pokemon.nameFr,
-        condition: ev.condition,
-      })),
-    };
-  }
-
-  /**
-   * Démarre une nouvelle manche de "Quel est ce Pokémon ?" avec masquage strict.
-   */
-  async startRound(config?: Partial<WhoIsItConfig>): Promise<WhoIsItRoundState> {
-    const generations = config?.generations?.length ? config.generations : [1, 2, 3, 4, 5, 6, 7, 8, 9];
-    const timeLimitSeconds = config?.timeLimitSeconds && config.timeLimitSeconds > 0 ? config.timeLimitSeconds : 30;
-
-    // Sélection aléatoire d'un Pokémon parmi les générations choisies
-    const pokemonsCount = await this.prisma.pokemon.count({
-      where: { generation: { in: generations } },
-    });
-
-    if (pokemonsCount === 0) {
-      throw new BadRequestException('Aucun Pokémon disponible pour ces générations en base de données. Veuillez lancer le script ETL.');
-    }
-
-    const skip = Math.floor(Math.random() * pokemonsCount);
     const pokemons = await this.prisma.pokemon.findMany({
-      where: { generation: { in: generations } },
-      include: { types: { include: { type: true } } },
-      skip,
-      take: 1,
+      where: whereClause,
+      include: {
+        types: {
+          include: { type: true },
+          orderBy: { slot: 'asc' },
+        },
+      },
     });
 
-    const selected = pokemons[0];
-    if (!selected) {
-      throw new NotFoundException('Erreur lors de la sélection du Pokémon');
+    if (pokemons.length === 0) {
+      throw new NotFoundException('Aucun Pokémon trouvé pour les générations spécifiées');
+    }
+
+    let targetIndex: number;
+    if (mode === 'DAILY') {
+      // Graine déterministe par date et index de round pour le défi du jour
+      const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+      let seed = 0;
+      for (let i = 0; i < todayStr.length; i++) {
+        seed = (seed * 31 + todayStr.charCodeAt(i) + roundIndex * 17) % pokemons.length;
+      }
+      targetIndex = Math.abs(seed) % pokemons.length;
+    } else {
+      targetIndex = Math.floor(Math.random() * pokemons.length);
+    }
+
+    const target = pokemons[targetIndex];
+    if (!target) {
+      throw new NotFoundException('Pokémon cible introuvable');
     }
 
     const roundId = uuidv4();
-    const sessionHash = uuidv4();
-    const startTime = Date.now();
+    const sessionHash = uuidv4().replace(/-/g, '').substring(0, 16);
 
-    // Enregistrement du proxy d'image anonymisé
-    await this.spriteProxyService.registerSpriteSession(
+    await this.spriteProxy.registerSpriteSession(
       sessionHash,
-      selected.id,
-      selected.spriteRegular,
-      timeLimitSeconds + 60,
+      target.id,
+      target.spriteRegular,
+      this.ROUND_TTL_SECONDS,
     );
 
-    const serverSession: WhoIsItServerSession = {
+    const type1 = target.types.find((t) => t.slot === 1)?.type.nameFr ?? target.types[0]?.type.nameFr ?? 'Inconnu';
+    const type2 = target.types.find((t) => t.slot === 2)?.type.nameFr ?? target.types[1]?.type.nameFr ?? 'Aucun';
+    const hintCost = config.hintCost ?? 10;
+
+    // Échelle d'indices à ordre fixe, débloquée par palier d'erreur, révélée au choix du joueur (payante).
+    // Ordre : couleur floutée, type 1, type 2, génération, puis première lettre (l'indice le plus fort en dernier).
+    const hints: WhoIsItHint[] = [
+      {
+        type: 'BLURRED_COLOR',
+        label: 'Couleur floutée',
+        value: 'Couleur dévoilée',
+        cost: hintCost,
+        unlockedAtMistakeCount: 1,
+        isRevealed: false,
+      },
+      {
+        type: 'TYPE_1',
+        label: 'Type 1',
+        value: type1,
+        cost: hintCost,
+        unlockedAtMistakeCount: 2,
+        isRevealed: false,
+      },
+      {
+        type: 'TYPE_2',
+        label: 'Type 2',
+        value: type2,
+        cost: hintCost,
+        unlockedAtMistakeCount: 3,
+        isRevealed: false,
+      },
+      {
+        type: 'GENERATION',
+        label: 'Génération',
+        value: target.generation,
+        cost: hintCost,
+        unlockedAtMistakeCount: 4,
+        isRevealed: false,
+      },
+      {
+        type: 'FIRST_LETTER',
+        label: 'Première lettre',
+        value: target.nameFr.charAt(0) + '...',
+        cost: hintCost,
+        unlockedAtMistakeCount: 5,
+        isRevealed: false,
+      },
+    ];
+
+    const session: InternalRoundSession = {
       roundId,
       sessionHash,
-      pokemonId: selected.id,
-      pokedexId: selected.pokedexId,
-      nameFr: selected.nameFr,
-      generation: selected.generation,
-      types: selected.types.map((pt) => pt.type.nameFr),
-      startTime,
-      timeLimitSeconds,
+      targetPokemonId: target.id,
+      targetNameFr: target.nameFr,
+      targetNameEn: target.nameEn,
       status: 'PLAYING',
+      startTime: Date.now(),
+      currentScore: startCapital,
+      mistakesCount: 0,
+      hintsUsedCount: 0,
+      mode,
+      roundIndex,
+      totalRounds,
+      hints,
+      ...(userId ? { userId } : {}),
     };
 
     await this.redisService.set(
-      `${this.ROUND_PREFIX}${roundId}`,
-      JSON.stringify(serverSession),
-      timeLimitSeconds + 120,
+      `${this.REDIS_PREFIX}${roundId}`,
+      JSON.stringify(session),
+      this.ROUND_TTL_SECONDS,
     );
 
     return {
@@ -209,52 +178,75 @@ export class WhoIsItService {
       sessionHash,
       spriteProxyUrl: `/api/sprites/${sessionHash}`,
       status: 'PLAYING',
-      startTime,
-      timeLimitSeconds,
-      hints: [],
+      startTime: session.startTime,
+      currentScore: session.currentScore,
+      mistakesCount: session.mistakesCount,
+      mode: session.mode,
+      roundIndex: session.roundIndex,
+      totalRounds: session.totalRounds,
+      hints: session.hints,
+    };
+  }
+
+  async getRoundState(roundId: string): Promise<WhoIsItRoundState> {
+    const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
+    if (!raw) {
+      throw new NotFoundException('Manche introuvable ou expirée');
+    }
+    const session = JSON.parse(raw) as InternalRoundSession;
+    return {
+      roundId: session.roundId,
+      sessionHash: session.sessionHash,
+      spriteProxyUrl: `/api/sprites/${session.sessionHash}`,
+      status: session.status,
+      startTime: session.startTime,
+      currentScore: session.currentScore,
+      mistakesCount: session.mistakesCount,
+      mode: session.mode,
+      roundIndex: session.roundIndex,
+      totalRounds: session.totalRounds,
+      hints: session.hints,
     };
   }
 
   /**
-   * Récupère l'état actuel d'un round et ses indices débloqués sans révéler le secret.
+   * Permet à un joueur d'acheter et de débloquer un indice s'il a atteint le palier d'erreur requis.
    */
-  async getRoundState(roundId: string): Promise<WhoIsItRoundState> {
-    const raw = await this.redisService.get(`${this.ROUND_PREFIX}${roundId}`);
+  async requestHint(roundId: string, hintType: WhoIsItHintType): Promise<WhoIsItRoundState> {
+    const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
     if (!raw) {
       throw new NotFoundException('Manche introuvable ou expirée');
     }
 
-    let session: WhoIsItServerSession;
-    try {
-      session = JSON.parse(raw) as WhoIsItServerSession;
-    } catch {
-      throw new NotFoundException('Session corrompue');
+    const session = JSON.parse(raw) as InternalRoundSession;
+    if (session.status !== 'PLAYING') {
+      throw new BadRequestException('Cette manche est déjà terminée');
     }
 
-    const elapsedSeconds = Math.floor((Date.now() - session.startTime) / 1000);
-
-    // Vérification du timeout automatique
-    if (session.status === 'PLAYING' && elapsedSeconds >= session.timeLimitSeconds) {
-      session.status = 'TIMEOUT';
-      await this.redisService.set(`${this.ROUND_PREFIX}${roundId}`, JSON.stringify(session), 60);
-      await this.spriteProxyService.revealSpriteSession(session.sessionHash);
-      const hints = this.calculateAvailableHints(session, elapsedSeconds);
-      this.eventEmitter.emit(
-        'game.round.completed',
-        new GameRoundCompletedEvent(
-          session.roundId,
-          'WHO_IS_IT',
-          session.pokemonId,
-          session.nameFr,
-          false,
-          elapsedSeconds,
-          hints.length,
-          0,
-        ),
-      );
+    const hint = session.hints.find((h) => h.type === hintType);
+    if (!hint) {
+      throw new NotFoundException('Indice introuvable');
     }
 
-    const hints = this.calculateAvailableHints(session, elapsedSeconds);
+    if (hint.isRevealed) {
+      throw new BadRequestException('Cet indice est déjà révélé');
+    }
+
+    if (session.mistakesCount < hint.unlockedAtMistakeCount) {
+      throw new BadRequestException(`Il faut ${hint.unlockedAtMistakeCount} erreurs pour débloquer cet indice`);
+    }
+
+    // Achat de l'indice : déduction du coût
+    hint.isRevealed = true;
+    session.currentScore = Math.max(0, session.currentScore - hint.cost);
+    session.hintsUsedCount++;
+
+    // L'indice de couleur passe par le proxy : la version floutée colorée devient servie, jamais le sprite net
+    if (hint.type === 'BLURRED_COLOR') {
+      await this.spriteProxy.revealColorSpriteSession(session.sessionHash);
+    }
+
+    await this.redisService.set(`${this.REDIS_PREFIX}${roundId}`, JSON.stringify(session), this.ROUND_TTL_SECONDS);
 
     return {
       roundId: session.roundId,
@@ -262,132 +254,165 @@ export class WhoIsItService {
       spriteProxyUrl: `/api/sprites/${session.sessionHash}`,
       status: session.status,
       startTime: session.startTime,
-      timeLimitSeconds: session.timeLimitSeconds,
-      hints,
+      currentScore: session.currentScore,
+      mistakesCount: session.mistakesCount,
+      mode: session.mode,
+      roundIndex: session.roundIndex,
+      totalRounds: session.totalRounds,
+      hints: session.hints,
     };
   }
 
   /**
-   * Soumet une tentative du joueur et vérifie la victoire côté serveur.
+   * Soumet une tentative (tentatives illimitées jusqu'à trouver).
    */
   async submitGuess(roundId: string, guess: string, userId?: string): Promise<WhoIsItGuessResponse> {
-    if (!guess || typeof guess !== 'string') {
-      throw new BadRequestException('Tentative invalide');
-    }
-
-    const raw = await this.redisService.get(`${this.ROUND_PREFIX}${roundId}`);
+    const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
     if (!raw) {
       throw new NotFoundException('Manche introuvable ou expirée');
     }
 
-    let session: WhoIsItServerSession;
-    try {
-      session = JSON.parse(raw) as WhoIsItServerSession;
-    } catch {
-      throw new NotFoundException('Session corrompue');
+    const session = JSON.parse(raw) as InternalRoundSession;
+    if (session.status !== 'PLAYING') {
+      throw new BadRequestException('Cette manche est déjà terminée');
     }
 
-    const elapsedSeconds = Math.floor((Date.now() - session.startTime) / 1000);
-
-    // Si le temps est dépassé ou la manche déjà terminée
-    if (session.status !== 'PLAYING' || elapsedSeconds > session.timeLimitSeconds) {
-      session.status = 'TIMEOUT';
-      await this.redisService.set(`${this.ROUND_PREFIX}${roundId}`, JSON.stringify(session), 60);
-      await this.spriteProxyService.revealSpriteSession(session.sessionHash);
-      const revealedPokemon = await this.getFullPokemonDTO(session.pokemonId);
-      const hints = this.calculateAvailableHints(session, elapsedSeconds);
-      this.eventEmitter.emit(
-        'game.round.completed',
-        new GameRoundCompletedEvent(
-          session.roundId,
-          'WHO_IS_IT',
-          session.pokemonId,
-          session.nameFr,
-          false,
-          elapsedSeconds,
-          hints.length,
-          0,
-          guess,
-          userId,
-        ),
-      );
-
-      return {
-        success: false,
-        isCorrect: false,
-        status: 'TIMEOUT',
-        message: `Temps écoulé ! C'était ${session.nameFr}.`,
-        scoreEarned: 0,
-        revealedPokemon,
-        unmaskedSpriteUrl: `/api/sprites/${session.sessionHash}`,
-      };
+    if (userId && !session.userId) {
+      session.userId = userId;
     }
 
-    const normalizedGuess = this.normalizeString(guess);
-    const normalizedTarget = this.normalizeString(session.nameFr);
+    const normalizedGuess = this.normalizeName(guess);
+    const normalizedTargetFr = this.normalizeName(session.targetNameFr);
+    const normalizedTargetEn = this.normalizeName(session.targetNameEn);
 
-    if (normalizedGuess === normalizedTarget) {
-      // VICTOIRE !
-      session.status = 'SOLVED';
-      await this.redisService.set(`${this.ROUND_PREFIX}${roundId}`, JSON.stringify(session), 300);
-      await this.spriteProxyService.revealSpriteSession(session.sessionHash);
+    const isCorrect = normalizedGuess === normalizedTargetFr || normalizedGuess === normalizedTargetEn;
 
-      // Calcul du score e-sport (1000 points de base - 20 pts par seconde écoulée, min 100)
-      const timePenalty = elapsedSeconds * 25;
-      const scoreEarned = Math.max(100, 1000 - timePenalty);
+    if (!isCorrect) {
+      session.mistakesCount++;
+      session.currentScore = Math.max(0, session.currentScore - 15);
+      await this.redisService.set(`${this.REDIS_PREFIX}${roundId}`, JSON.stringify(session), this.ROUND_TTL_SECONDS);
 
-      // Enregistrer dans l'historique si un joueur est authentifié
-      if (userId) {
-        await this.prisma.gameHistory.create({
-          data: {
-            userId,
-            gameType: 'WHO_IS_IT',
-            score: scoreEarned,
-            isMulti: false,
-          },
-        }).catch(() => {
-          // Gérer gracieusement si le userId est externe/inconnu au test
-        });
-      }
-
-      const revealedPokemon = await this.getFullPokemonDTO(session.pokemonId);
-      const hints = this.calculateAvailableHints(session, elapsedSeconds);
-      this.eventEmitter.emit(
-        'game.round.completed',
-        new GameRoundCompletedEvent(
-          session.roundId,
-          'WHO_IS_IT',
-          session.pokemonId,
-          session.nameFr,
-          true,
-          elapsedSeconds,
-          hints.length,
-          scoreEarned,
-          guess,
-          userId,
-        ),
-      );
-
-      return {
-        success: true,
-        isCorrect: true,
-        status: 'SOLVED',
-        message: `Bravo ! C'était bien ${session.nameFr} ! (+${scoreEarned} pts)`,
-        scoreEarned,
-        revealedPokemon,
-        unmaskedSpriteUrl: `/api/sprites/${session.sessionHash}`,
-      };
-    } else {
-      // Tentative incorrecte
       return {
         success: true,
         isCorrect: false,
         status: 'PLAYING',
-        message: 'Non, ce n’est pas ce Pokémon ! Réessayez.',
-        scoreEarned: 0,
+        message: 'Ce n’est pas le bon Pokémon ! (-15 points)',
+        currentScore: session.currentScore,
+        mistakesCount: session.mistakesCount,
+        hints: session.hints,
         revealedPokemon: null,
         unmaskedSpriteUrl: null,
       };
     }
+
+    // Victoire !
+    session.status = 'SOLVED';
+    await this.spriteProxy.revealSpriteSession(session.sessionHash);
+    await this.redisService.set(`${this.REDIS_PREFIX}${roundId}`, JSON.stringify(session), this.ROUND_TTL_SECONDS);
+
+    const fullPokemon = await this.getFullPokemonDTO(session.targetPokemonId);
+    const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+
+    const effectiveUserId = session.userId ?? userId;
+    if (effectiveUserId) {
+      try {
+        await this.prisma.gameHistory.create({
+          data: {
+            userId: effectiveUserId,
+            gameType: 'WHO_IS_IT',
+            score: session.currentScore,
+            isMulti: false,
+          },
+        });
+      } catch {
+        // Ignorer si le user n'existe pas ou erreur FK
+      }
+    }
+
+    const auditEvent = new GameRoundCompletedEvent(
+      session.roundId,
+      'WHO_IS_IT',
+      session.targetPokemonId,
+      session.targetNameFr,
+      true,
+      durationSeconds,
+      session.hintsUsedCount,
+      session.currentScore,
+      guess,
+      effectiveUserId,
+      false,
+    );
+    this.eventEmitter.emit('game.round.completed', auditEvent);
+
+    return {
+      success: true,
+      isCorrect: true,
+      status: 'SOLVED',
+      message: `Bonne réponse ! Vous gagnez ${session.currentScore} points !`,
+      currentScore: session.currentScore,
+      mistakesCount: session.mistakesCount,
+      hints: session.hints,
+      revealedPokemon: fullPokemon,
+      unmaskedSpriteUrl: `/api/sprites/${session.sessionHash}`,
+    };
+  }
+
+  private normalizeName(str: string): string {
+    return str
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  private async getFullPokemonDTO(pokemonId: number): Promise<PokemonDTO | null> {
+    const dbPok = await this.prisma.pokemon.findUnique({
+      where: { id: pokemonId },
+      include: {
+        types: { include: { type: true }, orderBy: { slot: 'asc' } },
+        evolutions: { include: { target: true } },
+        evolvedFrom: { include: { pokemon: true } },
+      },
+    });
+
+    if (!dbPok) return null;
+
+    return {
+      id: dbPok.id,
+      pokedexId: dbPok.pokedexId,
+      nameFr: dbPok.nameFr,
+      nameEn: dbPok.nameEn,
+      category: dbPok.category,
+      generation: dbPok.generation,
+      spriteRegular: dbPok.spriteRegular,
+      spriteShiny: dbPok.spriteShiny,
+      stats: {
+        hp: dbPok.statsHp,
+        atk: dbPok.statsAtk,
+        def: dbPok.statsDef,
+        speAtk: dbPok.statsSpeAtk,
+        speDef: dbPok.statsSpeDef,
+        speed: dbPok.statsSpeed,
+      },
+      weight: dbPok.weight,
+      height: dbPok.height,
+      types: dbPok.types.map((pt) => ({
+        id: pt.type.id,
+        nameFr: pt.type.nameFr,
+        nameEn: pt.type.nameEn,
+        image: pt.type.image,
+      })),
+      evolutions: dbPok.evolutions.map((ev) => ({
+        pokedexId: ev.target.pokedexId,
+        nameFr: ev.target.nameFr,
+        condition: ev.condition,
+      })),
+      evolvedFrom: dbPok.evolvedFrom.map((ev) => ({
+        pokedexId: ev.pokemon.pokedexId,
+        nameFr: ev.pokemon.nameFr,
+        condition: ev.condition,
+      })),
+    };
   }
 }

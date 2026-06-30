@@ -66,19 +66,20 @@ export class TyradexEtlService {
 
     let count = 0;
 
+    // Passe 1 : Création / Maj des Pokémon et de leurs types
     for (const raw of rawPokemons) {
       if (raw.pokedex_id === 0 || !raw.name?.fr || !raw.sprites?.regular) {
         continue;
       }
 
+      // Correction parsing décimal (ex: "0,7 m" -> "0.7" -> 0.7)
       const parsedHeight = raw.height
-        ? parseFloat(raw.height.replace(/[^0-9.]/g, ''))
+        ? parseFloat(raw.height.replace(/,/g, '.').replace(/[^0-9.]/g, ''))
         : null;
       const parsedWeight = raw.weight
-        ? parseFloat(raw.weight.replace(/[^0-9.]/g, ''))
+        ? parseFloat(raw.weight.replace(/,/g, '.').replace(/[^0-9.]/g, ''))
         : null;
 
-      // Upsert du Pokémon
       const pokemon = await this.prisma.pokemon.upsert({
         where: { pokedexId: raw.pokedex_id },
         update: {
@@ -117,15 +118,18 @@ export class TyradexEtlService {
         },
       });
 
-      // Gestion des Types
+      // Gestion des Types avec Slot (1 pour Type primaire, 2 pour Type secondaire)
       if (raw.types && Array.isArray(raw.types)) {
-        for (const typeInfo of raw.types) {
+        for (let idx = 0; idx < raw.types.length; idx++) {
+          const typeInfo = raw.types[idx];
+          if (!typeInfo) continue;
+
           const dbType = await this.prisma.type.upsert({
             where: { nameFr: typeInfo.name },
             update: { image: typeInfo.image },
             create: {
               nameFr: typeInfo.name,
-              nameEn: typeInfo.name, // Tyradex FR fournit le nom FR
+              nameEn: typeInfo.name,
               image: typeInfo.image,
             },
           });
@@ -137,16 +141,43 @@ export class TyradexEtlService {
                 typeId: dbType.id,
               },
             },
-            update: {},
+            update: { slot: idx + 1 },
             create: {
               pokemonId: pokemon.id,
               typeId: dbType.id,
+              slot: idx + 1,
             },
           });
         }
       }
 
       count++;
+    }
+
+    // Passe 2 : Synchronisation des Évolutions
+    for (const raw of rawPokemons) {
+      if (raw.pokedex_id === 0 || !raw.evolution?.next || !Array.isArray(raw.evolution.next)) {
+        continue;
+      }
+
+      for (const ev of raw.evolution.next) {
+        if (ev.pokedex_id === 0) continue;
+        const targetExists = await this.prisma.pokemon.findUnique({ where: { id: ev.pokedex_id } });
+        if (targetExists) {
+          const existingEv = await this.prisma.evolution.findFirst({
+            where: { pokemonId: raw.pokedex_id, targetId: ev.pokedex_id },
+          });
+          if (!existingEv) {
+            await this.prisma.evolution.create({
+              data: {
+                pokemonId: raw.pokedex_id,
+                targetId: ev.pokedex_id,
+                condition: ev.condition ?? null,
+              },
+            });
+          }
+        }
+      }
     }
 
     this.logger.log(`Synchronisation ETL terminée : ${count} Pokémon importés.`);

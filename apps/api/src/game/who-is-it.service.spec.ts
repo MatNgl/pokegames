@@ -36,6 +36,7 @@ describe('WhoIsItService', () => {
       {
         pokemonId: 25,
         typeId: 1,
+        slot: 1,
         type: { id: 1, nameFr: 'Électrik', nameEn: 'Electric', image: 'https://example.com/elec.png' },
       },
     ],
@@ -72,6 +73,7 @@ describe('WhoIsItService', () => {
     const mockSpriteProxyService: Partial<SpriteProxyService> = {
       registerSpriteSession: mockRegisterSpriteSession,
       revealSpriteSession: mockRevealSpriteSession,
+      revealColorSpriteSession: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -92,38 +94,42 @@ describe('WhoIsItService', () => {
   });
 
   describe('startRound', () => {
-    it('doit démarrer un round sans divulguer le nom ou l’ID du Pokémon', async () => {
-      const state = await service.startRound({ timeLimitSeconds: 30 });
+    it('doit démarrer un round avec un capital de 100 points et des indices masqués', async () => {
+      const state = await service.startRound({ generations: [1], mode: 'CLASSIC' });
 
       expect(state.roundId).toBeDefined();
       expect(state.sessionHash).toBeDefined();
       expect(state.status).toBe('PLAYING');
-      expect(state.spriteProxyUrl).toContain('/api/sprites/');
-      expect(state.hints).toHaveLength(0);
+      expect(state.currentScore).toBe(100);
+      expect(state.hints).toHaveLength(5);
+      expect(state.hints.every((h) => !h.isRevealed)).toBe(true);
 
       expect(mockRegisterSpriteSession).toHaveBeenCalledWith(
         state.sessionHash,
         25,
         mockPokemon.spriteRegular,
-        90,
+        3600,
       );
     });
   });
 
   describe('submitGuess', () => {
-    it('doit valider une bonne réponse même avec des accents ou majuscules (ex: pÍkâchú)', async () => {
-      const startTime = Date.now() - 2000; // 2 secondes écoulées
+    it('doit valider une bonne réponse et émettre l’événement d’audit avec le score actuel', async () => {
       const mockSession = {
         roundId: 'test-round-id',
         sessionHash: 'test-session-hash',
-        pokemonId: 25,
-        pokedexId: 25,
-        nameFr: 'Pikachu',
-        generation: 1,
-        types: ['Électrik'],
-        startTime,
-        timeLimitSeconds: 30,
+        targetPokemonId: 25,
+        targetNameFr: 'Pikachu',
+        targetNameEn: 'Pikachu',
         status: 'PLAYING',
+        startTime: Date.now() - 2000,
+        currentScore: 100,
+        mistakesCount: 0,
+        hintsUsedCount: 0,
+        mode: 'CLASSIC',
+        roundIndex: 1,
+        totalRounds: 5,
+        hints: [],
       };
 
       mockRedisGet.mockResolvedValue(JSON.stringify(mockSession));
@@ -133,23 +139,27 @@ describe('WhoIsItService', () => {
       expect(res.success).toBe(true);
       expect(res.isCorrect).toBe(true);
       expect(res.status).toBe('SOLVED');
-      expect(res.scoreEarned).toBeGreaterThan(0);
+      expect(res.currentScore).toBe(100);
       expect(mockRevealSpriteSession).toHaveBeenCalledWith('test-session-hash');
       expect(mockEmit).toHaveBeenCalledWith('game.round.completed', expect.anything());
     });
 
-    it('doit refuser une réponse incorrecte et garder le statut PLAYING', async () => {
+    it('doit pénaliser une mauvaise réponse (-15 points) sans clore la manche', async () => {
       const mockSession = {
         roundId: 'test-round-id',
         sessionHash: 'test-session-hash',
-        pokemonId: 25,
-        pokedexId: 25,
-        nameFr: 'Pikachu',
-        generation: 1,
-        types: ['Électrik'],
-        startTime: Date.now(),
-        timeLimitSeconds: 30,
+        targetPokemonId: 25,
+        targetNameFr: 'Pikachu',
+        targetNameEn: 'Pikachu',
         status: 'PLAYING',
+        startTime: Date.now(),
+        currentScore: 100,
+        mistakesCount: 0,
+        hintsUsedCount: 0,
+        mode: 'CLASSIC',
+        roundIndex: 1,
+        totalRounds: 5,
+        hints: [],
       };
 
       mockRedisGet.mockResolvedValue(JSON.stringify(mockSession));
@@ -158,7 +168,46 @@ describe('WhoIsItService', () => {
 
       expect(res.isCorrect).toBe(false);
       expect(res.status).toBe('PLAYING');
+      expect(res.currentScore).toBe(85);
+      expect(res.mistakesCount).toBe(1);
       expect(res.revealedPokemon).toBeNull();
+    });
+  });
+
+  describe('requestHint', () => {
+    it('doit débloquer l’indice si le palier d’erreur est atteint et réduire le score (-10 points)', async () => {
+      const mockSession = {
+        roundId: 'test-round-id',
+        sessionHash: 'test-session-hash',
+        targetPokemonId: 25,
+        targetNameFr: 'Pikachu',
+        targetNameEn: 'Pikachu',
+        status: 'PLAYING',
+        startTime: Date.now(),
+        currentScore: 85,
+        mistakesCount: 1,
+        hintsUsedCount: 0,
+        mode: 'CLASSIC',
+        roundIndex: 1,
+        totalRounds: 5,
+        hints: [
+          {
+            type: 'FIRST_LETTER',
+            label: 'Première lettre',
+            value: 'P...',
+            cost: 10,
+            unlockedAtMistakeCount: 1,
+            isRevealed: false,
+          },
+        ],
+      };
+
+      mockRedisGet.mockResolvedValue(JSON.stringify(mockSession));
+
+      const state = await service.requestHint('test-round-id', 'FIRST_LETTER');
+
+      expect(state.currentScore).toBe(75);
+      expect(state.hints[0]?.isRevealed).toBe(true);
     });
   });
 });

@@ -1,7 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import axios from 'axios';
 import { SpriteProxyService } from './sprite-proxy.service';
 import { RedisService } from '../redis/redis.service';
+
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+jest.mock('sharp', () => {
+  const makeChain = (state: { blurred: boolean }) => ({
+    ensureAlpha: () => makeChain(state),
+    modulate: () => makeChain(state),
+    blur: () => makeChain({ blurred: true }),
+    png: () => makeChain(state),
+    toBuffer: async (): Promise<Buffer> => Buffer.from(state.blurred ? 'blurred-buffer' : 'silhouetted-buffer'),
+  });
+  return () => makeChain({ blurred: false });
+});
 
 describe('SpriteProxyService', () => {
   let service: SpriteProxyService;
@@ -36,6 +51,7 @@ describe('SpriteProxyService', () => {
         pokemonId: 25,
         spriteUrl: 'https://example.com/25.png',
         isRevealed: false,
+        colorRevealed: false,
       }),
       300,
     );
@@ -61,6 +77,63 @@ describe('SpriteProxyService', () => {
       }),
       600,
     );
+  });
+
+  it('doit transformer le buffer en silhouette noire (sharp) si isRevealed est false', async () => {
+    mockGet.mockResolvedValue(
+      JSON.stringify({
+        pokemonId: 25,
+        spriteUrl: 'https://example.com/25.png',
+        isRevealed: false,
+      }),
+    );
+
+    mockedAxios.get.mockResolvedValue({
+      data: Buffer.from('original-colored-buffer'),
+      headers: { 'content-type': 'image/png' },
+    });
+
+    const result = await service.getSpriteBuffer('hash-123');
+    expect(result.buffer.toString()).toBe('silhouetted-buffer');
+    expect(result.contentType).toBe('image/png');
+  });
+
+  it('doit renvoyer une version floutée colorée si colorRevealed est true et isRevealed false', async () => {
+    mockGet.mockResolvedValue(
+      JSON.stringify({
+        pokemonId: 25,
+        spriteUrl: 'https://example.com/25.png',
+        isRevealed: false,
+        colorRevealed: true,
+      }),
+    );
+
+    mockedAxios.get.mockResolvedValue({
+      data: Buffer.from('original-colored-buffer'),
+      headers: { 'content-type': 'image/png' },
+    });
+
+    const result = await service.getSpriteBuffer('hash-123');
+    expect(result.buffer.toString()).toBe('blurred-buffer');
+    expect(result.contentType).toBe('image/png');
+  });
+
+  it('doit renvoyer le buffer couleur original si isRevealed est true', async () => {
+    mockGet.mockResolvedValue(
+      JSON.stringify({
+        pokemonId: 25,
+        spriteUrl: 'https://example.com/25.png',
+        isRevealed: true,
+      }),
+    );
+
+    mockedAxios.get.mockResolvedValue({
+      data: Buffer.from('original-colored-buffer'),
+      headers: { 'content-type': 'image/png' },
+    });
+
+    const result = await service.getSpriteBuffer('hash-123');
+    expect(result.buffer.toString()).toBe('original-colored-buffer');
   });
 
   it('doit rejeter getSpriteBuffer si la session n’existe pas en cache', async () => {

@@ -111,7 +111,7 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * **Concept :** le joueur fait face à la silhouette masquée d'un Pokémon et doit deviner son nom français.
 * **Réponse :** saisie libre avec autocomplétion proposant des noms valides. La validation est faite côté serveur, jamais par comparaison côté client. Le nom saisi est normalisé avant comparaison au nom français canonique (minuscules, accents neutralisés, tirets et espaces normalisés ; cas particuliers comme les symboles de genre gérés).
 * **Tentatives :** illimitées par défaut. Il n'y a pas d'échec : la manche se termine quand le joueur trouve. Un plafond de tentatives optionnel peut être imposé en admin (au-delà, la manche se clôt et la réponse est révélée).
-* **Indices (échelle fixe) :** chaque mauvaise réponse ouvre le palier d'indice suivant. Au palier courant, le joueur choisit de révéler l'indice (ce qui coûte des points) ou de continuer à deviner sans le révéler. L'ordre des indices est fixe et réglable en admin. Ordre par défaut : premier niveau de couleur, Type 1, Type 2, Génération, second niveau de couleur, puis première lettre.
+* **Indices (échelle fixe) :** chaque mauvaise réponse ouvre le palier d'indice suivant. Au palier courant, le joueur choisit de révéler l'indice (ce qui coûte des points) ou de continuer à deviner sans le révéler. L'ordre des indices est fixe et réglable en admin. Ordre par défaut : couleur floutée, Type 1, Type 2, Génération, puis première lettre (l'indice le plus fort en dernier).
 * **Révélation de couleur (anti-triche) :** les niveaux de couleur ne dévoilent jamais le vrai sprite côté client. Le serveur génère des variantes intermédiaires masquées (silhouette, puis versions floutées colorées non identifiables), servies par le proxy `/api/sprites/:sessionHash`. Le sprite net n'est servi qu'après résolution de la manche.
 * **Score :** chaque manche part d'un capital de points. On retire une pénalité par mauvaise réponse et une pénalité par indice révélé. Pas de bonus de temps, pas de combo de série. Le score de manche a un plancher à 0, le score de partie est la somme des manches. Barème (capital et pénalités) réglable en admin. Valeurs par défaut : capital 100 par manche, pénalité 15 par mauvaise réponse, pénalité 10 par indice révélé, 5 manches en partie classique, série quotidienne de 10, plafond de tentatives illimité.
 * **Modes :**
@@ -172,6 +172,13 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 2. **Nouveau Code :** Toujours vérifier `npm run typecheck` dans l'ensemble du monorepo avant d'achever une tâche. Zéro erreur tolérée.
 3. **Sécurité :** Lors de l'ajout d'une API de jeu, se poser systématiquement la question : *"Un joueur avec l'onglet Réseau (F12) ouvert peut-il lire la réponse ou deviner l'issue ?"*. Si oui, appliquer le Data Masking.
 4. **Tests Backend Obligatoires :** Pour chaque service ou fonctionnalité du backend (`*.service.ts`, contrôleur critique), créer et maintenir un fichier de test unitaire (`*.spec.ts`) exécutable via Jest pour valider rigoureusement le comportement et l'intégrité anti-triche.
+5. **Interdiction de pousser du code en erreur (règle non négociable) :** aucun `git push` ne doit partir si une seule de ces étapes échoue : typecheck (`tsc --noEmit`), lint (ESLint, zéro erreur), tests (Jest, tous au vert), et présence d'un fichier de test par service. Ne jamais contourner le hook (`--no-verify`) sans accord explicite du porteur du projet.
+6. **Tests présents et exécutés :** chaque service doit avoir son fichier de test écrit ET passant. Le script `npm run check:specs` vérifie la présence d'un `*.service.spec.ts` par service (les wrappers d'infrastructure Prisma et Redis sont exclus). Un service sans test, ou un test qui échoue, bloque le push.
+
+### Garde-fou automatisé (Husky)
+* Un hook **pre-push** (Husky, dans `.husky/pre-push`) exécute `npm run verify` à chaque `git push`.
+* `npm run verify` enchaîne, dans l'ordre : `typecheck` puis `lint` puis `test` puis `check:specs`. Le push n'a lieu que si tout passe.
+* Les scripts racine associés : `lint` (ESLint flat config, `no-explicit-any` en erreur conforme à la Règle 1), `test` (Jest sur les workspaces), `check:specs` (présence des fichiers de test).
 
 ---
 

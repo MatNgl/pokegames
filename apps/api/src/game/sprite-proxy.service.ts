@@ -1,48 +1,75 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import axios from 'axios';
+import sharp from 'sharp';
 import { RedisService } from '../redis/redis.service';
 
 export interface SpriteSessionData {
   pokemonId: number;
   spriteUrl: string;
   isRevealed: boolean;
+  colorRevealed: boolean;
 }
 
 @Injectable()
 export class SpriteProxyService {
   private readonly REDIS_PREFIX = 'sprite_session:';
+  private readonly DEFAULT_TTL_SECONDS = 600;
 
   constructor(private readonly redisService: RedisService) {}
 
   /**
    * Enregistre un mapping temporaire entre un hash unique et le sprite d'un Pokémon.
    */
-  async registerSpriteSession(sessionHash: string, pokemonId: number, spriteUrl: string, ttlSeconds = 600): Promise<void> {
+  async registerSpriteSession(
+    sessionHash: string,
+    pokemonId: number,
+    spriteUrl: string,
+    ttlSeconds = this.DEFAULT_TTL_SECONDS,
+  ): Promise<void> {
     const data: SpriteSessionData = {
       pokemonId,
       spriteUrl,
       isRevealed: false,
+      colorRevealed: false,
     };
     await this.redisService.set(`${this.REDIS_PREFIX}${sessionHash}`, JSON.stringify(data), ttlSeconds);
   }
 
-  /**
-   * Marque le sprite de la session comme révélé (fin de round ou victoire).
-   */
-  async revealSpriteSession(sessionHash: string): Promise<void> {
+  private async patchSession(sessionHash: string, patch: Partial<SpriteSessionData>): Promise<void> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${sessionHash}`);
     if (!raw) return;
     try {
       const data = JSON.parse(raw) as SpriteSessionData;
-      data.isRevealed = true;
-      await this.redisService.set(`${this.REDIS_PREFIX}${sessionHash}`, JSON.stringify(data), 600);
+      const updated: SpriteSessionData = { ...data, ...patch };
+      await this.redisService.set(
+        `${this.REDIS_PREFIX}${sessionHash}`,
+        JSON.stringify(updated),
+        this.DEFAULT_TTL_SECONDS,
+      );
     } catch {
-      // Ignorer erreur de parsing
+      // Ignorer une session corrompue
     }
   }
 
   /**
-   * Récupère le buffer de l'image via le sessionHash, en masquant toute métadonnée.
+   * Marque le sprite de la session comme révélé (fin de round ou victoire) : le proxy sert alors le sprite couleur net.
+   */
+  async revealSpriteSession(sessionHash: string): Promise<void> {
+    await this.patchSession(sessionHash, { isRevealed: true });
+  }
+
+  /**
+   * Débloque le niveau de couleur flouté : le proxy sert une version colorée mais fortement floutée,
+   * non identifiable, sans jamais exposer le sprite net (anti-triche, Règle 2).
+   */
+  async revealColorSpriteSession(sessionHash: string): Promise<void> {
+    await this.patchSession(sessionHash, { colorRevealed: true });
+  }
+
+  /**
+   * Récupère le buffer de l'image via le sessionHash, masqué selon l'état de la manche.
+   * ANTI-TRICHE (Règle 2) : tant que la manche n'est pas résolue, le sprite net n'est jamais renvoyé.
+   * Trois états : silhouette noire, couleur floutée (indice), puis sprite net (résolution).
    */
   async getSpriteBuffer(sessionHash: string): Promise<{ buffer: Buffer; contentType: string }> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${sessionHash}`);
@@ -57,14 +84,22 @@ export class SpriteProxyService {
       throw new NotFoundException('Données de session de sprite corrompues');
     }
 
-    // Récupérer l'image source
-    const response = await axios.get<ArrayBuffer>(data.spriteUrl, {
-      responseType: 'arraybuffer',
-    });
+    const response = await axios.get<ArrayBuffer>(data.spriteUrl, { responseType: 'arraybuffer' });
+    let buffer: Buffer = Buffer.from(response.data);
 
-    const buffer = Buffer.from(response.data);
-    const contentType = String(response.headers['content-type'] ?? 'image/png');
+    if (data.isRevealed) {
+      const contentType = String(response.headers['content-type'] ?? 'image/png');
+      return { buffer, contentType };
+    }
 
-    return { buffer, contentType };
+    if (data.colorRevealed) {
+      // Couleur conservée mais flou prononcé : la palette transparait, l'identité reste cachée
+      buffer = await sharp(buffer).ensureAlpha().blur(14).png().toBuffer();
+      return { buffer, contentType: 'image/png' };
+    }
+
+    // Silhouette noire absolue : impossible d'extraire l'image couleur via F12
+    buffer = await sharp(buffer).ensureAlpha().modulate({ brightness: 0 }).png().toBuffer();
+    return { buffer, contentType: 'image/png' };
   }
 }

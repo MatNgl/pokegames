@@ -58,56 +58,60 @@ export type GameStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
  * JEU 1 : QUEL EST CE POKÉMON ? (WHO'S THAT POKÉMON)
  * ========================================================================== */
 
+export type WhoIsItMode = 'CLASSIC' | 'DAILY';
+
 export interface WhoIsItConfig {
-  generations: number[]; // ex: [1, 2, 3] pour filtrer les générations
-  timeLimitSeconds: number; // ex: 30
+  generations: number[];
+  mode?: WhoIsItMode;
+  roundsCount?: number; // par défaut 5 en classique
+  startCapital?: number; // par défaut 100
+  wrongGuessPenalty?: number; // par défaut 15
+  hintCost?: number; // par défaut 10
 }
 
-/**
- * Indice progressif révélé au joueur au cours de la manche.
- */
+export type WhoIsItHintType = 'GENERATION' | 'TYPE_1' | 'TYPE_2' | 'FIRST_LETTER' | 'BLURRED_COLOR';
+
 export interface WhoIsItHint {
-  type: 'GENERATION' | 'TYPE_1' | 'TYPE_2' | 'FIRST_LETTER';
+  type: WhoIsItHintType;
   label: string;
   value: string | number;
-  revealedAtSecond: number; // seconde du timer où l'indice a été révélé
+  cost: number;
+  unlockedAtMistakeCount: number; // Palier d'erreur pour débloquer
+  isRevealed: boolean;
 }
 
-/**
- * Payload initial envoyé au client au démarrage du round.
- * ANTI-TRICHE : Aucune information permettant de deviner le Pokémon (ni nom, ni ID).
- * Le sprite est accessible UNIQUEMENT via `spriteProxyUrl`.
- */
 export interface WhoIsItRoundState {
-  roundId: string; // UUID unique pour cette manche
-  sessionHash: string; // Hash temporaire pour charger le sprite masqué (/api/sprites/:sessionHash)
-  spriteProxyUrl: string; // URL complète de proxy (ex: "/api/sprites/8f9d2a1c")
-  status: 'PLAYING' | 'SOLVED' | 'TIMEOUT';
-  startTime: number; // Timestamp du début du round
-  timeLimitSeconds: number;
-  hints: WhoIsItHint[]; // Indices déjà disponibles
+  roundId: string;
+  sessionHash: string;
+  spriteProxyUrl: string;
+  status: 'PLAYING' | 'SOLVED' | 'CANCELLED';
+  startTime: number;
+  currentScore: number;
+  mistakesCount: number;
+  mode: WhoIsItMode;
+  roundIndex: number;
+  totalRounds: number;
+  hints: WhoIsItHint[];
 }
 
-/**
- * Requête envoyée par le client pour soumettre sa tentative.
- */
 export interface WhoIsItGuessRequest {
   roundId: string;
-  guess: string; // Tentative saisie par l'utilisateur (ex: "Pikachu")
+  guess: string;
 }
 
-/**
- * Réponse du serveur après une tentative ou l'expiration du chrono.
- */
+export interface WhoIsItHintRequest {
+  roundId: string;
+  hintType: WhoIsItHintType;
+}
+
 export interface WhoIsItGuessResponse {
   success: boolean;
   isCorrect: boolean;
-  status: 'PLAYING' | 'SOLVED' | 'TIMEOUT';
+  status: 'PLAYING' | 'SOLVED' | 'CANCELLED';
   message?: string;
-  scoreEarned: number;
-  /**
-   * Une fois le round terminé (SOLVED ou TIMEOUT), le serveur révèle le Pokémon complet.
-   */
+  currentScore: number;
+  mistakesCount: number;
+  hints: WhoIsItHint[];
   revealedPokemon: PokemonDTO | null;
   unmaskedSpriteUrl: string | null;
 }

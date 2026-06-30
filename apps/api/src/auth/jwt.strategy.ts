@@ -9,13 +9,18 @@ interface JwtPayload {
   role: string;
 }
 
+const jwtSecret = process.env['JWT_SECRET'];
+if (process.env['NODE_ENV'] === 'production' && !jwtSecret) {
+  throw new Error('La variable d’environnement JWT_SECRET est strictement obligatoire en production');
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'pokegames-secret-key-change-in-prod',
+      secretOrKey: jwtSecret ?? 'pokegames-dev-secret-only',
     });
   }
 

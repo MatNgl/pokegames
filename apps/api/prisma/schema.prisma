@@ -45,6 +45,7 @@ model Type {
 model PokemonType {
   pokemonId Int
   typeId    Int
+  slot      Int     @default(1)
   pokemon   Pokemon @relation(fields: [pokemonId], references: [id], onDelete: Cascade)
   type      Type    @relation(fields: [typeId], references: [id], onDelete: Cascade)
 
