@@ -12,18 +12,32 @@ interface GuessAutocompleteProps {
   value: string;
   names: string[];
   disabled?: boolean;
+  excluded?: string[];
   onChange: (value: string) => void;
 }
 
-export function GuessAutocomplete({ value, names, disabled, onChange }: GuessAutocompleteProps) {
+export function GuessAutocomplete({
+  value,
+  names,
+  disabled,
+  excluded,
+  onChange,
+}: GuessAutocompleteProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const excludedSet = useMemo(() => new Set((excluded ?? []).map(normalize)), [excluded]);
 
   const suggestions = useMemo(() => {
     const query = normalize(value.trim());
     if (!query) return [];
-    return names.filter((name) => normalize(name).includes(query)).slice(0, 8);
-  }, [value, names]);
+    return names
+      .filter((name) => {
+        const normalized = normalize(name);
+        return normalized.includes(query) && !excludedSet.has(normalized);
+      })
+      .slice(0, 8);
+  }, [value, names, excludedSet]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

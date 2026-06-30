@@ -15,7 +15,12 @@ export function AppHeader() {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/60 px-4 backdrop-blur-md sm:px-6">
       <div className="flex items-center gap-6">
-        <Link to="/" className="flex items-center">
+        <Link
+          to="/"
+          className="flex cursor-pointer items-center transition-opacity duration-200 hover:opacity-80"
+          title="Retour à la sélection des jeux"
+          aria-label="Retour à la sélection des jeux"
+        >
           <Logo />
         </Link>
         <nav className="hidden items-center gap-1 sm:flex">

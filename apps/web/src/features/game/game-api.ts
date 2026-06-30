@@ -24,6 +24,11 @@ export async function submitGuess(roundId: string, guess: string): Promise<WhoIs
   return res.data;
 }
 
+export async function getRoundState(roundId: string): Promise<WhoIsItRoundState> {
+  const res = await api.get<WhoIsItRoundState>(`/games/who-is-it/round/${roundId}`);
+  return res.data;
+}
+
 export async function getPokemonNames(): Promise<string[]> {
   const res = await api.get<string[]>('/pokemon/names');
   return res.data;
