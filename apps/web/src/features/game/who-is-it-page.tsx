@@ -234,16 +234,16 @@ export function WhoIsItPage() {
             </Card>
           ) : (
             <Card className="flex w-full max-w-xl flex-col gap-5 p-6">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-lg font-extrabold text-foreground">Quel est ce Pokémon ?</h1>
-                  <p className="text-sm font-semibold text-muted">
-                    Défi du jour, manche {round.roundIndex} sur {round.totalRounds}
-                  </p>
+              <div className="flex items-start justify-between gap-4">
+                <h1 className="text-lg font-extrabold text-foreground">Quel est ce Pokémon ?</h1>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="font-display text-[11px] text-muted">
+                    {round.roundIndex}/{round.totalRounds}
+                  </span>
+                  <Badge className="border-primary bg-primary text-primary-foreground">
+                    {liveAttempts} essai{liveAttempts > 1 ? 's' : ''}
+                  </Badge>
                 </div>
-                <Badge className="border-primary bg-primary text-primary-foreground">
-                  {liveAttempts} essai{liveAttempts > 1 ? 's' : ''}
-                </Badge>
               </div>
 
               {solved && result ? (

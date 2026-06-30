@@ -1,6 +1,5 @@
-import { type ComponentType, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Shuffle, Users } from 'lucide-react';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
 import { Badge } from '@/components/ui/badge';
@@ -11,13 +10,14 @@ import { whoIsItDailyStatus, type WhoIsItDailyStatus } from '@/features/game/dai
 import whoIsItImg from '@/assets/games/who-is-it.png';
 import pokeMotusImg from '@/assets/games/poke-motus.png';
 import plusMinusImg from '@/assets/games/plus-minus.png';
+import intrusImg from '@/assets/games/intrus.png';
+import quiEstCeImg from '@/assets/games/quiestce.png';
 
 interface GameEntry {
   title: string;
   description: string;
   to?: string;
-  iconImg?: string;
-  icon?: ComponentType<{ className?: string }>;
+  iconImg: string;
   available: boolean;
   dailyGame?: boolean;
 }
@@ -38,8 +38,8 @@ const games: GameEntry[] = [
     iconImg: plusMinusImg,
     available: false,
   },
-  { title: "L'Intrus", description: 'Repère celui qui ne va pas', icon: Shuffle, available: false },
-  { title: 'Qui est-ce', description: 'Déduction en duel', icon: Users, available: false },
+  { title: "L'Intrus", description: 'Repère celui qui ne va pas', iconImg: intrusImg, available: false },
+  { title: 'Qui est-ce', description: 'Déduction en duel', iconImg: quiEstCeImg, available: false },
 ];
 
 function StatusBadge({ status }: { status: WhoIsItDailyStatus }) {
@@ -71,7 +71,6 @@ export function GamesPage() {
 
           <div className="mt-8 grid w-full gap-4 sm:grid-cols-2">
             {games.map((game) => {
-              const Icon = game.icon;
               const card = (
                 <Card
                   className={cn(
@@ -95,11 +94,7 @@ export function GamesPage() {
                         : 'border-2 border-border-strong bg-surface-2 text-muted',
                     )}
                   >
-                    {game.iconImg ? (
-                      <img src={game.iconImg} alt="" className="h-7 w-7 shrink-0 object-contain" />
-                    ) : (
-                      Icon && <Icon className="h-5 w-5 shrink-0" />
-                    )}
+                    <img src={game.iconImg} alt="" className="h-7 w-7 shrink-0 object-contain" />
                     <span className="text-sm font-bold">{game.description}</span>
                     {!game.available && (
                       <span className="ml-auto text-[10px] font-bold uppercase">Bientôt</span>

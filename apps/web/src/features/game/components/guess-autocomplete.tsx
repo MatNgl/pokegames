@@ -65,7 +65,7 @@ export function GuessAutocomplete({
         onFocus={() => setOpen(true)}
       />
       {showList && (
-        <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-control border border-border bg-surface py-1 shadow-lg">
+        <ul className="absolute bottom-full z-20 mb-1 max-h-56 w-full overflow-auto rounded-control border-2 border-border-strong bg-surface py-1 shadow-lg">
           {suggestions.map((name) => (
             <li key={name}>
               <button
