@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
+import { EtlModule } from './etl/etl.module';
+import { EventsModule } from './events/events.module';
+import { GameModule } from './game/game.module';
+import { AdminModule } from './admin/admin.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+
+@Module({
+  imports: [PrismaModule, RedisModule, EtlModule, EventsModule, GameModule, AdminModule, AuthModule, UsersModule],
+})
+export class AppModule {}

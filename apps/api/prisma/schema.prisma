@@ -1,0 +1,105 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Pokemon {
+  id             Int           @id // Pokedex ID
+  pokedexId      Int           @unique
+  nameFr         String
+  nameEn         String
+  category       String?
+  generation     Int
+  spriteRegular  String
+  spriteShiny    String?
+  statsHp        Int
+  statsAtk       Int
+  statsDef       Int
+  statsSpeAtk    Int
+  statsSpeDef    Int
+  statsSpeed     Int
+  weight         Float?
+  height         Float?
+  types          PokemonType[]
+  evolutions     Evolution[]   @relation("PokemonEvolutions")
+  evolvedFrom    Evolution[]   @relation("PokemonPreEvolutions")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([generation])
+  @@index([nameFr])
+}
+
+model Type {
+  id       Int           @id @default(autoincrement())
+  nameFr   String        @unique
+  nameEn   String        @unique
+  image    String
+  pokemons PokemonType[]
+}
+
+model PokemonType {
+  pokemonId Int
+  typeId    Int
+  pokemon   Pokemon @relation(fields: [pokemonId], references: [id], onDelete: Cascade)
+  type      Type    @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@id([pokemonId, typeId])
+}
+
+model Evolution {
+  id             Int     @id @default(autoincrement())
+  pokemonId      Int
+  targetId       Int
+  condition      String?
+  pokemon        Pokemon @relation("PokemonEvolutions", fields: [pokemonId], references: [id], onDelete: Cascade)
+  target         Pokemon @relation("PokemonPreEvolutions", fields: [targetId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  username     String        @unique
+  passwordHash String
+  role         String        @default("USER")
+  avatarUrl    String?
+  eloScore     Int           @default(1000)
+  createdAt    DateTime      @default(now())
+  gameHistory  GameHistory[]
+}
+
+model GameHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  gameType    String   // "WHO_IS_IT", "MOTUS", "PLUS_MINUS", "INTRUDER", "GUESS_WHO"
+  score       Int
+  isMulti     Boolean  @default(false)
+  playedAt    DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Journal d'audit détaillé pour les administrateurs et l'analyse anti-triche/statistiques,
+/// alimenté en arrière-plan par des événements de domaine (Event Emitter / Job Event).
+model GameAuditLog {
+  id               String   @id @default(uuid())
+  roundId          String   @unique
+  gameType         String   // "WHO_IS_IT", "MOTUS", "PLUS_MINUS", "INTRUDER", "GUESS_WHO"
+  userId           String?  // Optionnel : enregistre aussi les parties de joueurs non connectés/invités
+  targetPokemonId  Int
+  targetNameFr     String
+  userGuess        String?
+  isSuccess        Boolean
+  scoreEarned      Int      @default(0)
+  durationSeconds  Int
+  hintsUsedCount   Int      @default(0)
+  isMultiplayer    Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([gameType, isSuccess])
+  @@index([createdAt])
+}
+
