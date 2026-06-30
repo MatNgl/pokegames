@@ -16,7 +16,8 @@ type SpriteState = 'silhouette' | 'color1' | 'color2' | 'full';
 @Injectable()
 export class SpriteProxyService {
   private readonly REDIS_PREFIX = 'sprite_session:';
-  private readonly DEFAULT_TTL_SECONDS = 600;
+  // Aligne sur la duree de vie d'une manche (cf. WhoIsItService) pour que le sprite n'expire pas avant elle.
+  private readonly DEFAULT_TTL_SECONDS = 3600;
 
   // Caches en memoire : evite de re-telecharger le sprite externe et de relancer sharp a chaque requete.
   private readonly originalCache = new Map<string, Buffer>();
@@ -135,6 +136,9 @@ export class SpriteProxyService {
     } catch {
       throw new NotFoundException('Données de session de sprite corrompues');
     }
+
+    // Rafraichit le TTL tant que le joueur consulte l'image, pour ne pas expirer en pleine manche.
+    await this.redisService.set(`${this.REDIS_PREFIX}${sessionHash}`, raw, this.DEFAULT_TTL_SECONDS);
 
     const state = this.resolveState(data);
     const cacheKey = `${data.pokemonId}:${state}`;

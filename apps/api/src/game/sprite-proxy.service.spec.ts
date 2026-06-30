@@ -76,7 +76,7 @@ describe('SpriteProxyService', () => {
         spriteUrl: 'https://example.com/25.png',
         isRevealed: true,
       }),
-      600,
+      3600,
     );
   });
 
