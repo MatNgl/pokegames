@@ -6,9 +6,10 @@ interface RoundResultProps {
   result: WhoIsItGuessResponse;
   spriteUrl: string;
   onNext: () => void;
+  nextLabel?: string;
 }
 
-export function RoundResult({ result, spriteUrl, onNext }: RoundResultProps) {
+export function RoundResult({ result, spriteUrl, onNext, nextLabel = 'Manche suivante' }: RoundResultProps) {
   const pokemon = result.revealedPokemon;
 
   return (
@@ -25,7 +26,7 @@ export function RoundResult({ result, spriteUrl, onNext }: RoundResultProps) {
       )}
       <p className="text-3xl font-bold text-primary">{result.currentScore} pts</p>
       <Button onClick={onNext} className="w-full">
-        Manche suivante
+        {nextLabel}
       </Button>
     </Card>
   );

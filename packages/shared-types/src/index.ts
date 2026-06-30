@@ -64,6 +64,7 @@ export interface WhoIsItConfig {
   generations: number[];
   mode?: WhoIsItMode;
   roundsCount?: number; // par défaut 5 en classique
+  roundIndex?: number; // manche courante dans la partie (1 à roundsCount)
   startCapital?: number; // par défaut 100
   wrongGuessPenalty?: number; // par défaut 15
   hintCost?: number; // par défaut 10

@@ -29,7 +29,7 @@ export class WhoIsItController {
       mode: config?.mode ?? 'CLASSIC',
       roundsCount: config?.roundsCount ?? 5,
     };
-    return this.whoIsItService.startRound(fullConfig, req.user?.id);
+    return this.whoIsItService.startRound(fullConfig, req.user?.id, config?.roundIndex ?? 1);
   }
 
   @Get('round/:roundId')

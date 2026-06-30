@@ -20,18 +20,21 @@ import {
   submitGuess,
 } from './game-api';
 import { GuessAutocomplete } from './components/guess-autocomplete';
-import { HintLadder } from './components/hint-ladder';
+import { HintIcons } from './components/hint-icons';
 import { RoundResult } from './components/round-result';
 import { ScorePill } from './components/score-pill';
 import { SilhouetteStage } from './components/silhouette-stage';
 
-// Persistance locale de la manche en cours : un refresh restaure le meme Pokemon, le score,
+const TOTAL_ROUNDS = 5;
+
+// Persistance locale de la partie en cours : un refresh restaure le meme Pokemon, le score cumule,
 // l'etape et les mauvaises reponses deja tentees (le serveur garde l'etat de la manche en Redis).
 const STORAGE_KEY = 'pokegames:who-is-it';
 
 interface SavedGame {
   roundId: string;
   tried: string[];
+  totalScore: number;
 }
 
 function loadSavedGame(): SavedGame | null {
@@ -40,7 +43,11 @@ function loadSavedGame(): SavedGame | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<SavedGame>;
     if (parsed && typeof parsed.roundId === 'string') {
-      return { roundId: parsed.roundId, tried: Array.isArray(parsed.tried) ? parsed.tried : [] };
+      return {
+        roundId: parsed.roundId,
+        tried: Array.isArray(parsed.tried) ? parsed.tried : [],
+        totalScore: typeof parsed.totalScore === 'number' ? parsed.totalScore : 0,
+      };
     }
     return null;
   } catch {
@@ -67,13 +74,15 @@ function clearSavedGame(): void {
 export function WhoIsItPage() {
   const [round, setRound] = useState<WhoIsItRoundState | null>(null);
   const [result, setResult] = useState<WhoIsItGuessResponse | null>(null);
+  const [totalScore, setTotalScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
   const [guess, setGuess] = useState('');
+  const [tried, setTried] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [spriteVersion, setSpriteVersion] = useState(0);
-  const [tried, setTried] = useState<string[]>([]);
 
   const { data: names = [] } = useQuery({
     queryKey: ['pokemon-names'],
@@ -81,17 +90,19 @@ export function WhoIsItPage() {
     staleTime: Infinity,
   });
 
-  const newRound = useCallback(async () => {
+  const startManche = useCallback(async (roundIndex: number, carriedTotal: number) => {
     setLoading(true);
     setError(null);
     setResult(null);
     setFeedback(null);
     setGuess('');
     setTried([]);
+    setGameOver(false);
     try {
-      const state = await startRound({ mode: 'CLASSIC' });
+      const state = await startRound({ mode: 'CLASSIC', roundsCount: TOTAL_ROUNDS, roundIndex });
       setRound(state);
-      persistSavedGame({ roundId: state.roundId, tried: [] });
+      setTotalScore(carriedTotal);
+      persistSavedGame({ roundId: state.roundId, tried: [], totalScore: carriedTotal });
       setSpriteVersion((v) => v + 1);
     } catch (err) {
       clearSavedGame();
@@ -101,10 +112,14 @@ export function WhoIsItPage() {
     }
   }, []);
 
+  const newGame = useCallback(() => {
+    void startManche(1, 0);
+  }, [startManche]);
+
   const restoreOrStart = useCallback(async () => {
     const saved = loadSavedGame();
     if (!saved) {
-      await newRound();
+      void startManche(1, 0);
       return;
     }
     setLoading(true);
@@ -117,18 +132,29 @@ export function WhoIsItPage() {
         setFeedback(null);
         setGuess('');
         setTried(saved.tried);
+        setTotalScore(saved.totalScore);
+        setGameOver(false);
         setSpriteVersion((v) => v + 1);
         setLoading(false);
       } else {
-        clearSavedGame();
-        await newRound();
+        // Manche deja resolue avant le refresh : on avance proprement.
+        const carried = saved.totalScore + state.currentScore;
+        if (state.roundIndex >= state.totalRounds) {
+          setRound(state);
+          setTotalScore(carried);
+          setGameOver(true);
+          setResult(null);
+          clearSavedGame();
+          setLoading(false);
+        } else {
+          void startManche(state.roundIndex + 1, carried);
+        }
       }
     } catch {
-      // Manche expirée ou introuvable : on repart sur une nouvelle.
       clearSavedGame();
-      await newRound();
+      void startManche(1, 0);
     }
-  }, [newRound]);
+  }, [startManche]);
 
   useEffect(() => {
     void restoreOrStart();
@@ -136,6 +162,7 @@ export function WhoIsItPage() {
 
   const solved = result?.status === 'SOLVED';
   const spriteUrl = round ? `${API_ORIGIN}${round.spriteProxyUrl}?v=${spriteVersion}` : '';
+  const isLastRound = round ? round.roundIndex >= round.totalRounds : false;
 
   const onGuess = async (event: FormEvent) => {
     event.preventDefault();
@@ -149,7 +176,6 @@ export function WhoIsItPage() {
       if (res.isCorrect) {
         setResult(res);
         setSpriteVersion((v) => v + 1);
-        clearSavedGame();
       } else {
         const nextTried = [...tried, attempt];
         setTried(nextTried);
@@ -159,7 +185,7 @@ export function WhoIsItPage() {
           mistakesCount: res.mistakesCount,
           hints: res.hints,
         });
-        persistSavedGame({ roundId: round.roundId, tried: nextTried });
+        persistSavedGame({ roundId: round.roundId, tried: nextTried, totalScore });
         setFeedback(res.message ?? "Ce n'est pas le bon Pokémon.");
         setGuess('');
       }
@@ -187,26 +213,49 @@ export function WhoIsItPage() {
     }
   };
 
+  const advance = () => {
+    if (!round || !result) return;
+    const carried = totalScore + result.currentScore;
+    if (round.roundIndex >= round.totalRounds) {
+      setTotalScore(carried);
+      setGameOver(true);
+      setResult(null);
+      clearSavedGame();
+    } else {
+      void startManche(round.roundIndex + 1, carried);
+    }
+  };
+
   return (
     <DotBackground>
       <div className="flex h-screen flex-col">
         <AppHeader />
         <main className="flex flex-1 items-center justify-center overflow-auto px-4 py-6">
-        {loading ? (
-          <Spinner className="h-7 w-7 text-primary" />
-        ) : !round ? (
-          <Card className="max-w-md p-6 text-center">
-            <p className="text-sm text-danger">{error ?? 'Une erreur est survenue.'}</p>
-            <Button className="mt-4" onClick={() => void newRound()}>
-              Réessayer
-            </Button>
-          </Card>
-        ) : (
-          <div className="grid w-full max-w-4xl gap-6 md:grid-cols-2">
-            <div className="flex flex-col gap-5">
+          {loading ? (
+            <Spinner className="h-7 w-7 text-primary" />
+          ) : gameOver && round ? (
+            <Card className="flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
+              <span className="text-xs font-semibold uppercase tracking-widest text-success">
+                Partie terminée
+              </span>
+              <p className="text-sm text-muted">Tu as bouclé les {round.totalRounds} manches.</p>
+              <p className="text-4xl font-bold text-primary">{totalScore} pts</p>
+              <Button className="w-full" onClick={newGame}>
+                Rejouer
+              </Button>
+            </Card>
+          ) : !round ? (
+            <Card className="max-w-md p-6 text-center">
+              <p className="text-sm text-danger">{error ?? 'Une erreur est survenue.'}</p>
+              <Button className="mt-4" onClick={newGame}>
+                Réessayer
+              </Button>
+            </Card>
+          ) : (
+            <Card className="flex w-full max-w-xl flex-col gap-5 p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-xl font-bold text-foreground">Quel est ce Pokémon ?</h1>
+                  <h1 className="text-lg font-bold text-foreground">Quel est ce Pokémon ?</h1>
                   <p className="text-sm text-muted">
                     Manche {round.roundIndex} sur {round.totalRounds}
                   </p>
@@ -215,11 +264,25 @@ export function WhoIsItPage() {
               </div>
 
               {solved && result ? (
-                <RoundResult result={result} spriteUrl={spriteUrl} onNext={() => void newRound()} />
+                <RoundResult
+                  result={result}
+                  spriteUrl={spriteUrl}
+                  onNext={advance}
+                  nextLabel={isLastRound ? 'Voir le résultat' : 'Manche suivante'}
+                />
               ) : (
                 <>
-                  <SilhouetteStage src={spriteUrl} revealed={false} />
-                  <form onSubmit={onGuess} className="flex flex-col gap-2">
+                  <div className="flex items-center justify-center gap-4">
+                    <SilhouetteStage src={spriteUrl} revealed={false} />
+                    <HintIcons
+                      hints={round.hints}
+                      mistakes={round.mistakesCount}
+                      busy={busy}
+                      onReveal={(type) => void onReveal(type)}
+                    />
+                  </div>
+
+                  <form onSubmit={onGuess} className="mx-auto flex w-full max-w-md flex-col gap-2">
                     <div className="flex gap-2">
                       <GuessAutocomplete
                         value={guess}
@@ -232,25 +295,13 @@ export function WhoIsItPage() {
                         {busy ? <Spinner className="h-4 w-4" /> : 'Valider'}
                       </Button>
                     </div>
-                    {feedback && <p className="text-sm text-danger">{feedback}</p>}
-                    {error && <p className="text-sm text-danger">{error}</p>}
+                    {feedback && <p className="text-center text-sm text-danger">{feedback}</p>}
+                    {error && <p className="text-center text-sm text-danger">{error}</p>}
                   </form>
                 </>
               )}
-            </div>
-
-            {!solved && (
-              <Card className="p-5">
-                <HintLadder
-                  hints={round.hints}
-                  mistakes={round.mistakesCount}
-                  busy={busy}
-                  onReveal={(type) => void onReveal(type)}
-                />
-              </Card>
-            )}
-          </div>
-        )}
+            </Card>
+          )}
         </main>
       </div>
     </DotBackground>
