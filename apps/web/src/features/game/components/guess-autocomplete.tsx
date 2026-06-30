@@ -41,7 +41,7 @@ export function GuessAutocomplete({
       if (aStarts !== bStarts) return aStarts - bStarts;
       return a.norm.localeCompare(b.norm);
     });
-    return matches.slice(0, 8).map((entry) => entry.name);
+    return matches.map((entry) => entry.name);
   }, [value, names, excludedSet]);
 
   useEffect(() => {
