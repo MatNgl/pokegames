@@ -31,12 +31,17 @@ export function GuessAutocomplete({
   const suggestions = useMemo(() => {
     const query = normalize(value.trim());
     if (!query) return [];
-    return names
-      .filter((name) => {
-        const normalized = normalize(name);
-        return normalized.includes(query) && !excludedSet.has(normalized);
-      })
-      .slice(0, 8);
+    const matches = names
+      .map((name) => ({ name, norm: normalize(name) }))
+      .filter((entry) => entry.norm.includes(query) && !excludedSet.has(entry.norm));
+    // Les noms qui commencent par la recherche d'abord, puis les autres, chacun en ordre alphabetique.
+    matches.sort((a, b) => {
+      const aStarts = a.norm.startsWith(query) ? 0 : 1;
+      const bStarts = b.norm.startsWith(query) ? 0 : 1;
+      if (aStarts !== bStarts) return aStarts - bStarts;
+      return a.norm.localeCompare(b.norm);
+    });
+    return matches.slice(0, 8).map((entry) => entry.name);
   }, [value, names, excludedSet]);
 
   useEffect(() => {
