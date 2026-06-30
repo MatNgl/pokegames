@@ -36,7 +36,7 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 
 ### Règle 3 : Indépendance des Données (Pipeline ETL Tyradex)
 * Le client (Frontend) ne fait **JAMAIS** d'appels à des API externes (PokéAPI, Tyradex, etc.).
-* Le backend NestJS dispose d'un service d'extraction (ETL) qui aspire périodiquement ou à l'initialisation les données depuis l'API **Tyradex** (`https://tyradex.vercel.app/api/v1/pokemon`) pour les persister dans notre base PostgreSQL locale via Prisma.
+* Le backend NestJS dispose d'un service d'extraction (ETL) qui aspire périodiquement ou à l'initialisation les données depuis l'API **Tyradex** (`https://tyradex.app/api/v1/pokemon`) pour les persister dans notre base PostgreSQL locale via Prisma.
 * Cible prioritaire Lot 1 : Données en **Français** (noms, types, descriptions, statistiques). Lot 2 : Anglais.
 
 ### Règle 4 : Autorité du Serveur (State Machine Multijoueur)
@@ -54,6 +54,7 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * Aucun emoji nulle part : code, commentaires, logs, messages d'erreur, libellés d'interface, et documentation comprise.
 * Aucune palette "explosive" ni dégradé criard typiques des rendus IA. La couleur reste sobre et maîtrisée, conforme au guide UI/UX. Les dégradés, s'ils existent, sont discrets et justifiés. Seule exception sanctionnée et cadrée : le fond `LightPillar` des pages vitrines (accueil, connexion, inscription), gardé avec ses couleurs d'origine comme touche de couleur assumée (voir le guide UI/UX, section Fonds par contexte).
 * Le style visuel et le code s'appuient sur des références humaines existantes (bibliothèques et patterns reconnus), jamais sur une esthétique inventée au fil de l'eau. Objectif constant : pro, simple, lisible.
+* **Orthographe irréprochable et accents français :** Toujours écrire correctement les mots français avec leurs accents dans tout le projet (textes d'interface, messages d'erreur, commentaires, documentation). Par exemple : "Vérifiez que l'API est démarrée." et non "Verifiez que l'API est demarree." Une attention stricte doit être portée à chaque écran front pour proscrire tout mot sans accent.
 
 ---
 
@@ -71,13 +72,18 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 
 ### Bibliothèques et tokens front (décisions actées)
 * **Composants UI :** **shadcn/ui** (primitives Radix + Tailwind, code copié dans le repo, aucune lib lourde imposée). Tout composant récurrent vit dans `apps/web/src/components/ui`.
-* **Icônes :** **lucide-animated** (`https://lucide-animated.com`), variante animée de Lucide. Trait fin homogène, animation discrète sur interaction uniquement, jamais en boucle permanente.
+* **Icônes :** **lucide-animated** (`https://lucide-animated.com`), variante animée de Lucide. Trait fin homogène, animation discrète sur interaction uniquement. Pour les ajouter via shadcn :
+  * Paramètres : `pnpm dlx shadcn@latest add "https://lucide-animated.com/r/settings.json"`
+  * Défi quotidien (Daily) : `pnpm dlx shadcn@latest add "https://lucide-animated.com/r/calendar-days.json"`
+  * Pokédex : `pnpm dlx shadcn@latest add "https://lucide-animated.com/r/folder-kanban.json"`
 * **Police :** **Outfit**, chargée en local (woff2), exposée via une variable CSS `--font-sans` et le thème Tailwind.
 * **Couleur d'accent :** **`#2596be`** (`hsl(196, 67%, 45%)`, bleu-cyan), accent unique de l'application. Pas de seconde couleur d'accent, pas de dégradé criard ni de glow saturé (cf. Règle 6). Décliné en nuances (hover, actif, fond d'accent à faible opacité) via les tokens.
 * **État serveur :** **TanStack Query** pour le cache HTTP, les états de chargement et l'invalidation.
 * **Formulaires :** **react-hook-form** couplé à **zod** pour la validation (schémas zod partagés depuis `packages/shared-types` quand c'est pertinent).
 * **Animations :** Framer Motion pour les transitions de manche, dosées et fonctionnelles, jamais décoratives à l'excès.
-* **Navigation :** **React Router** (SPA Vite), lazy loading par route.
+* **Navigation & Performance (Bonnes Pratiques Front) :**
+  * **Lazy Loading :** Chargement différé (`React.lazy` + `Suspense`) systématique sur les routes et écrans de jeux afin de réduire le bundle initial.
+  * **Skeletons (États de chargement) :** Affichage de composants Skeletons élégants et fluides (`Skeleton` shadcn) pendant les requêtes TanStack Query ou le chargement initial des sprites/données afin d'éviter tout saut visuel (CLS) ou écran vide.
 * **Thème :** sombre d'abord. Tokens sémantiques (variables CSS via shadcn) prévus dès le départ pour un mode clair ultérieur, mais seul le dark est soigné en v1.
 * **Tests front :** **Vitest** pour l'unitaire et les composants. Objectif zéro erreur `typecheck` et zéro erreur de lint avant toute fin de tâche.
 * **Skill UI/UX obligatoire :** tout le travail front s'appuie sur le skill **ui-ux-pro-max** (`https://github.com/nextlevelbuilder/ui-ux-pro-max-skill`). Il est activé pour chaque écran et chaque composant afin de garantir un rendu de niveau pro, sans tomber dans les travers listés à la Règle 6.
@@ -221,7 +227,7 @@ Le modèle persiste tout ce que les jeux consomment, importé depuis Tyradex. To
 * **Note `isLegendary` :** Tyradex n'expose pas de drapeau légendaire fiable. Ce champ est donc alimenté par une **liste curatée maintenue dans le projet** (seed), appliquée après l'import, et non par l'ETL brut. À documenter et tenir à jour.
 
 ### 8.2 ETL Tyradex
-* **Source :** `https://tyradex.vercel.app/api/v1/pokemon` (catalogue complet). Le client ne l'appelle jamais (cf. Règle 3) : seul le backend extrait.
+* **Source :** `https://tyradex.app/api/v1/pokemon` (catalogue complet). Le client ne l'appelle jamais (cf. Règle 3) : seul le backend extrait.
 * **Couverture :** **toutes les générations** dès la v1. La sélection par génération côté joueur viendra plus tard.
 * **Déclenchement :** **commande manuelle** `npm run etl:pokemon` (workspace `apps/api`) **et cron quotidien** (une fois par jour) pour rafraîchir.
 * **Idempotence :** upsert sur `pokedexId`. Une réexécution ne crée jamais de doublon et met à jour les champs existants.

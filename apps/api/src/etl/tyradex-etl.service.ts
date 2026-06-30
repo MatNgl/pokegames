@@ -47,7 +47,7 @@ interface TyradexPokemonResponse {
 @Injectable()
 export class TyradexEtlService {
   private readonly logger = new Logger(TyradexEtlService.name);
-  private readonly TYRADEX_URL = 'https://tyradex.vercel.app/api/v1/pokemon';
+  private readonly TYRADEX_URL = 'https://tyradex.app/api/v1/pokemon';
 
   constructor(private readonly prisma: PrismaService) {}
 

@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "ignoreDeprecations": "5.0",
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "node",
@@ -23,7 +24,7 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@pokegames/shared-types": ["packages/shared-types/src/index.ts"]
+      "@pokegames/shared-types": ["packages/shared-types/dist/index.d.ts"]
     }
   }
 }

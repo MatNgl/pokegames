@@ -10,10 +10,11 @@
     "target": "ES2021",
     "sourceMap": true,
     "baseUrl": "./",
+    "rootDir": "src",
+    "outDir": "./dist",
     "paths": {
-      "@pokegames/shared-types": ["../../packages/shared-types/src/index.ts"]
+      "@pokegames/shared-types": ["../../packages/shared-types/dist/index.d.ts"]
     },
-    "incremental": true,
     "strictNullChecks": true,
     "noImplicitAny": true
   },
