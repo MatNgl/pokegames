@@ -185,6 +185,7 @@ export class WhoIsItService {
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
       hints: session.hints,
+      ...(userId ? {} : { guestUsername: 'Dresseur Invité' }),
     };
   }
 
@@ -206,6 +207,7 @@ export class WhoIsItService {
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
       hints: session.hints,
+      ...(session.userId ? {} : { guestUsername: 'Dresseur Invité' }),
     };
   }
 
@@ -260,6 +262,7 @@ export class WhoIsItService {
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
       hints: session.hints,
+      ...(session.userId ? {} : { guestUsername: 'Dresseur Invité' }),
     };
   }
 
@@ -302,6 +305,7 @@ export class WhoIsItService {
         hints: session.hints,
         revealedPokemon: null,
         unmaskedSpriteUrl: null,
+        ...(session.userId ? {} : { guestUsername: 'Dresseur Invité' }),
       };
     }
 
@@ -354,6 +358,8 @@ export class WhoIsItService {
       hints: session.hints,
       revealedPokemon: fullPokemon,
       unmaskedSpriteUrl: `/api/sprites/${session.sessionHash}`,
+      durationSeconds,
+      ...(effectiveUserId ? {} : { guestUsername: 'Dresseur Invité', canCreateAccountToSave: true }),
     };
   }
 

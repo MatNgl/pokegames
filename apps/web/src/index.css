@@ -1,0 +1,66 @@
+@import 'tailwindcss';
+
+/* Tokens semantiques du design system PokeGames (dark e-sport, accent unique).
+   Le clair sera ajoute plus tard via les memes tokens (sombre d'abord). */
+@theme {
+  --font-sans: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: #0b0e14;
+  --color-surface: #121721;
+  --color-surface-2: #19202d;
+  --color-foreground: #e8ebf2;
+  --color-muted: #8b94a7;
+  --color-border: #232c3d;
+
+  --color-primary: #2596be;
+  --color-primary-foreground: #04141a;
+  --color-primary-soft: rgba(37, 150, 190, 0.14);
+
+  --color-success: #2fd49a;
+  --color-danger: #f0616d;
+  --color-warning: #e7b14c;
+
+  --radius-card: 14px;
+  --radius-control: 12px;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Chiffres tabulaires pour aligner scores et compteurs */
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+
+  /* Accessibilite : respect du reglage systeme de reduction des animations */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

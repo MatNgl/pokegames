@@ -9,6 +9,9 @@ async function bootstrap(): Promise<void> {
 
   app.use(cookieParser());
 
+  // Toutes les routes HTTP sont servies sous /api (coherent avec spriteProxyUrl et le client web).
+  app.setGlobalPrefix('api');
+
   const allowedOrigins = process.env['CORS_ORIGIN']
     ? process.env['CORS_ORIGIN'].split(',').map((o) => o.trim())
     : ['http://localhost:5173', 'http://127.0.0.1:5173'];

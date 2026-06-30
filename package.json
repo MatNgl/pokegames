@@ -8,7 +8,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "eslint \"apps/**/*.ts\" \"packages/**/*.ts\"",
+    "lint": "eslint \"apps/**/*.{ts,tsx}\" \"packages/**/*.{ts,tsx}\"",
     "test": "npm run test --workspaces --if-present",
     "check:specs": "node scripts/check-specs.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run check:specs",

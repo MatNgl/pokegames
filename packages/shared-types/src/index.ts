@@ -92,6 +92,7 @@ export interface WhoIsItRoundState {
   roundIndex: number;
   totalRounds: number;
   hints: WhoIsItHint[];
+  guestUsername?: string;
 }
 
 export interface WhoIsItGuessRequest {
@@ -114,6 +115,9 @@ export interface WhoIsItGuessResponse {
   hints: WhoIsItHint[];
   revealedPokemon: PokemonDTO | null;
   unmaskedSpriteUrl: string | null;
+  durationSeconds?: number;
+  guestUsername?: string;
+  canCreateAccountToSave?: boolean;
 }
 
 /* ==========================================================================
