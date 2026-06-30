@@ -66,12 +66,3 @@
   }
 }
 
-/* Derive lente des nuages du fond. */
-@keyframes cloud-drift {
-  from {
-    transform: translateX(-6%);
-  }
-  to {
-    transform: translateX(6%);
-  }
-}
