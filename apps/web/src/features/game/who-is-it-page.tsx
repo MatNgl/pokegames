@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import type {
@@ -11,6 +12,7 @@ import { AppBackground } from '@/components/backgrounds/app-background';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { HelpPopover } from '@/components/ui/help-popover';
 import { Spinner } from '@/components/ui/spinner';
 import { API_ORIGIN } from '@/lib/env';
 import { getApiErrorMessage } from '@/lib/errors';
@@ -33,11 +35,20 @@ import { GuessAutocomplete } from './components/guess-autocomplete';
 import { HintIcons } from './components/hint-icons';
 import { RoundResult } from './components/round-result';
 import { SilhouetteStage } from './components/silhouette-stage';
+import { WhoIsItSkeleton } from './components/who-is-it-skeleton';
 
 const TOTAL_ROUNDS = 5;
 
+const WHO_IS_IT_RULES = [
+  'Devine le Pokémon caché derrière la silhouette.',
+  'Chaque mauvaise réponse débloque un nouvel indice.',
+  'On compte les essais, pas de points : vise le minimum.',
+  'Saisie libre avec autocomplétion (flèches puis Entrée).',
+];
+
 export function WhoIsItPage() {
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [round, setRound] = useState<WhoIsItRoundState | null>(null);
   const [result, setResult] = useState<WhoIsItGuessResponse | null>(null);
   const [totalAttempts, setTotalAttempts] = useState(0);
@@ -49,6 +60,9 @@ export function WhoIsItPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [spriteVersion, setSpriteVersion] = useState(0);
+  const [shakeKey, setShakeKey] = useState(0);
+  // Laisse jouer la revelation en place avant d'afficher le bloc d'infos.
+  const [revealReady, setRevealReady] = useState(false);
 
   const { data: names = [] } = useQuery({
     queryKey: ['pokemon-names'],
@@ -68,6 +82,8 @@ export function WhoIsItPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setRevealReady(false);
+    setShakeKey(0);
     setFeedback(null);
     setGuess('');
     setTried([]);
@@ -155,6 +171,12 @@ export function WhoIsItPage() {
       if (res.isCorrect) {
         setResult(res);
         setSpriteVersion((v) => v + 1);
+        if (reduceMotion) {
+          setRevealReady(true);
+        } else {
+          // Temps de la revelation (glow + pop) avant le bloc d'infos.
+          window.setTimeout(() => setRevealReady(true), 650);
+        }
       } else {
         const nextTried = [...tried, attempt];
         setTried(nextTried);
@@ -166,6 +188,7 @@ export function WhoIsItPage() {
         });
         saveGame({ date: todayKey(), roundId: round.roundId, tried: nextTried, totalAttempts });
         setFeedback(res.message ?? "Ce n'est pas le bon Pokémon.");
+        setShakeKey((k) => k + 1);
         setGuess('');
       }
     } catch (err) {
@@ -208,7 +231,7 @@ export function WhoIsItPage() {
         <AppHeader />
         <main className="flex flex-1 items-center justify-center px-4 py-8">
           {loading ? (
-            <Spinner className="h-7 w-7 text-primary" />
+            <WhoIsItSkeleton />
           ) : gameOver ? (
             <Card className="flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
               <span className="font-display text-[10px] uppercase tracking-widest text-success">
@@ -235,36 +258,44 @@ export function WhoIsItPage() {
           ) : (
             <Card className="flex w-full max-w-xl flex-col gap-5 p-6">
               <div className="flex items-start justify-between gap-4">
-                <h1 className="text-lg font-extrabold text-foreground">Quel est ce Pokémon ?</h1>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="font-display text-[11px] text-muted">
-                    {round.roundIndex}/{round.totalRounds}
-                  </span>
-                  <Badge className="border-primary bg-primary text-primary-foreground">
-                    {liveAttempts} essai{liveAttempts > 1 ? 's' : ''}
-                  </Badge>
+                <h1 className="font-display text-sm leading-relaxed text-foreground">
+                  Quel est ce Pokémon ?
+                </h1>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="font-display text-[11px] text-muted">
+                      {round.roundIndex}/{round.totalRounds}
+                    </span>
+                    <Badge className="border-primary bg-primary text-primary-foreground">
+                      {liveAttempts} essai{liveAttempts > 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+                  <HelpPopover ariaLabel="Règles du jeu" rules={WHO_IS_IT_RULES} />
                 </div>
               </div>
 
-              {solved && result ? (
-                <RoundResult
-                  result={result}
-                  spriteUrl={spriteUrl}
-                  onNext={advance}
-                  nextLabel={isLastRound ? 'Voir le résultat' : 'Manche suivante'}
-                />
-              ) : (
-                <>
-                  <div className="flex items-center justify-center gap-4">
-                    <SilhouetteStage src={spriteUrl} revealed={false} />
+              <div className="flex flex-col items-center gap-5">
+                <div className="flex w-full flex-wrap items-center justify-center gap-4">
+                  <SilhouetteStage src={spriteUrl} revealed={solved} shakeKey={shakeKey} />
+                  {!solved && (
                     <HintIcons
                       hints={round.hints}
                       mistakes={round.mistakesCount}
                       busy={busy}
                       onReveal={(type) => void onReveal(type)}
                     />
-                  </div>
+                  )}
+                </div>
 
+                {solved ? (
+                  revealReady && result ? (
+                    <RoundResult
+                      result={result}
+                      onNext={advance}
+                      nextLabel={isLastRound ? 'Voir le résultat' : 'Manche suivante'}
+                    />
+                  ) : null
+                ) : (
                   <form onSubmit={onGuess} className="mx-auto flex w-full max-w-md flex-col gap-2">
                     <div className="flex gap-2">
                       <GuessAutocomplete
@@ -278,11 +309,12 @@ export function WhoIsItPage() {
                         {busy ? <Spinner className="h-4 w-4" /> : 'Valider'}
                       </Button>
                     </div>
-                    {feedback && <p className="text-center text-sm font-semibold text-danger">{feedback}</p>}
-                    {error && <p className="text-center text-sm font-semibold text-danger">{error}</p>}
+                    <p role="alert" aria-live="assertive" className="min-h-5 text-center text-sm font-semibold text-danger">
+                      {feedback ?? error ?? ''}
+                    </p>
                   </form>
-                </>
-              )}
+                )}
+              </div>
             </Card>
           )}
         </main>

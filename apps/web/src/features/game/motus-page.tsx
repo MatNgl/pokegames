@@ -18,10 +18,23 @@ import {
   saveMotusDone,
   type MotusDone,
 } from './motus-storage';
+import { HelpPopover, type HelpLegendItem } from '@/components/ui/help-popover';
 import { MotusGrid } from './components/motus-grid';
-import { MotusHelp } from './components/motus-help';
 import { MotusKeyboard } from './components/motus-keyboard';
 import { MotusSkeleton } from './components/motus-skeleton';
+
+const MOTUS_RULES = [
+  'Devine le Pokémon du jour en 6 essais.',
+  'La première lettre est donnée.',
+  'Chaque proposition doit être un vrai Pokémon de la même longueur.',
+  'La ligne se valide automatiquement une fois pleine.',
+];
+
+const MOTUS_LEGEND: HelpLegendItem[] = [
+  { className: 'border-go-shadow bg-go text-white', label: 'Bien placée' },
+  { className: 'border-accent-shadow bg-accent text-foreground', label: 'Présente, mal placée' },
+  { className: 'border-absent-shadow bg-absent text-surface', label: 'Absente du mot' },
+];
 
 const STATE_PRIORITY: Record<MotusLetterState, number> = { ABSENT: 0, PRESENT: 1, CORRECT: 2 };
 
@@ -233,7 +246,11 @@ export function MotusPage() {
                   <Badge className="border-primary bg-primary text-primary-foreground">
                     {attemptsUsed}/{state.maxAttempts}
                   </Badge>
-                  <MotusHelp />
+                  <HelpPopover
+                    ariaLabel="Règles du Poké-Motus"
+                    rules={MOTUS_RULES}
+                    legend={MOTUS_LEGEND}
+                  />
                 </div>
               </div>
 

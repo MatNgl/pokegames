@@ -2,14 +2,21 @@ import { useEffect, useState } from 'react';
 import { HelpCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const LEGEND: { className: string; label: string }[] = [
-  { className: 'border-go-shadow bg-go text-white', label: 'Bien placée' },
-  { className: 'border-accent-shadow bg-accent text-foreground', label: 'Présente, mal placée' },
-  { className: 'border-absent-shadow bg-absent text-surface', label: 'Absente du mot' },
-];
+export interface HelpLegendItem {
+  className: string;
+  label: string;
+  glyph?: string;
+}
 
-// Bouton "?" + popover expliquant les regles du Poke-Motus en quelques lignes.
-export function MotusHelp() {
+interface HelpPopoverProps {
+  rules: string[];
+  legend?: HelpLegendItem[];
+  title?: string;
+  ariaLabel?: string;
+}
+
+// Bouton "?" + popover expliquant les regles d'un jeu en quelques lignes. Reutilisable.
+export function HelpPopover({ rules, legend, title = 'Règles', ariaLabel = 'Règles du jeu' }: HelpPopoverProps) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -26,7 +33,7 @@ export function MotusHelp() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Règles du jeu"
+        aria-label={ariaLabel}
         aria-expanded={open}
         className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
       >
@@ -44,11 +51,11 @@ export function MotusHelp() {
           />
           <div
             role="dialog"
-            aria-label="Règles du Poké-Motus"
+            aria-label={ariaLabel}
             className="absolute right-0 top-11 z-20 w-72 rounded-card border-4 border-border bg-surface p-4 text-left shadow-[0_6px_0_rgba(63,93,29,0.25)]"
           >
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="font-display text-[11px] uppercase text-foreground">Règles</h2>
+              <h2 className="font-display text-[11px] uppercase text-foreground">{title}</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -59,26 +66,27 @@ export function MotusHelp() {
               </button>
             </div>
             <ul className="space-y-1.5 text-sm font-semibold text-muted">
-              <li>Devine le Pokémon du jour en 6 essais.</li>
-              <li>La première lettre est donnée.</li>
-              <li>Chaque proposition doit être un vrai Pokémon de la même longueur.</li>
-              <li>La ligne se valide automatiquement une fois pleine.</li>
-            </ul>
-            <div className="mt-3 space-y-1.5">
-              {LEGEND.map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      'flex h-6 w-6 items-center justify-center rounded border-2 font-display text-[10px]',
-                      item.className,
-                    )}
-                  >
-                    A
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{item.label}</span>
-                </div>
+              {rules.map((rule) => (
+                <li key={rule}>{rule}</li>
               ))}
-            </div>
+            </ul>
+            {legend && legend.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {legend.map((item) => (
+                  <div key={item.label} className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'flex h-6 w-6 items-center justify-center rounded border-2 font-display text-[10px]',
+                        item.className,
+                      )}
+                    >
+                      {item.glyph ?? 'A'}
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

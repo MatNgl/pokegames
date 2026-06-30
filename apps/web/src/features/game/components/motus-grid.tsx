@@ -81,7 +81,7 @@ export function MotusGrid({ state, current, shakeKey }: MotusGridProps) {
           <div
             key={isCurrent ? `current-${shakeKey}` : `row-${r}`}
             role="row"
-            className={cn('flex gap-1.5', isCurrent && shakeKey > 0 && 'motus-shake')}
+            className={cn('flex gap-1.5', isCurrent && shakeKey > 0 && 'shake')}
           >
             {cols.map((c) => {
               if (attempt) {

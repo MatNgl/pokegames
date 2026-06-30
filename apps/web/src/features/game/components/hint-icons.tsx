@@ -1,4 +1,5 @@
-import type { ComponentType } from 'react';
+import { useEffect, useRef, type ComponentType } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import type { WhoIsItHint, WhoIsItHintType } from '@pokegames/shared-types';
 import { Hash, Lock, Tag, Tags, Type } from 'lucide-react';
 import colorRevealIcon from '@/assets/games/couleur_reveal.png';
@@ -27,11 +28,22 @@ interface HintIconsProps {
 
 // Largeur fixe : reveler la valeur d'un indice ne doit jamais decaler la silhouette voisine.
 export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
+  const reduceMotion = useReducedMotion();
+  // Nombre d'erreurs au rendu precedent : sert a popper uniquement l'indice qui vient de s'ouvrir.
+  const prevMistakesRef = useRef<number | null>(null);
+  const previousMistakes = prevMistakesRef.current ?? mistakes;
+  useEffect(() => {
+    prevMistakesRef.current = mistakes;
+  }, [mistakes]);
+
   return (
     <div className="flex w-32 shrink-0 flex-col gap-2">
       {hints.map((hint) => {
         const unlocked = mistakes >= hint.unlockedAtMistakeCount;
         const plural = hint.unlockedAtMistakeCount > 1 ? 's' : '';
+        const justUnlocked =
+          previousMistakes < hint.unlockedAtMistakeCount &&
+          hint.unlockedAtMistakeCount <= mistakes;
 
         if (hint.isRevealed) {
           return (
@@ -62,15 +74,18 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
 
         return (
           <div key={hint.type} className="flex justify-end" title={`${hint.label} : révéler`}>
-            <button
+            <motion.button
               type="button"
               disabled={busy}
               onClick={() => onReveal(hint.type)}
               aria-label={`Révéler ${hint.label}`}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-control border-2 border-go bg-white text-go-shadow transition-colors duration-200 hover:bg-go hover:text-white disabled:opacity-50"
+              initial={justUnlocked && !reduceMotion ? { scale: 0.5, opacity: 0 } : false}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-control border-2 border-go bg-surface text-go-shadow transition-colors duration-200 hover:bg-go hover:text-white disabled:opacity-50"
             >
               <HintGlyph type={hint.type} />
-            </button>
+            </motion.button>
           </div>
         );
       })}
