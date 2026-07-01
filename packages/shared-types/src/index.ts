@@ -212,6 +212,51 @@ export interface PlusMinusChoiceResponse {
 }
 
 /* ==========================================================================
+ * JEU 4 : L'INTRUS (TROUVE CELUI QUI NE VA PAS)
+ * ========================================================================== */
+
+export type IntruderRule = 'GENERATION' | 'TYPE' | 'STAT' | 'EVOLUTION' | 'MEGA';
+
+export interface IntruderMember {
+  pokemonId: number;
+  name: string;
+  spriteUrl: string;
+}
+
+export interface IntruderRoundState {
+  roundId: string;
+  totalRounds: number;
+  roundIndex: number; // manche courante (1 a totalRounds)
+  correctCount: number;
+  status: 'PLAYING' | 'FINISHED';
+  prompt: string; // consigne affichee ("Trouve l'intrus")
+  members: IntruderMember[]; // 4 Pokemon melanges, la regle et l'intrus restent secrets
+}
+
+export interface IntruderMemberReveal {
+  pokemonId: number;
+  isIntruder: boolean;
+  detail: string; // valeur affichee selon la regle (ex. "Vitesse 45", "Generation 1", "Feu")
+  typeImage?: string; // regle TYPE : image du type partage
+  megaSpriteUrl?: string; // regle MEGA : sprite de la mega-evolution
+}
+
+export interface IntruderChoiceRequest {
+  roundId: string;
+  pokemonId: number;
+}
+
+export interface IntruderChoiceResponse {
+  correct: boolean;
+  intruderId: number;
+  rule: IntruderRule;
+  commonLabel: string; // trait commun aux 3 autres (ex. "Meme type principal : Feu")
+  reveals: IntruderMemberReveal[];
+  // Etat apres avancement : manche suivante si PLAYING, sinon partie terminee.
+  state: IntruderRoundState;
+}
+
+/* ==========================================================================
  * AUTHENTIFICATION & UTILISATEURS (AUTH / USERS)
  * ========================================================================== */
 

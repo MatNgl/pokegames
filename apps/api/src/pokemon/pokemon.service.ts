@@ -35,16 +35,33 @@ export class PokemonService {
       throw new NotFoundException('Pokémon introuvable');
     }
 
-    const cached = this.spriteCache.get(pokemon.spriteRegular);
+    return this.fetchSprite(pokemon.spriteRegular);
+  }
+
+  /**
+   * Sprite de la mega-evolution, servi par le backend (Regle 3). Utilise par la revelation de
+   * la regle MEGA du jeu de l'Intrus. 404 si le Pokemon n'a pas de mega-evolution.
+   */
+  async getMegaSprite(pokemonId: number): Promise<{ buffer: Buffer; contentType: string }> {
+    const pokemon = await this.prisma.pokemon.findUnique({
+      where: { id: pokemonId },
+      select: { megaSpriteRegular: true },
+    });
+    if (!pokemon?.megaSpriteRegular) {
+      throw new NotFoundException('Méga-évolution introuvable');
+    }
+    return this.fetchSprite(pokemon.megaSpriteRegular);
+  }
+
+  private async fetchSprite(url: string): Promise<{ buffer: Buffer; contentType: string }> {
+    const cached = this.spriteCache.get(url);
     if (cached) {
       return { buffer: cached, contentType: 'image/png' };
     }
 
-    const response = await axios.get<ArrayBuffer>(pokemon.spriteRegular, {
-      responseType: 'arraybuffer',
-    });
+    const response = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer' });
     const buffer: Buffer = Buffer.from(response.data);
-    this.spriteCache.set(pokemon.spriteRegular, buffer);
+    this.spriteCache.set(url, buffer);
     if (this.spriteCache.size > this.SPRITE_CACHE_MAX) {
       const oldest = this.spriteCache.keys().next().value;
       if (oldest !== undefined) this.spriteCache.delete(oldest);

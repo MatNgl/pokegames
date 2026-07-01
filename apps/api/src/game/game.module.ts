@@ -7,10 +7,18 @@ import { MotusService } from './motus.service';
 import { MotusController } from './motus.controller';
 import { PlusMinusService } from './plus-minus.service';
 import { PlusMinusController } from './plus-minus.controller';
+import { IntruderService } from './intruder.service';
+import { IntruderController } from './intruder.controller';
 
 @Module({
-  controllers: [SpriteProxyController, WhoIsItController, MotusController, PlusMinusController],
-  providers: [SpriteProxyService, WhoIsItService, MotusService, PlusMinusService],
-  exports: [SpriteProxyService, WhoIsItService, MotusService, PlusMinusService],
+  controllers: [
+    SpriteProxyController,
+    WhoIsItController,
+    MotusController,
+    PlusMinusController,
+    IntruderController,
+  ],
+  providers: [SpriteProxyService, WhoIsItService, MotusService, PlusMinusService, IntruderService],
+  exports: [SpriteProxyService, WhoIsItService, MotusService, PlusMinusService, IntruderService],
 })
 export class GameModule {}

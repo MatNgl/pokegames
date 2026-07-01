@@ -24,6 +24,11 @@ model Pokemon {
   statsSpeed     Int
   weight         Float?
   height         Float?
+  evolutionStage    Int     @default(1) // 1 = forme de base, 2, 3... (nb de pré-évolutions + 1)
+  isFinalEvolution  Boolean @default(true) // vrai si aucune évolution suivante
+  hasMega           Boolean @default(false)
+  megaSpriteRegular String?
+  megaSpriteShiny   String?
   types          PokemonType[]
   evolutions     Evolution[]   @relation("PokemonEvolutions")
   evolvedFrom    Evolution[]   @relation("PokemonPreEvolutions")

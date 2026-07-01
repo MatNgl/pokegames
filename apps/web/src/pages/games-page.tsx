@@ -9,13 +9,14 @@ import { cn } from '@/lib/utils';
 import { whoIsItDailyStatus, type WhoIsItDailyStatus } from '@/features/game/daily-storage';
 import { motusDailyStatus } from '@/features/game/motus-storage';
 import { plusMinusDailyStatus } from '@/features/game/plus-minus-storage';
+import { intruderDailyStatus } from '@/features/game/intruder-storage';
 import whoIsItImg from '@/assets/games/who-is-it.png';
 import pokeMotusImg from '@/assets/games/poke-motus.png';
 import plusMinusImg from '@/assets/games/plus-minus.png';
 import intrusImg from '@/assets/games/intrus.png';
 import quiEstCeImg from '@/assets/games/quiestce.png';
 
-type DailyKey = 'who-is-it' | 'motus' | 'plus-minus';
+type DailyKey = 'who-is-it' | 'motus' | 'plus-minus' | 'intruder';
 
 interface GameEntry {
   title: string;
@@ -51,7 +52,14 @@ const games: GameEntry[] = [
     available: true,
     dailyKey: 'plus-minus',
   },
-  { title: "L'Intrus", description: 'Repère celui qui ne va pas', iconImg: intrusImg, available: false },
+  {
+    title: "L'Intrus",
+    description: 'Repère celui qui ne va pas',
+    to: '/intrus',
+    iconImg: intrusImg,
+    available: true,
+    dailyKey: 'intruder',
+  },
   { title: 'Qui est-ce', description: 'Déduction en duel', iconImg: quiEstCeImg, available: false },
 ];
 
@@ -70,6 +78,7 @@ export function GamesPage() {
     'who-is-it': whoIsItDailyStatus(),
     motus: motusDailyStatus(),
     'plus-minus': plusMinusDailyStatus(),
+    intruder: intruderDailyStatus(),
   }));
 
   return (

@@ -22,6 +22,14 @@ interface TyradexEvolution {
   condition?: string;
 }
 
+interface TyradexMega {
+  orbe?: string;
+  sprites?: {
+    regular?: string | null;
+    shiny?: string | null;
+  } | null;
+}
+
 interface TyradexPokemonResponse {
   pokedex_id: number;
   generation?: number;
@@ -41,6 +49,7 @@ interface TyradexPokemonResponse {
   evolution?: {
     pre?: TyradexEvolution[] | null;
     next?: TyradexEvolution[] | null;
+    mega?: TyradexMega[] | null;
   } | null;
 }
 
@@ -80,6 +89,19 @@ export class TyradexEtlService {
         ? parseFloat(raw.weight.replace(/,/g, '.').replace(/[^0-9.]/g, ''))
         : null;
 
+      // Niveau d'évolution : le nombre de pré-évolutions donne le stade (base = 1).
+      const preCount = Array.isArray(raw.evolution?.pre) ? raw.evolution.pre.length : 0;
+      const evolutionStage = preCount + 1;
+      // Forme finale : aucune évolution suivante (next null ou vide).
+      const isFinalEvolution =
+        !raw.evolution?.next || !Array.isArray(raw.evolution.next) || raw.evolution.next.length === 0;
+      // Méga-évolution : portée par la forme finale de la lignée dans Tyradex.
+      const megaList = Array.isArray(raw.evolution?.mega) ? raw.evolution.mega : [];
+      const hasMega = megaList.length > 0;
+      const megaSprites = megaList[0]?.sprites ?? null;
+      const megaSpriteRegular = hasMega ? (megaSprites?.regular ?? null) : null;
+      const megaSpriteShiny = hasMega ? (megaSprites?.shiny ?? null) : null;
+
       const pokemon = await this.prisma.pokemon.upsert({
         where: { pokedexId: raw.pokedex_id },
         update: {
@@ -97,6 +119,11 @@ export class TyradexEtlService {
           statsSpeed: raw.stats?.vit ?? 0,
           weight: isNaN(Number(parsedWeight)) ? null : parsedWeight,
           height: isNaN(Number(parsedHeight)) ? null : parsedHeight,
+          evolutionStage,
+          isFinalEvolution,
+          hasMega,
+          megaSpriteRegular,
+          megaSpriteShiny,
         },
         create: {
           id: raw.pokedex_id,
@@ -115,6 +142,11 @@ export class TyradexEtlService {
           statsSpeed: raw.stats?.vit ?? 0,
           weight: isNaN(Number(parsedWeight)) ? null : parsedWeight,
           height: isNaN(Number(parsedHeight)) ? null : parsedHeight,
+          evolutionStage,
+          isFinalEvolution,
+          hasMega,
+          megaSpriteRegular,
+          megaSpriteShiny,
         },
       });
 

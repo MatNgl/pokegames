@@ -1,18 +1,24 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { PokemonService } from './pokemon.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('PokemonService', () => {
   let service: PokemonService;
   let mockFindMany: jest.Mock;
+  let mockFindUnique: jest.Mock;
 
   beforeEach(async () => {
     mockFindMany = jest.fn();
+    mockFindUnique = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PokemonService,
-        { provide: PrismaService, useValue: { pokemon: { findMany: mockFindMany } } },
+        {
+          provide: PrismaService,
+          useValue: { pokemon: { findMany: mockFindMany, findUnique: mockFindUnique } },
+        },
       ],
     }).compile();
 
@@ -33,5 +39,21 @@ describe('PokemonService', () => {
       select: { nameFr: true },
       orderBy: { nameFr: 'asc' },
     });
+  });
+
+  it('renvoie 404 pour le méga-sprite d’un Pokémon sans méga-évolution', async () => {
+    mockFindUnique.mockResolvedValue({ megaSpriteRegular: null });
+
+    await expect(service.getMegaSprite(4)).rejects.toBeInstanceOf(NotFoundException);
+    expect(mockFindUnique).toHaveBeenCalledWith({
+      where: { id: 4 },
+      select: { megaSpriteRegular: true },
+    });
+  });
+
+  it('renvoie 404 pour le méga-sprite d’un Pokémon inexistant', async () => {
+    mockFindUnique.mockResolvedValue(null);
+
+    await expect(service.getMegaSprite(99999)).rejects.toBeInstanceOf(NotFoundException);
   });
 });
