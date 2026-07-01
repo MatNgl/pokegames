@@ -8,7 +8,7 @@ import { AppHeader } from '@/components/layout/app-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { getApiErrorMessage } from '@/lib/errors';
+import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import { getMotusRound, startMotus, submitMotusGuess } from './motus-api';
 import {
   clearMotus,
@@ -22,6 +22,7 @@ import {
 } from './motus-storage';
 import { HelpPopover, type HelpLegendItem } from '@/components/ui/help-popover';
 import { LevelSelectScreen } from './components/level-select-screen';
+import { DailyDoneCard } from './components/daily-done-card';
 import { MotusGrid } from './components/motus-grid';
 import { MotusKeyboard } from './components/motus-keyboard';
 import { MotusSkeleton } from './components/motus-skeleton';
@@ -82,6 +83,7 @@ function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void })
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
   const [resultReady, setResultReady] = useState(false);
+  const [alreadyDone, setAlreadyDone] = useState(false);
 
   const start = useCallback(async () => {
     setLoading(true);
@@ -94,6 +96,10 @@ function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void })
       setState(round);
       saveMotus(level, round.roundId, round.attempts.length);
     } catch (err) {
+      if (isDailyCompletedError(err)) {
+        setAlreadyDone(true);
+        return;
+      }
       clearMotus(level);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le Motus du jour'));
     } finally {
@@ -243,7 +249,9 @@ function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void })
           {liveMessage}
         </p>
         <main className="flex flex-1 items-center justify-center px-4 py-8">
-          {loading ? (
+          {alreadyDone ? (
+            <DailyDoneCard onBack={onBack} />
+          ) : loading ? (
             <MotusSkeleton />
           ) : finished ? (
             <Card className="flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">

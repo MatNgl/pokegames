@@ -16,8 +16,9 @@ import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { API_ORIGIN } from '@/lib/env';
 import { cn } from '@/lib/utils';
-import { getApiErrorMessage } from '@/lib/errors';
+import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
+import { DailyDoneCard } from './components/daily-done-card';
 import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
 import { getIntruderRound, startIntruder, submitIntruderChoice } from './intruder-api';
 import {
@@ -87,6 +88,7 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [alreadyDone, setAlreadyDone] = useState(false);
 
   const start = useCallback(async () => {
     setLoading(true);
@@ -100,6 +102,10 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
       setState(round);
       saveIntruder(level, round.roundId, round.roundIndex);
     } catch (err) {
+      if (isDailyCompletedError(err)) {
+        setAlreadyDone(true);
+        return;
+      }
       clearIntruder(level);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
     } finally {
@@ -262,7 +268,9 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
       <div className="flex min-h-screen flex-col">
         <AppHeader />
         <main className="flex flex-1 items-center justify-center px-4 py-8">
-          {loading ? (
+          {alreadyDone ? (
+            <DailyDoneCard onBack={onBack} />
+          ) : loading ? (
             <Spinner className="h-7 w-7 text-primary" />
           ) : ended ? (
             <Card className="flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">

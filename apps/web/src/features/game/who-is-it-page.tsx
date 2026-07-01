@@ -17,7 +17,7 @@ import { Card } from '@/components/ui/card';
 import { HelpPopover } from '@/components/ui/help-popover';
 import { Spinner } from '@/components/ui/spinner';
 import { API_ORIGIN } from '@/lib/env';
-import { getApiErrorMessage } from '@/lib/errors';
+import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import {
   getPokemonNames,
   getRoundState,
@@ -40,6 +40,7 @@ import { LevelSelectScreen } from './components/level-select-screen';
 import { RoundResult } from './components/round-result';
 import { SilhouetteStage } from './components/silhouette-stage';
 import { WhoIsItSkeleton } from './components/who-is-it-skeleton';
+import { DailyDoneCard } from './components/daily-done-card';
 
 const TOTAL_ROUNDS = 5;
 
@@ -96,6 +97,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
   const [spriteVersion, setSpriteVersion] = useState(0);
   const [shakeKey, setShakeKey] = useState(0);
   const [revealReady, setRevealReady] = useState(false);
+  const [alreadyDone, setAlreadyDone] = useState(false);
 
   const { data: names = [] } = useQuery({
     queryKey: ['pokemon-names'],
@@ -139,6 +141,10 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
         });
         setSpriteVersion((v) => v + 1);
       } catch (err) {
+        if (isDailyCompletedError(err)) {
+          setAlreadyDone(true);
+          return;
+        }
         clearSavedGame(level);
         setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
       } finally {
@@ -282,7 +288,9 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
       <div className="flex min-h-screen flex-col">
         <AppHeader />
         <main className="flex flex-1 items-center justify-center px-4 py-8">
-          {loading ? (
+          {alreadyDone ? (
+            <DailyDoneCard onBack={onBack} />
+          ) : loading ? (
             <WhoIsItSkeleton />
           ) : gameOver ? (
             <Card className="flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">

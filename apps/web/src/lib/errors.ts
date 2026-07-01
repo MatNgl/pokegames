@@ -15,3 +15,12 @@ export function getApiErrorMessage(error: unknown, fallback = 'Une erreur est su
   }
   return fallback;
 }
+
+/** Vrai si le serveur a refuse le start car le defi du jour est deja termine (verrou 1x/jour). */
+export function isDailyCompletedError(error: unknown): boolean {
+  if (error instanceof AxiosError && error.response?.status === 409) {
+    const data = error.response.data as { message?: string } | undefined;
+    return data?.message === 'DAILY_ALREADY_COMPLETED';
+  }
+  return false;
+}
