@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +21,7 @@ import {
 } from '@pokegames/shared-types';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 import { ANTI_REPEAT_WINDOW_DAYS, WHO_IS_IT_ADMIN_CONFIG } from './game-config';
 
 const WHO_IS_IT_LEVELS: WhoIsItLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
@@ -52,6 +58,7 @@ export class WhoIsItService {
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
+    private readonly dailyResult: DailyResultService,
   ) {}
 
   private readonly HISTORY_GAME = 'WHO_IS_IT';
@@ -159,6 +166,14 @@ export class WhoIsItService {
     type PokemonWithTypes = (typeof pokemons)[number];
     let target: PokemonWithTypes | undefined;
     if (mode === 'DAILY') {
+      // Verrou serveur : au demarrage du defi (1re manche), on refuse si deja termine aujourd'hui.
+      if (
+        roundIndex === 1 &&
+        userId &&
+        (await this.dailyResult.hasCompleted(userId, this.HISTORY_GAME, level, new Date()))
+      ) {
+        throw new ConflictException('DAILY_ALREADY_COMPLETED');
+      }
       // Serie du jour propre au niveau : DISJOINTE entre niveaux (meme jour), sans repetition dans
       // la serie, et sans reproposer un Pokemon tire ces derniers jours (anti-repetition par niveau).
       const now = new Date();
@@ -473,6 +488,16 @@ export class WhoIsItService {
       false,
     );
     this.eventEmitter.emit('game.round.completed', auditEvent);
+
+    // Defi quotidien termine (derniere manche resolue) : enregistrement du resultat du joueur.
+    if (session.mode === 'DAILY' && session.roundIndex >= session.totalRounds && effectiveUserId) {
+      await this.dailyResult.record(effectiveUserId, this.HISTORY_GAME, session.level, new Date(), {
+        won: true,
+        score: session.currentScore,
+        totalRounds: session.totalRounds,
+        durationSeconds,
+      });
+    }
 
     return {
       success: true,

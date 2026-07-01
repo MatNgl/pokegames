@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { SpriteProxyService } from './sprite-proxy.service';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 
 describe('WhoIsItService', () => {
   let service: WhoIsItService;
@@ -94,6 +95,13 @@ describe('WhoIsItService', () => {
             recordPicks: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: DailyResultService,
+          useValue: {
+            hasCompleted: jest.fn().mockResolvedValue(false),
+            record: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -133,7 +141,7 @@ describe('WhoIsItService', () => {
 
     it('Difficile : zoom et rotation initiaux du niveau', async () => {
       const state = await service.startRound({ generations: [1], level: 'DIFFICILE' });
-      expect(state.zoomRatio).toBe(3.0);
+      expect(state.zoomRatio).toBe(2.6);
       expect(state.rotationAngle).toBe(30);
     });
 

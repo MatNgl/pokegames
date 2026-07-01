@@ -1,10 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 import { ANTI_REPEAT_WINDOW_DAYS, MOTUS_ADMIN_CONFIG } from './game-config';
 import type {
   MotusGuessResponse,
@@ -52,6 +58,7 @@ export class MotusService {
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
+    private readonly dailyResult: DailyResultService,
   ) {}
 
   /** Retire les accents et ne garde que les lettres A a Z (majuscules). */
@@ -188,6 +195,9 @@ export class MotusService {
     if (!MOTUS_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
+    if (userId && (await this.dailyResult.hasCompleted(userId, this.HISTORY_GAME, level, new Date()))) {
+      throw new ConflictException('DAILY_ALREADY_COMPLETED');
+    }
     const { targets } = await this.loadData();
     if (targets.length === 0) {
       throw new NotFoundException('Aucun Pokémon disponible pour le Motus. Lancez le script ETL.');
@@ -273,6 +283,7 @@ export class MotusService {
 
     if (session.status !== 'PLAYING') {
       const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+      const won = session.status === 'WON';
       this.eventEmitter.emit(
         'game.round.completed',
         new GameRoundCompletedEvent(
@@ -280,7 +291,7 @@ export class MotusService {
           'MOTUS',
           session.pokemonId,
           session.answer,
-          session.status === 'WON',
+          won,
           durationSeconds,
           0,
           0,
@@ -289,6 +300,15 @@ export class MotusService {
           false,
         ),
       );
+      if (session.userId) {
+        await this.dailyResult.record(
+          session.userId,
+          this.HISTORY_GAME,
+          session.level ?? 'MOYEN',
+          new Date(),
+          { won, attempts: session.attempts.length, durationSeconds },
+        );
+      }
     }
 
     return { accepted: true, state: this.toState(session) };

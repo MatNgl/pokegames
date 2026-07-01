@@ -1,10 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 import { ANTI_REPEAT_WINDOW_DAYS, PLUS_MINUS_CONFIG } from './game-config';
 import type {
   PlusMinusChoiceResponse,
@@ -71,6 +77,7 @@ export class PlusMinusService {
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
+    private readonly dailyResult: DailyResultService,
   ) {}
 
   private readonly HISTORY_GAME = 'PLUS_MINUS';
@@ -353,6 +360,10 @@ export class PlusMinusService {
     if (!PLUS_MINUS_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
+    // Verrou serveur : un joueur connecte ne rejoue pas un defi deja termine aujourd'hui.
+    if (userId && (await this.dailyResult.hasCompleted(userId, this.HISTORY_GAME, level, new Date()))) {
+      throw new ConflictException('DAILY_ALREADY_COMPLETED');
+    }
     const pool = await this.loadPool();
     if (pool.length < 2) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
@@ -441,6 +452,7 @@ export class PlusMinusService {
 
     if (session.status === 'FINISHED') {
       const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+      const won = session.correctCount === session.duels.length;
       this.eventEmitter.emit(
         'game.round.completed',
         new GameRoundCompletedEvent(
@@ -448,7 +460,7 @@ export class PlusMinusService {
           'PLUS_MINUS',
           duel.a.id,
           duel.a.name,
-          session.correctCount === session.duels.length,
+          won,
           durationSeconds,
           0,
           session.correctCount,
@@ -457,6 +469,14 @@ export class PlusMinusService {
           false,
         ),
       );
+      if (session.userId) {
+        await this.dailyResult.record(session.userId, this.HISTORY_GAME, session.level, new Date(), {
+          won,
+          correctCount: session.correctCount,
+          totalRounds: session.duels.length,
+          durationSeconds,
+        });
+      }
     }
 
     return {

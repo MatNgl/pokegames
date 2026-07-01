@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
@@ -7,6 +12,7 @@ import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 import { ANTI_REPEAT_WINDOW_DAYS, TRUE_SHINY_CONFIG } from './game-config';
 import type {
   TrueShinyChoiceResponse,
@@ -62,6 +68,7 @@ export class TrueShinyService {
     private readonly pokemonService: PokemonService,
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
+    private readonly dailyResult: DailyResultService,
   ) {}
 
   private async loadPool(): Promise<PoolPokemon[]> {
@@ -216,6 +223,9 @@ export class TrueShinyService {
     if (!TRUE_SHINY_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
+    if (userId && (await this.dailyResult.hasCompleted(userId, this.HISTORY_GAME, level, new Date()))) {
+      throw new ConflictException('DAILY_ALREADY_COMPLETED');
+    }
     const pool = await this.loadPool();
     if (pool.length < TRUE_SHINY_CONFIG.roundsCount) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
@@ -334,6 +344,7 @@ export class TrueShinyService {
     if (session.currentIndex >= session.rounds.length) {
       session.status = 'FINISHED';
       const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+      const won = session.correctCount === session.rounds.length;
       this.eventEmitter.emit(
         'game.round.completed',
         new GameRoundCompletedEvent(
@@ -341,7 +352,7 @@ export class TrueShinyService {
           'TRUE_SHINY',
           round.pokemonId,
           round.name,
-          session.correctCount === session.rounds.length,
+          won,
           durationSeconds,
           0,
           session.correctCount,
@@ -350,6 +361,14 @@ export class TrueShinyService {
           false,
         ),
       );
+      if (session.userId) {
+        await this.dailyResult.record(session.userId, this.HISTORY_GAME, session.level, new Date(), {
+          won,
+          correctCount: session.correctCount,
+          totalRounds: session.rounds.length,
+          durationSeconds,
+        });
+      }
     }
 
     await this.persist(session);

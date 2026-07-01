@@ -76,6 +76,7 @@ model User {
   eloScore     Int           @default(1000)
   createdAt    DateTime      @default(now())
   gameHistory  GameHistory[]
+  dailyResults DailyResult[]
 }
 
 model GameHistory {
@@ -125,5 +126,30 @@ model DailyPick {
   @@index([game, scope, pickDate])
   @@index([game, scope, pokemonId])
   @@index([game, scope, detail])
+}
+
+/// Resultat quotidien d'un joueur connecte pour un defi (jeu x scope x jour). Sert au verrou serveur
+/// de l'unicite quotidienne, a l'historique joueur et aux futurs classements. Une seule ligne par
+/// (utilisateur, jeu, scope, jour). Les invites ne sont pas persistes (localStorage cote client).
+model DailyResult {
+  id              String   @id @default(uuid())
+  userId          String
+  gameType        String // "WHO_IS_IT", "MOTUS", ...
+  scope           String   @default("") // niveau et/ou mode ("FACILE", "FIND_SHINY:MOYEN", ...)
+  dayDate         DateTime @db.Date // jour UTC du defi
+  won             Boolean  @default(false)
+  // Metriques generiques : chaque jeu renseigne celles qui le concernent (classement selon le jeu).
+  attempts        Int? // Silhouette / Motus : nombre d'essais
+  score           Int? // ex. Who-is-it : capital restant
+  correctCount    Int? // Plus ou Moins / Intrus / Shiny / Juste Stat : bonnes reponses
+  totalRounds     Int?
+  durationSeconds Int?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameType, scope, dayDate])
+  @@index([gameType, scope, dayDate])
+  @@index([userId, dayDate])
 }
 

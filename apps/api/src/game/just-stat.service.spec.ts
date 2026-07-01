@@ -4,6 +4,7 @@ import { JustStatService } from './just-stat.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 
 const pool = Array.from({ length: 12 }, (_, i) => ({
   id: i + 1,
@@ -45,6 +46,13 @@ describe('JustStatService', () => {
             recentDetails: jest.fn().mockResolvedValue(new Set<string>()),
             hasPicksFor: jest.fn().mockResolvedValue(false),
             recordPicks: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: DailyResultService,
+          useValue: {
+            hasCompleted: jest.fn().mockResolvedValue(false),
+            record: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

@@ -5,6 +5,7 @@ import { PlusMinusService } from './plus-minus.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 
 interface StoredDuelSide {
   id: number;
@@ -88,6 +89,13 @@ describe('PlusMinusService', () => {
             recentPokemonIds: mockRecentIds,
             hasPicksFor: jest.fn().mockResolvedValue(false),
             recordPicks: mockRecordPicks,
+          },
+        },
+        {
+          provide: DailyResultService,
+          useValue: {
+            hasCompleted: jest.fn().mockResolvedValue(false),
+            record: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

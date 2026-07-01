@@ -10,6 +10,24 @@ export interface PokemonTypeInfo {
   image: string;
 }
 
+/* Resultats quotidiens (joueurs connectes) : verrou serveur, historique, classements. */
+export interface DailyResultDTO {
+  gameType: string;
+  scope: string; // niveau et/ou mode ("FACILE", "FIND_SHINY:MOYEN", ...)
+  dayDate: string; // AAAA-MM-JJ (UTC)
+  won: boolean;
+  attempts: number | null;
+  score: number | null;
+  correctCount: number | null;
+  totalRounds: number | null;
+  durationSeconds: number | null;
+}
+
+export interface DailyStatusResponse {
+  authenticated: boolean;
+  results: DailyResultDTO[];
+}
+
 export interface PokemonStats {
   hp: number;
   atk: number;

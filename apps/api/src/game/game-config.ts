@@ -40,9 +40,9 @@ export const WHO_IS_IT_ADMIN_CONFIG: WhoIsItAdminConfig = {
   },
   levels: {
     FACILE: { allowedGenerations: [1, 2, 3], initialZoomRatio: 1.0, zoomStepPerMistake: 0, initialRotationAngle: 0, rotationStepPerMistake: 0 },
-    MOYEN: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 2.6, zoomStepPerMistake: 0.2, initialRotationAngle: 0, rotationStepPerMistake: 0 },
-    DIFFICILE: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 3.0, zoomStepPerMistake: 0.24, initialRotationAngle: 30, rotationStepPerMistake: 8 },
-    EXTREME: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 3.4, zoomStepPerMistake: 0.3, initialRotationAngle: 70, rotationStepPerMistake: 15 },
+    MOYEN: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 2.0, zoomStepPerMistake: 0.2, initialRotationAngle: 0, rotationStepPerMistake: 0 },
+    DIFFICILE: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 2.6, zoomStepPerMistake: 0.24, initialRotationAngle: 30, rotationStepPerMistake: 8 },
+    EXTREME: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 3.0, zoomStepPerMistake: 0.3, initialRotationAngle: 70, rotationStepPerMistake: 15 },
   },
 };
 

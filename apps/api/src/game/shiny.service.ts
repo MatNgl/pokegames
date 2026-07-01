@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
@@ -6,6 +11,7 @@ import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 import { ANTI_REPEAT_WINDOW_DAYS, SHINY_CONFIG } from './game-config';
 import type {
   ShinyChoiceResponse,
@@ -60,9 +66,15 @@ export class ShinyService {
     private readonly pokemonService: PokemonService,
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
+    private readonly dailyResult: DailyResultService,
   ) {}
 
   private readonly HISTORY_GAME = 'SHINY';
+
+  // Chaque mode x niveau est un defi distinct pour le verrou/historique.
+  private resultScope(mode: ShinyMode, level: ShinyLevel): string {
+    return `${mode}:${level}`;
+  }
 
   private async loadPool(): Promise<PoolPokemon[]> {
     if (this.poolCache) return this.poolCache;
@@ -238,6 +250,12 @@ export class ShinyService {
     if (!SHINY_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
+    if (
+      userId &&
+      (await this.dailyResult.hasCompleted(userId, this.HISTORY_GAME, this.resultScope(mode, level), new Date()))
+    ) {
+      throw new ConflictException('DAILY_ALREADY_COMPLETED');
+    }
     const pool = await this.loadPool();
     if (pool.length < SHINY_CONFIG.levels[level].gridSize) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
@@ -358,6 +376,7 @@ export class ShinyService {
     if (session.status === 'FINISHED') {
       const answerTile = round.slots[round.answerSlot];
       const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+      const won = session.correctCount === session.rounds.length;
       this.eventEmitter.emit(
         'game.round.completed',
         new GameRoundCompletedEvent(
@@ -365,7 +384,7 @@ export class ShinyService {
           'SHINY',
           answerTile?.pokemonId ?? 0,
           answerTile?.name ?? '',
-          session.correctCount === session.rounds.length,
+          won,
           durationSeconds,
           0,
           session.correctCount,
@@ -374,6 +393,15 @@ export class ShinyService {
           false,
         ),
       );
+      if (session.userId) {
+        await this.dailyResult.record(
+          session.userId,
+          this.HISTORY_GAME,
+          this.resultScope(session.mode, session.level),
+          new Date(),
+          { won, correctCount: session.correctCount, totalRounds: session.rounds.length, durationSeconds },
+        );
+      }
     }
 
     return {

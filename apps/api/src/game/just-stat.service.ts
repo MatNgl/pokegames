@@ -3,8 +3,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { ConflictException } from '@nestjs/common';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 import {
   ANTI_REPEAT_DETAIL_WINDOW_DAYS,
   ANTI_REPEAT_WINDOW_DAYS,
@@ -59,13 +61,26 @@ export class JustStatService {
   private poolCache: PoolPokemon[] | null = null;
   private planCache: { date: string; rounds: RoundDef[] } | null = null;
   private readonly HISTORY_GAME = 'JUST_STAT';
+  private readonly RESULT_SCOPE = ''; // mode unique, pas de niveau
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
+    private readonly dailyResult: DailyResultService,
   ) {}
+
+  private async recordIfFinished(session: JustStatSession): Promise<void> {
+    if (session.status !== 'FINISHED' || !session.userId) return;
+    const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+    await this.dailyResult.record(session.userId, this.HISTORY_GAME, this.RESULT_SCOPE, new Date(), {
+      won: session.correctCount === session.rounds.length,
+      correctCount: session.correctCount,
+      totalRounds: session.rounds.length,
+      durationSeconds,
+    });
+  }
 
   private async loadPool(): Promise<PoolPokemon[]> {
     if (this.poolCache) return this.poolCache;
@@ -268,6 +283,12 @@ export class JustStatService {
   }
 
   async startDaily(userId?: string): Promise<JustStatRoundState> {
+    if (
+      userId &&
+      (await this.dailyResult.hasCompleted(userId, this.HISTORY_GAME, this.RESULT_SCOPE, new Date()))
+    ) {
+      throw new ConflictException('DAILY_ALREADY_COMPLETED');
+    }
     const pool = await this.loadPool();
     if (pool.length < JUST_STAT_CONFIG.roundsCount) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
@@ -386,6 +407,7 @@ export class JustStatService {
     }
 
     await this.persist(session);
+    await this.recordIfFinished(session);
 
     return {
       direction,
@@ -410,6 +432,7 @@ export class JustStatService {
 
     this.advanceAndMaybeFinish(session, round);
     await this.persist(session);
+    await this.recordIfFinished(session);
 
     return {
       direction: null,

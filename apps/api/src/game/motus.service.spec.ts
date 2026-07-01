@@ -4,6 +4,7 @@ import { MotusService } from './motus.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 
 describe('MotusService', () => {
   let service: MotusService;
@@ -51,6 +52,13 @@ describe('MotusService', () => {
             recentPokemonIds: jest.fn().mockResolvedValue(new Set<number>()),
             hasPicksFor: jest.fn().mockResolvedValue(false),
             recordPicks: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: DailyResultService,
+          useValue: {
+            hasCompleted: jest.fn().mockResolvedValue(false),
+            record: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

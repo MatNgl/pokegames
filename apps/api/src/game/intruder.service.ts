@@ -1,10 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 import { ANTI_REPEAT_WINDOW_DAYS, INTRUDER_CONFIG, type IntruderHintMode } from './game-config';
 import type {
   IntruderChoiceResponse,
@@ -102,6 +108,7 @@ export class IntruderService {
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
+    private readonly dailyResult: DailyResultService,
   ) {}
 
   private readonly HISTORY_GAME = 'INTRUDER';
@@ -568,6 +575,9 @@ export class IntruderService {
     if (!INTRUDER_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
+    if (userId && (await this.dailyResult.hasCompleted(userId, this.HISTORY_GAME, level, new Date()))) {
+      throw new ConflictException('DAILY_ALREADY_COMPLETED');
+    }
     const pool = await this.loadPool();
     if (pool.length < INTRUDER_CONFIG.levels[level].gridSize) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
@@ -663,6 +673,7 @@ export class IntruderService {
 
     if (session.status === 'FINISHED') {
       const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+      const won = session.correctCount === session.rounds.length;
       this.eventEmitter.emit(
         'game.round.completed',
         new GameRoundCompletedEvent(
@@ -670,7 +681,7 @@ export class IntruderService {
           'INTRUDER',
           round.intruderId,
           round.names[round.intruderId] ?? '',
-          session.correctCount === session.rounds.length,
+          won,
           durationSeconds,
           0,
           session.correctCount,
@@ -679,6 +690,14 @@ export class IntruderService {
           false,
         ),
       );
+      if (session.userId) {
+        await this.dailyResult.record(session.userId, this.HISTORY_GAME, session.level, new Date(), {
+          won,
+          correctCount: session.correctCount,
+          totalRounds: session.rounds.length,
+          durationSeconds,
+        });
+      }
     }
 
     return {
