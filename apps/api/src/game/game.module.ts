@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PokemonModule } from '../pokemon/pokemon.module';
+import { HistoryModule } from '../history/history.module';
 import { SpriteProxyService } from './sprite-proxy.service';
 import { SpriteProxyController } from './sprite-proxy.controller';
 import { WhoIsItService } from './who-is-it.service';
@@ -18,7 +19,7 @@ import { TrueShinyService } from './true-shiny.service';
 import { TrueShinyController } from './true-shiny.controller';
 
 @Module({
-  imports: [PokemonModule],
+  imports: [PokemonModule, HistoryModule],
   controllers: [
     SpriteProxyController,
     WhoIsItController,

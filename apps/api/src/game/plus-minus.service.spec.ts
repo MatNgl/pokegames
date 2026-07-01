@@ -4,6 +4,7 @@ import type { PlusMinusCriterion, PlusMinusLevel } from '@pokegames/shared-types
 import { PlusMinusService } from './plus-minus.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { HistoryService } from '../history/history.service';
 
 interface StoredDuelSide {
   id: number;
@@ -44,6 +45,8 @@ describe('PlusMinusService', () => {
   let mockGet: jest.Mock;
   let mockSet: jest.Mock;
   let mockEmit: jest.Mock;
+  let mockRecentIds: jest.Mock;
+  let mockRecordPicks: jest.Mock;
 
   function duelSession(overrides: Record<string, unknown> = {}): string {
     return JSON.stringify({
@@ -70,6 +73,8 @@ describe('PlusMinusService', () => {
     mockGet = jest.fn();
     mockSet = jest.fn().mockResolvedValue(undefined);
     mockEmit = jest.fn().mockReturnValue(true);
+    mockRecentIds = jest.fn().mockResolvedValue(new Set<number>());
+    mockRecordPicks = jest.fn().mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -77,6 +82,14 @@ describe('PlusMinusService', () => {
         { provide: PrismaService, useValue: { pokemon: { findMany: jest.fn().mockResolvedValue(bigPool) } } },
         { provide: RedisService, useValue: { get: mockGet, set: mockSet, del: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: mockEmit } },
+        {
+          provide: HistoryService,
+          useValue: {
+            recentPokemonIds: mockRecentIds,
+            hasPicksFor: jest.fn().mockResolvedValue(false),
+            recordPicks: mockRecordPicks,
+          },
+        },
       ],
     }).compile();
 
@@ -114,6 +127,20 @@ describe('PlusMinusService', () => {
         expect(diff).toBeGreaterThanOrEqual(1);
         expect(diff).toBeLessThanOrEqual(9);
       }
+    });
+
+    it('exclut les Pokémon tirés les jours précédents et enregistre le tirage du jour', async () => {
+      const excluded = new Set<number>(Array.from({ length: 60 }, (_, i) => i + 1));
+      mockRecentIds.mockResolvedValue(excluded);
+
+      await service.startDaily('FACILE');
+      const session = lastSavedSession();
+
+      for (const duel of session.duels) {
+        expect(excluded.has(duel.a.id)).toBe(false);
+        expect(excluded.has(duel.b.id)).toBe(false);
+      }
+      expect(mockRecordPicks).toHaveBeenCalledTimes(1);
     });
 
     it('ne répète aucun Pokémon entre les niveaux d’un même jour', async () => {

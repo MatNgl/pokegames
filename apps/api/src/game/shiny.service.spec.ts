@@ -4,6 +4,7 @@ import { ShinyService } from './shiny.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
+import { HistoryService } from '../history/history.service';
 import type { ShinyMode } from '@pokegames/shared-types';
 
 // Assez grand pour les 3 niveaux d'un mode sans repetition (5*3 + 5*4 + 5*6 = 65 Pokemon).
@@ -56,6 +57,14 @@ describe('ShinyService', () => {
           useValue: { getSprite: mockGetSprite, getShinySprite: mockGetShinySprite },
         },
         { provide: EventEmitter2, useValue: { emit: mockEmit } },
+        {
+          provide: HistoryService,
+          useValue: {
+            recentPokemonIds: jest.fn().mockResolvedValue(new Set<number>()),
+            hasPicksFor: jest.fn().mockResolvedValue(false),
+            recordPicks: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

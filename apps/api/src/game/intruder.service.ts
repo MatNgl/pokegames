@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
-import { INTRUDER_CONFIG, type IntruderHintMode } from './game-config';
+import { HistoryService } from '../history/history.service';
+import { ANTI_REPEAT_WINDOW_DAYS, INTRUDER_CONFIG, type IntruderHintMode } from './game-config';
 import type {
   IntruderChoiceResponse,
   IntruderLevel,
@@ -99,7 +100,10 @@ export class IntruderService {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly history: HistoryService,
   ) {}
+
+  private readonly HISTORY_GAME = 'INTRUDER';
 
   private async loadPool(): Promise<PoolPokemon[]> {
     if (this.poolCache) return this.poolCache;
@@ -477,21 +481,56 @@ export class IntruderService {
     return rounds;
   }
 
-  /**
-   * Plan du jour complet : les 3 niveaux construits dans un ordre fixe avec un meme RNG et un
-   * ensemble d'exclusion partage, pour qu'aucun Pokemon ne se repete entre les niveaux du jour.
-   */
-  private getDailyPlan(pool: PoolPokemon[]): Record<IntruderLevel, RoundDef[]> {
-    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    if (this.planCache && this.planCache.date === today) {
-      return this.planCache.plan;
-    }
+  private buildPlan(pool: PoolPokemon[], initialUsed: Set<number>): Record<IntruderLevel, RoundDef[]> {
     const rng = this.makeRng(this.dailySeed());
-    const used = new Set<number>();
+    const used = new Set<number>(initialUsed);
     const plan = {} as Record<IntruderLevel, RoundDef[]>;
     for (const level of INTRUDER_LEVELS) {
       plan[level] = this.buildRounds(pool, level, rng, used);
     }
+    return plan;
+  }
+
+  private planComplete(plan: Record<IntruderLevel, RoundDef[]>): boolean {
+    return INTRUDER_LEVELS.every((level) => plan[level].length === INTRUDER_CONFIG.roundsCount);
+  }
+
+  /**
+   * Plan du jour : dedup entre niveaux (meme jour) + anti-repetition cross-jours via l'historique.
+   * Repli sans historique si l'exclusion rend un niveau incomplet. Tirage enregistre une fois par jour.
+   */
+  private async getDailyPlan(pool: PoolPokemon[]): Promise<Record<IntruderLevel, RoundDef[]>> {
+    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    if (this.planCache && this.planCache.date === today) {
+      return this.planCache.plan;
+    }
+    const now = new Date();
+    const recent = await this.history.recentPokemonIds(
+      this.HISTORY_GAME,
+      '',
+      now,
+      ANTI_REPEAT_WINDOW_DAYS.INTRUDER,
+    );
+    let plan = this.buildPlan(pool, recent);
+    if (!this.planComplete(plan)) {
+      plan = this.buildPlan(pool, new Set<number>());
+    }
+
+    if (!(await this.history.hasPicksFor(this.HISTORY_GAME, '', now))) {
+      const ids = new Set<number>();
+      for (const level of INTRUDER_LEVELS) {
+        for (const round of plan[level]) {
+          for (const id of round.memberIds) ids.add(id);
+        }
+      }
+      await this.history.recordPicks(
+        this.HISTORY_GAME,
+        '',
+        now,
+        [...ids].map((id) => ({ pokemonId: id })),
+      );
+    }
+
     this.planCache = { date: today, plan };
     return plan;
   }
@@ -528,7 +567,7 @@ export class IntruderService {
     if (pool.length < INTRUDER_CONFIG.levels[level].gridSize) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
-    const rounds = this.getDailyPlan(pool)[level];
+    const rounds = (await this.getDailyPlan(pool))[level];
     if (rounds.length === 0) {
       throw new NotFoundException('Impossible de générer les manches du jour');
     }

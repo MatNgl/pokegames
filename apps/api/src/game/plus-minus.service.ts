@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
-import { PLUS_MINUS_CONFIG } from './game-config';
+import { HistoryService } from '../history/history.service';
+import { ANTI_REPEAT_WINDOW_DAYS, PLUS_MINUS_CONFIG } from './game-config';
 import type {
   PlusMinusChoiceResponse,
   PlusMinusContestant,
@@ -69,7 +70,10 @@ export class PlusMinusService {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly history: HistoryService,
   ) {}
+
+  private readonly HISTORY_GAME = 'PLUS_MINUS';
 
   private async loadPool(): Promise<PoolPokemon[]> {
     if (this.poolCache) return this.poolCache;
@@ -261,21 +265,59 @@ export class PlusMinusService {
     return duels;
   }
 
-  /**
-   * Plan du jour complet : tous les niveaux construits dans un ordre fixe avec un meme RNG et un
-   * ensemble d'exclusion partage, de sorte qu'aucun Pokemon ne se repete entre les niveaux du jour.
-   */
-  private getDailyPlan(pool: PoolPokemon[]): Record<PlusMinusLevel, Duel[]> {
-    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    if (this.planCache && this.planCache.date === today) {
-      return this.planCache.plan;
-    }
+  // Construit tous les niveaux avec un meme RNG et une exclusion partagee (dedup intra-jour + historique).
+  private buildPlan(pool: PoolPokemon[], initialUsed: Set<number>): Record<PlusMinusLevel, Duel[]> {
     const rng = this.makeRng(this.dailySeed());
-    const used = new Set<number>();
+    const used = new Set<number>(initialUsed);
     const plan = {} as Record<PlusMinusLevel, Duel[]>;
     for (const level of PLUS_MINUS_LEVELS) {
       plan[level] = this.buildDuels(pool, level, rng, used);
     }
+    return plan;
+  }
+
+  private planComplete(plan: Record<PlusMinusLevel, Duel[]>): boolean {
+    return PLUS_MINUS_LEVELS.every((level) => plan[level].length === PLUS_MINUS_CONFIG.roundsCount);
+  }
+
+  /**
+   * Plan du jour : dedup entre niveaux (meme jour) + anti-repetition cross-jours via l'historique.
+   * On exclut les Pokemon tires ces derniers jours ; si l'exclusion rend un niveau incomplet, on
+   * rejoue sans l'historique (repli). Le tirage retenu est enregistre une fois par jour.
+   */
+  private async getDailyPlan(pool: PoolPokemon[]): Promise<Record<PlusMinusLevel, Duel[]>> {
+    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    if (this.planCache && this.planCache.date === today) {
+      return this.planCache.plan;
+    }
+    const now = new Date();
+    const recent = await this.history.recentPokemonIds(
+      this.HISTORY_GAME,
+      '',
+      now,
+      ANTI_REPEAT_WINDOW_DAYS.PLUS_MINUS,
+    );
+    let plan = this.buildPlan(pool, recent);
+    if (!this.planComplete(plan)) {
+      plan = this.buildPlan(pool, new Set<number>());
+    }
+
+    if (!(await this.history.hasPicksFor(this.HISTORY_GAME, '', now))) {
+      const ids = new Set<number>();
+      for (const level of PLUS_MINUS_LEVELS) {
+        for (const duel of plan[level]) {
+          ids.add(duel.a.id);
+          ids.add(duel.b.id);
+        }
+      }
+      await this.history.recordPicks(
+        this.HISTORY_GAME,
+        '',
+        now,
+        [...ids].map((id) => ({ pokemonId: id })),
+      );
+    }
+
     this.planCache = { date: today, plan };
     return plan;
   }
@@ -313,7 +355,7 @@ export class PlusMinusService {
     if (pool.length < 2) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
-    const duels = this.getDailyPlan(pool)[level];
+    const duels = (await this.getDailyPlan(pool))[level];
     if (duels.length === 0) {
       throw new NotFoundException('Impossible de générer les duels du jour');
     }

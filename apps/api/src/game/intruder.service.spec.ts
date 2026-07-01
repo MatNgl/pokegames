@@ -4,6 +4,7 @@ import type { IntruderLevel } from '@pokegames/shared-types';
 import { IntruderService } from './intruder.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { HistoryService } from '../history/history.service';
 
 const TYPES = ['Feu', 'Eau', 'Plante', 'Électrik', 'Roche', 'Insecte'];
 
@@ -59,6 +60,14 @@ describe('IntruderService', () => {
         },
         { provide: RedisService, useValue: { get: mockGet, set: mockSet, del: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: mockEmit } },
+        {
+          provide: HistoryService,
+          useValue: {
+            recentPokemonIds: jest.fn().mockResolvedValue(new Set<number>()),
+            hasPicksFor: jest.fn().mockResolvedValue(false),
+            recordPicks: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

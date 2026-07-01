@@ -176,6 +176,24 @@ export interface StatDescriptor {
   max: number;
 }
 
+/**
+ * Anti-repetition cross-jours : nombre de jours pendant lesquels un Pokemon deja tire n'est plus
+ * repropose dans un jeu. Calcule d'apres pool / tires-par-jour (facteur ~0,4, plafond 30 jours) pour
+ * rester equitable sans geler le dex. Voir HistoryService (recentPokemonIds + recordPicks).
+ */
+export const ANTI_REPEAT_WINDOW_DAYS = {
+  PLUS_MINUS: 5,
+  INTRUDER: 6,
+  SHINY: 6, // par mode
+  WHO_IS_IT: 20,
+  TRUE_SHINY: 30,
+  JUST_STAT: 30,
+  MOTUS: 30,
+} as const;
+
+// Dimensions secondaires (stat, critere) : rarefiees sur une fenetre courte.
+export const ANTI_REPEAT_DETAIL_WINDOW_DAYS = 1;
+
 export const JUST_STAT_DESCRIPTORS: Record<JustStatKey, StatDescriptor> = {
   HP: { label: 'PV', unit: '', min: 1, max: 255 },
   ATK: { label: 'Attaque', unit: '', min: 1, max: 255 },

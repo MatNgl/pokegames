@@ -5,7 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
-import { SHINY_CONFIG } from './game-config';
+import { HistoryService } from '../history/history.service';
+import { ANTI_REPEAT_WINDOW_DAYS, SHINY_CONFIG } from './game-config';
 import type {
   ShinyChoiceResponse,
   ShinyLevel,
@@ -58,7 +59,10 @@ export class ShinyService {
     private readonly redisService: RedisService,
     private readonly pokemonService: PokemonService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly history: HistoryService,
   ) {}
+
+  private readonly HISTORY_GAME = 'SHINY';
 
   private async loadPool(): Promise<PoolPokemon[]> {
     if (this.poolCache) return this.poolCache;
@@ -145,22 +149,64 @@ export class ShinyService {
     return rounds;
   }
 
+  private buildPlan(
+    mode: ShinyMode,
+    pool: PoolPokemon[],
+    initialUsed: Set<number>,
+  ): Record<ShinyLevel, RoundDef[]> {
+    const rng = this.makeRng(this.dailySeed(mode));
+    const used = new Set<number>(initialUsed);
+    const plan = {} as Record<ShinyLevel, RoundDef[]>;
+    for (const level of SHINY_LEVELS) {
+      plan[level] = this.buildRounds(pool, mode, SHINY_CONFIG.levels[level].gridSize, rng, used);
+    }
+    return plan;
+  }
+
+  private planComplete(plan: Record<ShinyLevel, RoundDef[]>): boolean {
+    return SHINY_LEVELS.every((level) => plan[level].length === SHINY_CONFIG.roundsCount);
+  }
+
   /**
-   * Plan du jour d'un mode : les 3 niveaux construits dans un ordre fixe avec un meme RNG et un
-   * ensemble d'exclusion partage, pour qu'aucun Pokemon ne se repete entre les niveaux du mode.
+   * Plan du jour d'un mode : dedup entre niveaux (meme mode, meme jour) + anti-repetition cross-jours.
+   * Le scope d'historique est le mode (les deux modes sont des defis distincts). Repli si incomplet.
    */
-  private getDailyPlan(mode: ShinyMode, pool: PoolPokemon[]): Record<ShinyLevel, RoundDef[]> {
+  private async getDailyPlan(
+    mode: ShinyMode,
+    pool: PoolPokemon[],
+  ): Promise<Record<ShinyLevel, RoundDef[]>> {
     const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
     const cached = this.planCache.get(mode);
     if (cached && cached.date === today) {
       return cached.plan;
     }
-    const rng = this.makeRng(this.dailySeed(mode));
-    const used = new Set<number>();
-    const plan = {} as Record<ShinyLevel, RoundDef[]>;
-    for (const level of SHINY_LEVELS) {
-      plan[level] = this.buildRounds(pool, mode, SHINY_CONFIG.levels[level].gridSize, rng, used);
+    const now = new Date();
+    const recent = await this.history.recentPokemonIds(
+      this.HISTORY_GAME,
+      mode,
+      now,
+      ANTI_REPEAT_WINDOW_DAYS.SHINY,
+    );
+    let plan = this.buildPlan(mode, pool, recent);
+    if (!this.planComplete(plan)) {
+      plan = this.buildPlan(mode, pool, new Set<number>());
     }
+
+    if (!(await this.history.hasPicksFor(this.HISTORY_GAME, mode, now))) {
+      const ids = new Set<number>();
+      for (const level of SHINY_LEVELS) {
+        for (const round of plan[level]) {
+          for (const slot of round.slots) ids.add(slot.pokemonId);
+        }
+      }
+      await this.history.recordPicks(
+        this.HISTORY_GAME,
+        mode,
+        now,
+        [...ids].map((id) => ({ pokemonId: id })),
+      );
+    }
+
     this.planCache.set(mode, { date: today, plan });
     return plan;
   }
@@ -196,7 +242,7 @@ export class ShinyService {
     if (pool.length < SHINY_CONFIG.levels[level].gridSize) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
-    const rounds = this.getDailyPlan(mode, pool)[level];
+    const rounds = (await this.getDailyPlan(mode, pool))[level];
     if (rounds.length === 0) {
       throw new NotFoundException('Impossible de générer les manches du jour');
     }
