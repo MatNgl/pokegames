@@ -285,20 +285,28 @@ export interface IntruderChoiceResponse {
 // FIND_NON_SHINY : 2 Pokemon shiny + 1 normal, trouver celui qui n'est pas shiny.
 export type ShinyMode = 'FIND_SHINY' | 'FIND_NON_SHINY';
 
+export type ShinyLevel = 'FACILE' | 'MOYEN' | 'DIFFICILE';
+
 export interface ShinyTile {
-  slot: number; // 0 a 2
+  slot: number; // 0 a gridSize-1
   imageUrl: string; // proxy opaque : ne revele jamais si la vignette est shiny
+}
+
+export interface ShinyStartRequest {
+  mode: ShinyMode;
+  level: ShinyLevel;
 }
 
 export interface ShinyRoundState {
   roundId: string;
   mode: ShinyMode;
+  level: ShinyLevel;
   totalRounds: number;
   roundIndex: number; // manche courante (1 a totalRounds)
   correctCount: number;
   status: 'PLAYING' | 'FINISHED';
   prompt: string; // consigne selon le mode
-  tiles: ShinyTile[]; // 3 Pokemon differents, l'intrus chromatique reste secret
+  tiles: ShinyTile[]; // gridSize Pokemon differents, l'intrus chromatique reste secret
 }
 
 export interface ShinyTileReveal {

@@ -1,13 +1,13 @@
-import type { ShinyMode } from '@pokegames/shared-types';
+import type { ShinyLevel, ShinyMode } from '@pokegames/shared-types';
 
-// Persistance locale des defis "Trouve le shiny" quotidiens (1 session par jour et par mode).
-// L'etat detaille vit en Redis. Les cles sont suffixees par le mode pour separer les deux defis.
-function storageKey(mode: ShinyMode): string {
-  return `pokegames:shiny:${mode}`;
+// Persistance locale des defis "Trouve le shiny" quotidiens (1 session par jour, par mode et par niveau).
+// L'etat detaille vit en Redis. Les cles sont suffixees par le mode et le niveau pour separer les defis.
+function storageKey(mode: ShinyMode, level: ShinyLevel): string {
+  return `pokegames:shiny:${mode}:${level}`;
 }
 
-function doneKey(mode: ShinyMode): string {
-  return `pokegames:shiny:${mode}:done`;
+function doneKey(mode: ShinyMode, level: ShinyLevel): string {
+  return `pokegames:shiny:${mode}:${level}:done`;
 }
 
 export function shinyTodayKey(): string {
@@ -43,45 +43,55 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-export function loadShinySaved(mode: ShinyMode): ShinySaved | null {
-  const saved = readJson<ShinySaved>(storageKey(mode));
+export function loadShinySaved(mode: ShinyMode, level: ShinyLevel): ShinySaved | null {
+  const saved = readJson<ShinySaved>(storageKey(mode, level));
   if (saved && typeof saved.roundId === 'string' && typeof saved.date === 'string') {
     return saved;
   }
   return null;
 }
 
-export function saveShiny(mode: ShinyMode, roundId: string, roundIndex = 1): void {
-  writeJson(storageKey(mode), { date: shinyTodayKey(), roundId, roundIndex });
+export function saveShiny(
+  mode: ShinyMode,
+  level: ShinyLevel,
+  roundId: string,
+  roundIndex = 1,
+): void {
+  writeJson(storageKey(mode, level), { date: shinyTodayKey(), roundId, roundIndex });
 }
 
-export function clearShiny(mode: ShinyMode): void {
+export function clearShiny(mode: ShinyMode, level: ShinyLevel): void {
   try {
-    localStorage.removeItem(storageKey(mode));
+    localStorage.removeItem(storageKey(mode, level));
   } catch {
     // Rien a faire si le stockage est indisponible.
   }
 }
 
-export function loadShinyDone(mode: ShinyMode): ShinyDone | null {
-  const done = readJson<ShinyDone>(doneKey(mode));
+export function loadShinyDone(mode: ShinyMode, level: ShinyLevel): ShinyDone | null {
+  const done = readJson<ShinyDone>(doneKey(mode, level));
   if (done && typeof done.date === 'string' && typeof done.correctCount === 'number') {
     return done;
   }
   return null;
 }
 
-export function saveShinyDone(mode: ShinyMode, correctCount: number, totalRounds: number): void {
-  writeJson(doneKey(mode), { date: shinyTodayKey(), correctCount, totalRounds });
+export function saveShinyDone(
+  mode: ShinyMode,
+  level: ShinyLevel,
+  correctCount: number,
+  totalRounds: number,
+): void {
+  writeJson(doneKey(mode, level), { date: shinyTodayKey(), correctCount, totalRounds });
 }
 
 export type ShinyDailyStatus = 'idle' | 'in-progress' | 'done';
 
-export function shinyDailyStatus(mode: ShinyMode): ShinyDailyStatus {
+export function shinyDailyStatus(mode: ShinyMode, level: ShinyLevel): ShinyDailyStatus {
   const today = shinyTodayKey();
-  const done = loadShinyDone(mode);
+  const done = loadShinyDone(mode, level);
   if (done && done.date === today) return 'done';
-  const saved = loadShinySaved(mode);
+  const saved = loadShinySaved(mode, level);
   if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }

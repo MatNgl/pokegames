@@ -1,8 +1,13 @@
 import { api } from '@/lib/api';
-import type { ShinyChoiceResponse, ShinyMode, ShinyRoundState } from '@pokegames/shared-types';
+import type {
+  ShinyChoiceResponse,
+  ShinyLevel,
+  ShinyMode,
+  ShinyRoundState,
+} from '@pokegames/shared-types';
 
-export async function startShiny(mode: ShinyMode): Promise<ShinyRoundState> {
-  const res = await api.post<ShinyRoundState>('/games/shiny/start', { mode });
+export async function startShiny(mode: ShinyMode, level: ShinyLevel): Promise<ShinyRoundState> {
+  const res = await api.post<ShinyRoundState>('/games/shiny/start', { mode, level });
   return res.data;
 }
 

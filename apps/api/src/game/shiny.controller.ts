@@ -19,6 +19,7 @@ import type {
   ShinyChoiceResponse,
   ShinyMode,
   ShinyRoundState,
+  ShinyStartRequest,
 } from '@pokegames/shared-types';
 
 interface AuthenticatedUser {
@@ -35,13 +36,14 @@ export class ShinyController {
   @Post('start')
   async start(
     @Req() req: Request & { user?: AuthenticatedUser },
-    @Body() body: { mode?: ShinyMode },
+    @Body() body: Partial<ShinyStartRequest>,
   ): Promise<ShinyRoundState> {
     const mode = body.mode;
     if (!mode || !SHINY_MODES.includes(mode)) {
       throw new BadRequestException('Mode invalide');
     }
-    return this.shinyService.startDaily(mode, req.user?.id);
+    const level = body.level ?? 'FACILE';
+    return this.shinyService.startDaily(mode, level, req.user?.id);
   }
 
   @Get('round/:roundId')

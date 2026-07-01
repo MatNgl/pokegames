@@ -6,10 +6,21 @@ import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import type { ShinyMode } from '@pokegames/shared-types';
 
-const pool = Array.from({ length: 30 }, (_, i) => ({
+// Assez grand pour les 3 niveaux d'un mode sans repetition (5*3 + 5*4 + 5*6 = 65 Pokemon).
+const pool = Array.from({ length: 100 }, (_, i) => ({
   id: i + 1,
   nameFr: `Pokemon${i + 1}`,
 }));
+
+interface StoredSlot {
+  pokemonId: number;
+}
+interface StoredRound {
+  slots: StoredSlot[];
+}
+interface StoredSession {
+  rounds: StoredRound[];
+}
 
 describe('ShinyService', () => {
   let service: ShinyService;
@@ -18,6 +29,10 @@ describe('ShinyService', () => {
   let mockEmit: jest.Mock;
   let mockGetSprite: jest.Mock;
   let mockGetShinySprite: jest.Mock;
+
+  function lastSaved(): StoredSession {
+    return JSON.parse(String(mockSet.mock.calls.at(-1)?.[1])) as StoredSession;
+  }
 
   beforeEach(async () => {
     mockGet = jest.fn();
@@ -52,14 +67,14 @@ describe('ShinyService', () => {
   });
 
   describe('startDaily', () => {
-    it('renvoie la 1re manche avec 3 vignettes opaques, sans révéler la réponse', async () => {
-      const state = await service.startDaily('FIND_SHINY');
+    it('renvoie la 1re manche (5 manches, 3 vignettes en Facile), sans révéler la réponse', async () => {
+      const state = await service.startDaily('FIND_SHINY', 'FACILE');
 
       expect(state.roundId).toBeDefined();
       expect(state.mode).toBe('FIND_SHINY');
-      expect(state.totalRounds).toBe(10);
+      expect(state.level).toBe('FACILE');
+      expect(state.totalRounds).toBe(5);
       expect(state.roundIndex).toBe(1);
-      expect(state.correctCount).toBe(0);
       expect(state.status).toBe('PLAYING');
       expect(state.tiles).toHaveLength(3);
       for (const tile of state.tiles) {
@@ -70,22 +85,47 @@ describe('ShinyService', () => {
       expect(serialized).not.toContain('isShiny');
     });
 
+    it('adapte le nombre de vignettes au niveau (Moyen 4, Difficile 6)', async () => {
+      const moyen = await service.startDaily('FIND_SHINY', 'MOYEN');
+      expect(moyen.tiles).toHaveLength(4);
+      const difficile = await service.startDaily('FIND_SHINY', 'DIFFICILE');
+      expect(difficile.tiles).toHaveLength(6);
+    });
+
+    it('rejette un niveau invalide', async () => {
+      await expect(
+        service.startDaily('FIND_SHINY', 'IMPOSSIBLE' as 'FACILE'),
+      ).rejects.toThrow('Niveau invalide');
+    });
+
+    it('ne répète aucun Pokémon entre les niveaux d’un même mode', async () => {
+      await service.startDaily('FIND_SHINY', 'FACILE');
+      const facile = lastSaved();
+      await service.startDaily('FIND_SHINY', 'DIFFICILE');
+      const difficile = lastSaved();
+
+      const facileIds = new Set(facile.rounds.flatMap((r) => r.slots.map((s) => s.pokemonId)));
+      const difficileIds = difficile.rounds.flatMap((r) => r.slots.map((s) => s.pokemonId));
+      for (const id of difficileIds) {
+        expect(facileIds.has(id)).toBe(false);
+      }
+    });
+
     it('génère un contenu différent entre les deux modes', async () => {
-      const shiny = await service.startDaily('FIND_SHINY');
-      const nonShiny = await service.startDaily('FIND_NON_SHINY');
-      // La session stockee differe : les seeds par mode produisent des manches distinctes.
-      const shinyBody = mockSet.mock.calls[0]?.[1] as string;
-      const nonShinyBody = mockSet.mock.calls[1]?.[1] as string;
+      const shiny = await service.startDaily('FIND_SHINY', 'FACILE');
+      const shinyBody = mockSet.mock.calls.at(-1)?.[1] as string;
+      const nonShiny = await service.startDaily('FIND_NON_SHINY', 'FACILE');
+      const nonShinyBody = mockSet.mock.calls.at(-1)?.[1] as string;
       expect(shiny.mode).toBe('FIND_SHINY');
       expect(nonShiny.mode).toBe('FIND_NON_SHINY');
       expect(shinyBody).not.toBe(nonShinyBody);
     });
 
-    it('est déterministe pour une même journée et un même mode', async () => {
-      await service.startDaily('FIND_SHINY');
-      await service.startDaily('FIND_SHINY');
-      const first = JSON.parse(mockSet.mock.calls[0]?.[1] as string) as { rounds: unknown };
-      const second = JSON.parse(mockSet.mock.calls[1]?.[1] as string) as { rounds: unknown };
+    it('est déterministe pour une même journée, un même mode et un même niveau', async () => {
+      await service.startDaily('FIND_SHINY', 'FACILE');
+      const first = lastSaved();
+      await service.startDaily('FIND_SHINY', 'FACILE');
+      const second = lastSaved();
       expect(second.rounds).toEqual(first.rounds);
     });
   });
@@ -95,6 +135,7 @@ describe('ShinyService', () => {
       return JSON.stringify({
         roundId: 'r1',
         mode,
+        level: 'FACILE',
         currentIndex: 0,
         correctCount: 0,
         status: 'PLAYING',
@@ -160,6 +201,7 @@ describe('ShinyService', () => {
     const tileSession = JSON.stringify({
       roundId: 'r1',
       mode: 'FIND_SHINY',
+      level: 'FACILE',
       currentIndex: 0,
       correctCount: 0,
       status: 'PLAYING',

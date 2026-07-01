@@ -181,8 +181,16 @@ export function GamesPage() {
       plusMinusDailyStatus('EXTREME'),
     ]),
     intruder: intruderDailyStatus(),
-    shiny: shinyDailyStatus('FIND_SHINY'),
-    'non-shiny': shinyDailyStatus('FIND_NON_SHINY'),
+    shiny: aggregateLevelStatus([
+      shinyDailyStatus('FIND_SHINY', 'FACILE'),
+      shinyDailyStatus('FIND_SHINY', 'MOYEN'),
+      shinyDailyStatus('FIND_SHINY', 'DIFFICILE'),
+    ]),
+    'non-shiny': aggregateLevelStatus([
+      shinyDailyStatus('FIND_NON_SHINY', 'FACILE'),
+      shinyDailyStatus('FIND_NON_SHINY', 'MOYEN'),
+      shinyDailyStatus('FIND_NON_SHINY', 'DIFFICILE'),
+    ]),
     'just-stat': justStatDailyStatus(),
     'true-shiny': aggregateLevelStatus([
       trueShinyDailyStatus('FACILE'),

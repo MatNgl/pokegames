@@ -1,6 +1,7 @@
 import type {
   JustStatKey,
   PlusMinusLevel,
+  ShinyLevel,
   TrueShinyLevel,
   WhoIsItLevel,
   MotusLevel,
@@ -98,6 +99,24 @@ export const JUST_STAT_CONFIG: JustStatConfig = {
   timeLimitSeconds: 20,
   maxAttempts: 15,
   allowedStats: ['HP', 'ATK', 'DEF', 'SPE_ATK', 'SPE_DEF', 'SPEED', 'HEIGHT_CM', 'WEIGHT_KG'],
+};
+
+export interface ShinyLevelConfig {
+  gridSize: number; // nombre de vignettes ; la difficulte vient du nombre de cartes
+}
+
+export interface ShinyConfig {
+  roundsCount: number;
+  levels: Record<ShinyLevel, ShinyLevelConfig>;
+}
+
+export const SHINY_CONFIG: ShinyConfig = {
+  roundsCount: 5,
+  levels: {
+    FACILE: { gridSize: 3 },
+    MOYEN: { gridSize: 4 },
+    DIFFICILE: { gridSize: 6 },
+  },
 };
 
 export interface TrueShinyLevelConfig {

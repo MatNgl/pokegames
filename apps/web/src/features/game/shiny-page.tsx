@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Sparkles } from 'lucide-react';
 import type {
   ShinyChoiceResponse,
+  ShinyLevel,
   ShinyMode,
   ShinyRoundState,
   ShinyTileReveal,
@@ -18,6 +19,7 @@ import { API_ORIGIN } from '@/lib/env';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
+import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
 import { getShinyRound, startShiny, submitShinyChoice } from './shiny-api';
 import {
   clearShiny,
@@ -25,6 +27,7 @@ import {
   loadShinySaved,
   saveShiny,
   saveShinyDone,
+  shinyDailyStatus,
   shinyTodayKey,
 } from './shiny-storage';
 
@@ -39,14 +42,14 @@ const MODE_TITLE: Record<ShinyMode, string> = {
 
 const MODE_RULES: Record<ShinyMode, string[]> = {
   FIND_SHINY: [
-    'Trois Pokémon, un seul est shiny (couleur chromatique).',
+    'Plusieurs Pokémon, un seul est shiny (couleur chromatique).',
     'Clique sur celui qui est shiny.',
-    'Aucun chrono, mais 10 manches : vise le meilleur score.',
+    'Aucun chrono, mais 5 manches : vise le meilleur score.',
   ],
   FIND_NON_SHINY: [
-    'Trois Pokémon, deux sont shiny.',
+    'Plusieurs Pokémon, tous shiny sauf un.',
     'Clique sur celui qui n’est PAS shiny (couleur normale).',
-    'Aucun chrono, mais 10 manches : vise le meilleur score.',
+    'Aucun chrono, mais 5 manches : vise le meilleur score.',
   ],
 };
 
@@ -55,12 +58,62 @@ const OTHER_MODE: Record<ShinyMode, { mode: ShinyMode; route: string }> = {
   FIND_NON_SHINY: { mode: 'FIND_SHINY', route: '/shiny' },
 };
 
+const LEVELS: { level: ShinyLevel; label: string; description: string }[] = [
+  { level: 'FACILE', label: 'Facile', description: '3 cartes' },
+  { level: 'MOYEN', label: 'Moyen', description: '4 cartes' },
+  { level: 'DIFFICILE', label: 'Difficile', description: '6 cartes' },
+];
+
+const LEVEL_LABEL: Record<ShinyLevel, string> = {
+  FACILE: 'Facile',
+  MOYEN: 'Moyen',
+  DIFFICILE: 'Difficile',
+};
+
+// 3 cartes -> 3 colonnes, 4 -> 2 colonnes (2x2), 6 -> 3 colonnes (2x3).
+function gridColsClass(count: number): string {
+  if (count === 4) return 'grid-cols-2';
+  return 'grid-cols-3';
+}
+
 interface EndInfo {
   correctCount: number;
   totalRounds: number;
 }
 
 export function ShinyPage({ mode }: ShinyPageProps) {
+  const [level, setLevel] = useState<ShinyLevel | null>(null);
+
+  if (!level) {
+    return <ShinyLevelSelect mode={mode} onPick={setLevel} />;
+  }
+  return <ShinyGame key={`${mode}-${level}`} mode={mode} level={level} onBack={() => setLevel(null)} />;
+}
+
+function ShinyLevelSelect({ mode, onPick }: { mode: ShinyMode; onPick: (level: ShinyLevel) => void }) {
+  const options = useMemo<LevelOption<ShinyLevel>[]>(
+    () => LEVELS.map((l) => ({ ...l, status: shinyDailyStatus(mode, l.level) })),
+    [mode],
+  );
+  return (
+    <LevelSelectScreen
+      title={MODE_TITLE[mode]}
+      rules={MODE_RULES[mode]}
+      options={options}
+      onPick={onPick}
+    />
+  );
+}
+
+function ShinyGame({
+  mode,
+  level,
+  onBack,
+}: {
+  mode: ShinyMode;
+  level: ShinyLevel;
+  onBack: () => void;
+}) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const [state, setState] = useState<ShinyRoundState | null>(null);
@@ -80,27 +133,27 @@ export function ShinyPage({ mode }: ShinyPageProps) {
     setEnded(false);
     setEndInfo(null);
     try {
-      const round = await startShiny(mode);
+      const round = await startShiny(mode, level);
       setState(round);
-      saveShiny(mode, round.roundId, round.roundIndex);
+      saveShiny(mode, level, round.roundId, round.roundIndex);
     } catch (err) {
-      clearShiny(mode);
+      clearShiny(mode, level);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
     } finally {
       setLoading(false);
     }
-  }, [mode]);
+  }, [mode, level]);
 
   const restoreOrStart = useCallback(async () => {
     const today = shinyTodayKey();
-    const done = loadShinyDone(mode);
+    const done = loadShinyDone(mode, level);
     if (done && done.date === today) {
       setEndInfo({ correctCount: done.correctCount, totalRounds: done.totalRounds });
       setEnded(true);
       setLoading(false);
       return;
     }
-    const saved = loadShinySaved(mode);
+    const saved = loadShinySaved(mode, level);
     if (!saved || saved.date !== today) {
       await start();
       return;
@@ -109,19 +162,19 @@ export function ShinyPage({ mode }: ShinyPageProps) {
     try {
       const round = await getShinyRound(saved.roundId);
       if (round.status === 'FINISHED') {
-        saveShinyDone(mode, round.correctCount, round.totalRounds);
+        saveShinyDone(mode, level, round.correctCount, round.totalRounds);
         setEndInfo({ correctCount: round.correctCount, totalRounds: round.totalRounds });
         setEnded(true);
       } else {
         setState(round);
-        saveShiny(mode, round.roundId, round.roundIndex);
+        saveShiny(mode, level, round.roundId, round.roundIndex);
       }
       setLoading(false);
     } catch {
-      clearShiny(mode);
+      clearShiny(mode, level);
       await start();
     }
-  }, [mode, start]);
+  }, [mode, level, start]);
 
   useEffect(() => {
     setState(null);
@@ -147,7 +200,7 @@ export function ShinyPage({ mode }: ShinyPageProps) {
       const res = await submitShinyChoice(state.roundId, slot);
       setReveal(res);
       if (res.state.status === 'FINISHED') {
-        saveShinyDone(mode, res.state.correctCount, res.state.totalRounds);
+        saveShinyDone(mode, level, res.state.correctCount, res.state.totalRounds);
       }
     } catch (err) {
       setChosenSlot(null);
@@ -165,7 +218,7 @@ export function ShinyPage({ mode }: ShinyPageProps) {
       setEnded(true);
     } else {
       setState(next);
-      saveShiny(mode, next.roundId, next.roundIndex);
+      saveShiny(mode, level, next.roundId, next.roundIndex);
       setReveal(null);
       setChosenSlot(null);
     }
@@ -224,10 +277,7 @@ export function ShinyPage({ mode }: ShinyPageProps) {
           >
             <span className="text-center text-sm font-extrabold text-foreground">{info.name}</span>
             <span
-              className={cn(
-                'text-xs font-bold',
-                info.isShiny ? 'text-accent-shadow' : 'text-muted',
-              )}
+              className={cn('text-xs font-bold', info.isShiny ? 'text-accent-shadow' : 'text-muted')}
             >
               {info.isShiny ? 'Shiny' : 'Normal'}
             </span>
@@ -261,6 +311,10 @@ export function ShinyPage({ mode }: ShinyPageProps) {
               <Button className="w-full" onClick={() => navigate('/')}>
                 Retour à l'accueil
               </Button>
+              <Button variant="secondary" size="sm" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4" />
+                Changer de niveau
+              </Button>
               <button
                 type="button"
                 onClick={() => navigate(other.route)}
@@ -282,9 +336,22 @@ export function ShinyPage({ mode }: ShinyPageProps) {
           ) : (
             <Card className="flex w-full max-w-xl flex-col items-center gap-5 p-6">
               <div className="flex w-full items-start justify-between gap-4">
-                <h1 className="font-display text-sm leading-relaxed text-foreground">
-                  {MODE_TITLE[mode]}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    aria-label="Changer de niveau"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <h1 className="font-display text-sm leading-relaxed text-foreground">
+                    {MODE_TITLE[mode]}
+                  </h1>
+                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                    {LEVEL_LABEL[state.level]}
+                  </Badge>
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -306,7 +373,7 @@ export function ShinyPage({ mode }: ShinyPageProps) {
                 {state.prompt}
               </p>
 
-              <div className="grid w-full grid-cols-3 gap-3">
+              <div className={cn('grid w-full gap-3', gridColsClass(state.tiles.length))}>
                 {state.tiles.map((tile) => renderTile(tile.slot, tile.imageUrl))}
               </div>
 

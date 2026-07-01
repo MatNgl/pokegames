@@ -1,12 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
+import { SHINY_CONFIG } from './game-config';
 import type {
   ShinyChoiceResponse,
+  ShinyLevel,
   ShinyMode,
   ShinyRoundState,
   ShinyTileReveal,
@@ -31,6 +33,7 @@ interface RoundDef {
 interface ShinySession {
   roundId: string;
   mode: ShinyMode;
+  level: ShinyLevel;
   rounds: RoundDef[];
   currentIndex: number;
   correctCount: number;
@@ -39,15 +42,16 @@ interface ShinySession {
   userId?: string;
 }
 
-const TILES_PER_ROUND = 3;
+const SHINY_LEVELS: ShinyLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE'];
 
 @Injectable()
 export class ShinyService {
   private readonly REDIS_PREFIX = 'game_shiny:';
   private readonly ROUND_TTL_SECONDS = 3600;
-  private readonly TOTAL_ROUNDS = 10;
 
   private poolCache: PoolPokemon[] | null = null;
+  // Plan du jour par mode (tous niveaux) memoise : determinisme + dedup inter-niveaux du mode.
+  private readonly planCache = new Map<ShinyMode, { date: string; plan: Record<ShinyLevel, RoundDef[]> }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -114,14 +118,22 @@ export class ShinyService {
     return copy;
   }
 
-  private buildRounds(pool: PoolPokemon[], mode: ShinyMode, rng: () => number): RoundDef[] {
+  private buildRounds(
+    pool: PoolPokemon[],
+    mode: ShinyMode,
+    gridSize: number,
+    rng: () => number,
+    used: Set<number>,
+  ): RoundDef[] {
     const rounds: RoundDef[] = [];
-    for (let i = 0; i < this.TOTAL_ROUNDS; i++) {
-      const trio = this.pickDistinct(pool, TILES_PER_ROUND, rng);
-      if (trio.length < TILES_PER_ROUND) continue;
+    for (let i = 0; i < SHINY_CONFIG.roundsCount; i++) {
+      const eligible = pool.filter((p) => !used.has(p.id));
+      const group = this.pickDistinct(eligible, gridSize, rng);
+      if (group.length < gridSize) break;
+      for (const p of group) used.add(p.id);
       // FIND_SHINY : une seule vignette shiny (la reponse). FIND_NON_SHINY : une seule normale (la reponse).
       const answerShiny = mode === 'FIND_SHINY';
-      const slots: SlotDef[] = trio.map((p, index) => ({
+      const slots: SlotDef[] = group.map((p, index) => ({
         pokemonId: p.id,
         name: p.name,
         shiny: index === 0 ? answerShiny : !answerShiny,
@@ -131,6 +143,26 @@ export class ShinyService {
       rounds.push({ slots: shuffled, answerSlot });
     }
     return rounds;
+  }
+
+  /**
+   * Plan du jour d'un mode : les 3 niveaux construits dans un ordre fixe avec un meme RNG et un
+   * ensemble d'exclusion partage, pour qu'aucun Pokemon ne se repete entre les niveaux du mode.
+   */
+  private getDailyPlan(mode: ShinyMode, pool: PoolPokemon[]): Record<ShinyLevel, RoundDef[]> {
+    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    const cached = this.planCache.get(mode);
+    if (cached && cached.date === today) {
+      return cached.plan;
+    }
+    const rng = this.makeRng(this.dailySeed(mode));
+    const used = new Set<number>();
+    const plan = {} as Record<ShinyLevel, RoundDef[]>;
+    for (const level of SHINY_LEVELS) {
+      plan[level] = this.buildRounds(pool, mode, SHINY_CONFIG.levels[level].gridSize, rng, used);
+    }
+    this.planCache.set(mode, { date: today, plan });
+    return plan;
   }
 
   private toState(session: ShinySession): ShinyRoundState {
@@ -143,6 +175,7 @@ export class ShinyService {
     return {
       roundId: session.roundId,
       mode: session.mode,
+      level: session.level,
       totalRounds: total,
       roundIndex: Math.min(session.currentIndex + 1, total),
       correctCount: session.correctCount,
@@ -155,12 +188,15 @@ export class ShinyService {
     };
   }
 
-  async startDaily(mode: ShinyMode, userId?: string): Promise<ShinyRoundState> {
+  async startDaily(mode: ShinyMode, level: ShinyLevel, userId?: string): Promise<ShinyRoundState> {
+    if (!SHINY_LEVELS.includes(level)) {
+      throw new BadRequestException('Niveau invalide');
+    }
     const pool = await this.loadPool();
-    if (pool.length < TILES_PER_ROUND) {
+    if (pool.length < SHINY_CONFIG.levels[level].gridSize) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
-    const rounds = this.buildRounds(pool, mode, this.makeRng(this.dailySeed(mode)));
+    const rounds = this.getDailyPlan(mode, pool)[level];
     if (rounds.length === 0) {
       throw new NotFoundException('Impossible de générer les manches du jour');
     }
@@ -169,6 +205,7 @@ export class ShinyService {
     const session: ShinySession = {
       roundId,
       mode,
+      level,
       rounds,
       currentIndex: 0,
       correctCount: 0,
