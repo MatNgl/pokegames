@@ -28,6 +28,24 @@ export interface DailyStatusResponse {
   results: DailyResultDTO[];
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  username: string;
+  isMe: boolean;
+  won: boolean;
+  attempts: number | null;
+  score: number | null;
+  correctCount: number | null;
+  totalRounds: number | null;
+  durationSeconds: number | null;
+}
+
+export interface LeaderboardResponse {
+  gameType: string;
+  scope: string;
+  entries: LeaderboardEntry[];
+}
+
 export interface PokemonStats {
   hp: number;
   atk: number;

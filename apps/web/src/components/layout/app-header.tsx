@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { History, LogOut } from 'lucide-react';
+import { History, LogOut, Trophy } from 'lucide-react';
 import { FolderKanbanIcon } from '@/components/ui/icons/folder-kanban-icon';
 import { SettingsIcon } from '@/components/ui/icons/settings-icon';
 import { Logo } from '@/components/brand/logo';
@@ -103,6 +103,9 @@ export function AppHeader() {
       </div>
 
       <div className="flex items-center gap-1">
+        <Link to="/classements" className={iconButtonClass} title="Classements" aria-label="Classements">
+          <Trophy className="h-5 w-5" />
+        </Link>
         <Link to="/historique" className={iconButtonClass} title="Mon historique" aria-label="Mon historique">
           <History className="h-5 w-5" />
         </Link>

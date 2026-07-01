@@ -10,6 +10,7 @@ import { ShinyPage } from '@/features/game/shiny-page';
 import { JustStatPage } from '@/features/game/just-stat-page';
 import { TrueShinyPage } from '@/features/game/true-shiny-page';
 import { HistoryPage } from '@/features/daily/history-page';
+import { LeaderboardPage } from '@/features/daily/leaderboard-page';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/juste-stat" element={<JustStatPage />} />
         <Route path="/bon-shiny" element={<TrueShinyPage />} />
         <Route path="/historique" element={<HistoryPage />} />
+        <Route path="/classements" element={<LeaderboardPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -1,0 +1,131 @@
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { AppBackground } from '@/components/backgrounds/app-background';
+import { AppHeader } from '@/components/layout/app-header';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
+import { getLeaderboard } from './daily-api';
+import { gameLabel, resultMetric } from './daily-catalog';
+import { DAILY_GAME_GROUPS } from './daily-challenges';
+
+const TAB_BASE =
+  'rounded-control border-2 px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer';
+
+export function LeaderboardPage() {
+  const navigate = useNavigate();
+  const [gameType, setGameType] = useState<string>(DAILY_GAME_GROUPS[0]?.gameType ?? 'WHO_IS_IT');
+  const [scope, setScope] = useState<string>(DAILY_GAME_GROUPS[0]?.challenges[0]?.scope ?? '');
+
+  const group = useMemo(
+    () => DAILY_GAME_GROUPS.find((g) => g.gameType === gameType) ?? DAILY_GAME_GROUPS[0],
+    [gameType],
+  );
+
+  const pickGame = (nextGame: string) => {
+    const nextGroup = DAILY_GAME_GROUPS.find((g) => g.gameType === nextGame);
+    setGameType(nextGame);
+    setScope(nextGroup?.challenges[0]?.scope ?? '');
+  };
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['leaderboard', gameType, scope],
+    queryFn: () => getLeaderboard(gameType, scope),
+    staleTime: 20_000,
+  });
+
+  const entries = data?.entries ?? [];
+
+  return (
+    <AppBackground>
+      <div className="flex min-h-screen flex-col">
+        <AppHeader />
+        <main className="flex flex-1 items-start justify-center px-4 py-8">
+          <Card className="flex w-full max-w-xl flex-col gap-4 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="font-display text-sm leading-relaxed text-foreground">
+                Classement du jour
+              </h1>
+              <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
+                Accueil
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {DAILY_GAME_GROUPS.map((g) => (
+                <button
+                  key={g.gameType}
+                  type="button"
+                  onClick={() => pickGame(g.gameType)}
+                  className={cn(
+                    TAB_BASE,
+                    g.gameType === gameType
+                      ? 'border-primary-shadow bg-primary text-primary-foreground'
+                      : 'border-border-strong bg-surface-2/60 text-muted hover:border-primary hover:text-foreground',
+                  )}
+                >
+                  {gameLabel(g.gameType)}
+                </button>
+              ))}
+            </div>
+
+            {group && group.challenges.length > 1 && (
+              <div className="flex flex-wrap gap-1.5">
+                {group.challenges.map((c) => (
+                  <button
+                    key={c.scope}
+                    type="button"
+                    onClick={() => setScope(c.scope)}
+                    className={cn(
+                      TAB_BASE,
+                      c.scope === scope
+                        ? 'border-accent-shadow bg-accent text-foreground'
+                        : 'border-border-strong bg-surface-2/60 text-muted hover:border-primary hover:text-foreground',
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {isLoading ? (
+              <Spinner className="mx-auto my-10 h-6 w-6 text-primary" />
+            ) : entries.length === 0 ? (
+              <p className="py-10 text-center text-sm font-semibold text-muted">
+                Personne n'a encore joué ce défi aujourd'hui. Sois le premier !
+              </p>
+            ) : (
+              <ol className="flex flex-col gap-1.5">
+                {entries.map((e) => (
+                  <li
+                    key={`${e.rank}-${e.username}`}
+                    className={cn(
+                      'flex items-center gap-3 rounded-control border-2 px-3 py-2',
+                      e.isMe
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border-strong bg-surface-2/60',
+                    )}
+                  >
+                    <span className="w-7 shrink-0 text-center font-display text-xs text-primary">
+                      {e.rank}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-foreground">
+                      {e.username}
+                      {e.isMe && <span className="ml-1 text-xs font-semibold text-primary">(toi)</span>}
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-muted">
+                      {resultMetric(e)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Card>
+        </main>
+      </div>
+    </AppBackground>
+  );
+}

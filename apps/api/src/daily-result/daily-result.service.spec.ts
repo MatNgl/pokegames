@@ -53,6 +53,26 @@ describe('DailyResultService', () => {
     expect(data.dayDate).toEqual(new Date(Date.UTC(2026, 6, 1)));
   });
 
+  it('leaderboard Motus : gagnants d’abord, puis moins d’essais', async () => {
+    mockFindMany.mockResolvedValue([
+      { userId: 'a', won: true, attempts: 4, score: null, correctCount: null, totalRounds: null, durationSeconds: 40, user: { username: 'Alice' } },
+      { userId: 'b', won: false, attempts: 6, score: null, correctCount: null, totalRounds: null, durationSeconds: 10, user: { username: 'Bob' } },
+      { userId: 'c', won: true, attempts: 2, score: null, correctCount: null, totalRounds: null, durationSeconds: 50, user: { username: 'Cara' } },
+    ]);
+    const rows = await service.leaderboard('MOTUS', 'FACILE', new Date('2026-07-01T10:00:00Z'));
+    expect(rows.map((r) => r.username)).toEqual(['Cara', 'Alice', 'Bob']);
+  });
+
+  it('leaderboard jeux a bonnes reponses : plus de correct d’abord, puis plus rapide', async () => {
+    mockFindMany.mockResolvedValue([
+      { userId: 'a', won: false, attempts: null, score: null, correctCount: 8, totalRounds: 10, durationSeconds: 30, user: { username: 'Alice' } },
+      { userId: 'b', won: true, attempts: null, score: null, correctCount: 10, totalRounds: 10, durationSeconds: 60, user: { username: 'Bob' } },
+      { userId: 'c', won: false, attempts: null, score: null, correctCount: 8, totalRounds: 10, durationSeconds: 20, user: { username: 'Cara' } },
+    ]);
+    const rows = await service.leaderboard('PLUS_MINUS', 'FACILE', new Date('2026-07-01T10:00:00Z'));
+    expect(rows.map((r) => r.username)).toEqual(['Bob', 'Cara', 'Alice']);
+  });
+
   it('record est idempotent : ignore le doublon (verrou strict)', async () => {
     const dup = new Prisma.PrismaClientKnownRequestError('dup', {
       code: 'P2002',

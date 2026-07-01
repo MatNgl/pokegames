@@ -17,6 +17,11 @@ export interface DailyResultRow extends DailyMetrics {
   dayDate: Date;
 }
 
+export interface LeaderboardRow extends DailyMetrics {
+  userId: string;
+  username: string;
+}
+
 /**
  * Resultats quotidiens des joueurs connectes : verrou de l'unicite du jour, historique et classements.
  * Autorite serveur : ecrit uniquement a la completion cote service de jeu, jamais sur signalement client.
@@ -86,6 +91,54 @@ export class DailyResultService {
       },
     });
     return rows;
+  }
+
+  /**
+   * Ordre du classement selon le jeu : Motus (gagne puis moins d'essais), Silhouette (meilleur
+   * score), autres (plus de bonnes reponses). Egalite departagee par la duree (plus rapide devant).
+   */
+  private compare(gameType: string, a: LeaderboardRow, b: LeaderboardRow): number {
+    const duration = (a.durationSeconds ?? Infinity) - (b.durationSeconds ?? Infinity);
+    if (gameType === 'MOTUS') {
+      if ((a.won ?? false) !== (b.won ?? false)) return a.won ? -1 : 1;
+      const diff = (a.attempts ?? Infinity) - (b.attempts ?? Infinity);
+      return diff !== 0 ? diff : duration;
+    }
+    if (gameType === 'WHO_IS_IT') {
+      const diff = (b.score ?? -Infinity) - (a.score ?? -Infinity);
+      return diff !== 0 ? diff : duration;
+    }
+    const diff = (b.correctCount ?? -Infinity) - (a.correctCount ?? -Infinity);
+    return diff !== 0 ? diff : duration;
+  }
+
+  /** Classement du jour pour un defi (jeu x scope), trie selon la metrique du jeu. */
+  async leaderboard(gameType: string, scope: string, day: Date): Promise<LeaderboardRow[]> {
+    const rows = await this.prisma.dailyResult.findMany({
+      where: { gameType, scope, dayDate: this.utcDateOnly(day) },
+      select: {
+        userId: true,
+        won: true,
+        attempts: true,
+        score: true,
+        correctCount: true,
+        totalRounds: true,
+        durationSeconds: true,
+        user: { select: { username: true } },
+      },
+    });
+    const mapped: LeaderboardRow[] = rows.map((r) => ({
+      userId: r.userId,
+      username: r.user.username,
+      won: r.won,
+      attempts: r.attempts,
+      score: r.score,
+      correctCount: r.correctCount,
+      totalRounds: r.totalRounds,
+      durationSeconds: r.durationSeconds,
+    }));
+    mapped.sort((a, b) => this.compare(gameType, a, b));
+    return mapped;
   }
 
   /** Historique recent du joueur (Lot 2). */

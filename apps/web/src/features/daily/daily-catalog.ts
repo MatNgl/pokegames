@@ -39,8 +39,13 @@ export function scopeLabel(scope: string): string {
   return LEVEL_LABELS[scope] ?? scope;
 }
 
+type MetricFields = Pick<
+  DailyResultDTO,
+  'won' | 'attempts' | 'score' | 'correctCount' | 'totalRounds'
+>;
+
 /** Metrique d'affichage selon le jeu (essais, score, bonnes reponses). */
-export function resultMetric(result: DailyResultDTO): string {
+export function resultMetric(result: MetricFields): string {
   if (result.attempts != null) {
     return result.won ? `Gagné en ${result.attempts} essai${result.attempts > 1 ? 's' : ''}` : 'Perdu';
   }
