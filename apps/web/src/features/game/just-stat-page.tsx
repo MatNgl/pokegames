@@ -58,7 +58,8 @@ export function JustStatPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const firedTimeout = useRef(false);
+  const stateRef = useRef<JustStatRoundState | null>(null);
+  stateRef.current = state;
 
   const roundOver = result?.roundOver ?? false;
 
@@ -117,18 +118,12 @@ export function JustStatPage() {
     void restoreOrStart();
   }, [restoreOrStart]);
 
-  // Reinitialise le chrono a chaque nouvelle manche.
-  useEffect(() => {
-    if (!state) return;
-    setSecondsLeft(state.timeLimitSeconds);
-    firedTimeout.current = false;
-  }, [state?.roundId, state?.roundIndex]);
-
   const onTimeout = useCallback(async () => {
-    if (!state) return;
+    const current = stateRef.current;
+    if (!current) return;
     setBusy(true);
     try {
-      const res = await timeoutJustStat(state.roundId);
+      const res = await timeoutJustStat(current.roundId);
       setResult(res);
       if (res.state.status === 'FINISHED') {
         saveJustStatDone(res.state.correctCount, res.state.totalRounds);
@@ -138,21 +133,27 @@ export function JustStatPage() {
     } finally {
       setBusy(false);
     }
-  }, [state]);
+  }, []);
 
-  // Compte a rebours : decremente chaque seconde, declenche le timeout a zero (une seule fois).
+  // Chrono par manche : un seul effet, cle sur roundId + roundIndex uniquement (pas sur secondsLeft
+  // ni sur chaque proposition). Le compteur est initialise en interne, il ne peut donc pas se
+  // declencher a zero au montage de la manche.
+  const roundKey = state ? `${state.roundId}:${state.roundIndex}` : '';
   useEffect(() => {
-    if (!state || roundOver || ended || loading) return;
-    if (secondsLeft <= 0) {
-      if (!firedTimeout.current) {
-        firedTimeout.current = true;
+    const current = stateRef.current;
+    if (!current || current.status !== 'PLAYING' || roundOver || ended) return;
+    setSecondsLeft(current.timeLimitSeconds);
+    let remaining = current.timeLimitSeconds;
+    const id = window.setInterval(() => {
+      remaining -= 1;
+      setSecondsLeft(remaining);
+      if (remaining <= 0) {
+        window.clearInterval(id);
         void onTimeout();
       }
-      return;
-    }
-    const t = window.setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => window.clearTimeout(t);
-  }, [secondsLeft, roundOver, ended, loading, state, onTimeout]);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [roundKey, roundOver, ended, onTimeout]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
