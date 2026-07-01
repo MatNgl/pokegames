@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { History, LogOut, Trophy } from 'lucide-react';
+import { History, LogOut, Menu, Trophy, X } from 'lucide-react';
 import { FolderKanbanIcon } from '@/components/ui/icons/folder-kanban-icon';
 import { SettingsIcon } from '@/components/ui/icons/settings-icon';
 import { Logo } from '@/components/brand/logo';
@@ -35,6 +35,7 @@ export function AppHeader() {
   const { user, logout } = useAuth();
   const [timeLeft, setTimeLeft] = useState(getNextResetDiff);
   const [onlineCount, setOnlineCount] = useState<number>(1);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -102,7 +103,8 @@ export function AppHeader() {
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      {/* Barre d'actions en ligne (tablette et desktop) */}
+      <div className="hidden items-center gap-1 md:flex">
         <Link to="/classements" className={iconButtonClass} title="Classements" aria-label="Classements">
           <Trophy className="h-5 w-5" />
         </Link>
@@ -117,7 +119,7 @@ export function AppHeader() {
         </button>
         {user ? (
           <div className="flex items-center gap-2 pl-2">
-            <span className="hidden text-sm font-medium text-foreground sm:inline">{user.username}</span>
+            <span className="text-sm font-medium text-foreground">{user.username}</span>
             <button
               type="button"
               onClick={() => void logout()}
@@ -133,11 +135,77 @@ export function AppHeader() {
             <Button
               size="sm"
               variant="go"
-              className="font-display text-[9px] uppercase tracking-wider shadow-[0_3px_0_var(--color-go-shadow)] sm:text-[10px]"
+              className="font-display text-[10px] uppercase tracking-wider shadow-[0_3px_0_var(--color-go-shadow)]"
             >
               Connexion
             </Button>
           </Link>
+        )}
+      </div>
+
+      {/* Menu burger (mobile) */}
+      <div className="relative md:hidden">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          className={iconButtonClass}
+          aria-label="Menu"
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+        {menuOpen && (
+          <>
+            <button
+              type="button"
+              aria-hidden="true"
+              tabIndex={-1}
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-30 cursor-default"
+            />
+            <div className="absolute right-0 top-12 z-40 flex w-52 flex-col gap-1 rounded-card border-4 border-border bg-surface p-2 shadow-[0_6px_0_rgba(63,93,29,0.25)]">
+              {user && (
+                <p className="px-2 py-1 text-sm font-bold text-foreground">{user.username}</p>
+              )}
+              <Link
+                to="/classements"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-foreground hover:bg-surface-2"
+              >
+                <Trophy className="h-4 w-4" /> Classements
+              </Link>
+              <Link
+                to="/historique"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-foreground hover:bg-surface-2"
+              >
+                <History className="h-4 w-4" /> Mon historique
+              </Link>
+              <span className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-muted/60">
+                <FolderKanbanIcon size={16} /> Pokédex (bientôt)
+              </span>
+              {user ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void logout();
+                  }}
+                  className="flex items-center gap-2 rounded-control px-2 py-2 text-left text-sm font-semibold text-danger hover:bg-surface-2"
+                >
+                  <LogOut className="h-4 w-4" /> Se déconnecter
+                </button>
+              ) : (
+                <Link
+                  to="/connexion"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-bold text-go hover:bg-surface-2"
+                >
+                  Connexion
+                </Link>
+              )}
+            </div>
+          </>
         )}
       </div>
     </header>

@@ -258,7 +258,7 @@ export function JustStatPage() {
             </Card>
           ) : (
             <Card className="flex w-full max-w-md flex-col items-center gap-4 p-4 sm:p-6">
-              <div className="flex w-full items-start justify-between gap-4">
+              <div className="flex w-full flex-wrap items-start justify-between gap-2 sm:gap-4">
                 <h1 className="font-display text-sm leading-relaxed text-foreground">La Juste Stat</h1>
                 <div className="flex items-center gap-2">
                   <Badge className="border-primary bg-primary text-primary-foreground">

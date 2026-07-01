@@ -44,6 +44,13 @@
     height: 100%;
   }
 
+  /* Aucun debordement horizontal (mobile) : rien ne depasse la largeur de l'ecran. */
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
   body {
     margin: 0;
     background-color: var(--color-background);
