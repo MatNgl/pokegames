@@ -7,11 +7,13 @@ import { Card } from '@/components/ui/card';
 import { Logo } from '@/components/brand/logo';
 import { RefreshCwIcon } from '@/components/ui/icons/refresh-cw-icon';
 import { cn } from '@/lib/utils';
-import { type WhoIsItDailyStatus } from '@/features/game/daily-storage';
+import { whoIsItDailyStatus, type WhoIsItDailyStatus } from '@/features/game/daily-storage';
 import { plusMinusDailyStatus } from '@/features/game/plus-minus-storage';
 import { intruderDailyStatus } from '@/features/game/intruder-storage';
 import { shinyDailyStatus } from '@/features/game/shiny-storage';
 import { justStatDailyStatus } from '@/features/game/just-stat-storage';
+import { motusDailyStatus } from '@/features/game/motus-storage';
+import { trueShinyDailyStatus } from '@/features/game/true-shiny-storage';
 import whoIsItImg from '@/assets/games/who-is-it.png';
 import pokeMotusImg from '@/assets/games/poke-motus.png';
 import plusMinusImg from '@/assets/games/plus-minus.png';
@@ -22,7 +24,22 @@ import findNotShinyImg from '@/assets/games/find_not_shiny.png';
 import justPriceImg from '@/assets/games/just_price.png';
 import leBonShinyImg from '@/assets/games/le_bon_shiny.png';
 
-type DailyKey = 'plus-minus' | 'intruder' | 'shiny' | 'non-shiny' | 'just-stat';
+type DailyKey =
+  | 'who-is-it'
+  | 'motus'
+  | 'plus-minus'
+  | 'intruder'
+  | 'shiny'
+  | 'non-shiny'
+  | 'just-stat'
+  | 'true-shiny';
+
+function aggregateLevelStatus(statuses: WhoIsItDailyStatus[]): WhoIsItDailyStatus {
+  if (statuses.length === 0) return 'idle';
+  if (statuses.every((s) => s === 'done')) return 'done';
+  if (statuses.some((s) => s === 'in-progress' || s === 'done')) return 'in-progress';
+  return 'idle';
+}
 
 interface GameEntry {
   title: string;
@@ -145,14 +162,29 @@ function ShinyToggleCard({ statuses }: { statuses: Record<DailyKey, WhoIsItDaily
 
 export function GamesPage() {
   const [statuses] = useState<Record<DailyKey, WhoIsItDailyStatus>>(() => ({
+    'who-is-it': aggregateLevelStatus([
+      whoIsItDailyStatus('FACILE'),
+      whoIsItDailyStatus('MOYEN'),
+      whoIsItDailyStatus('DIFFICILE'),
+      whoIsItDailyStatus('EXTREME'),
+    ]),
+    motus: aggregateLevelStatus([
+      motusDailyStatus('FACILE'),
+      motusDailyStatus('MOYEN'),
+      motusDailyStatus('DIFFICILE'),
+      motusDailyStatus('EXTREME'),
+    ]),
     'plus-minus': plusMinusDailyStatus(),
     intruder: intruderDailyStatus(),
     shiny: shinyDailyStatus('FIND_SHINY'),
     'non-shiny': shinyDailyStatus('FIND_NON_SHINY'),
     'just-stat': justStatDailyStatus(),
+    'true-shiny': aggregateLevelStatus([
+      trueShinyDailyStatus('FACILE'),
+      trueShinyDailyStatus('MOYEN'),
+      trueShinyDailyStatus('DIFFICILE'),
+    ]),
   }));
-  // Silhouette et Motus ont des niveaux : leur statut est par niveau (visible sur l'ecran de choix),
-  // donc pas de badge agrege sur la carte d'accueil (comme Le Bon Shiny).
 
   const games: GameEntry[] = [
     {
@@ -161,6 +193,7 @@ export function GamesPage() {
       to: '/jouer',
       iconImg: whoIsItImg,
       available: true,
+      dailyKey: 'who-is-it',
     },
     {
       title: 'Motus',
@@ -168,6 +201,7 @@ export function GamesPage() {
       to: '/motus',
       iconImg: pokeMotusImg,
       available: true,
+      dailyKey: 'motus',
     },
     {
       title: 'Plus ou Moins',
@@ -199,6 +233,7 @@ export function GamesPage() {
       to: '/bon-shiny',
       iconImg: leBonShinyImg,
       available: true,
+      dailyKey: 'true-shiny',
     },
     { title: 'Qui est-ce', description: 'Déduction en duel', iconImg: quiEstCeImg, available: false },
   ];
