@@ -13,7 +13,7 @@ import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
-import { ANTI_REPEAT_WINDOW_DAYS, TRUE_SHINY_CONFIG } from './game-config';
+import { GameConfigService } from '../game-config/game-config.service';
 import type {
   TrueShinyChoiceResponse,
   TrueShinyLevel,
@@ -69,6 +69,7 @@ export class TrueShinyService {
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
     private readonly dailyResult: DailyResultService,
+    private readonly gameConfig: GameConfigService,
   ) {}
 
   private async loadPool(): Promise<PoolPokemon[]> {
@@ -119,7 +120,7 @@ export class TrueShinyService {
     rng: () => number,
     used: Set<number>,
   ): RoundDef[] {
-    const { roundsCount, levels } = TRUE_SHINY_CONFIG;
+    const { roundsCount, levels } = this.gameConfig.trueShiny();
     const { gridSize, hueMin, hueMax } = levels[level];
     const available = pool.filter((p) => !used.has(p.id));
     const pokemons = this.shuffle(available, rng).slice(0, roundsCount);
@@ -157,7 +158,7 @@ export class TrueShinyService {
   }
 
   private planComplete(plan: Record<TrueShinyLevel, RoundDef[]>): boolean {
-    return TRUE_SHINY_LEVELS.every((level) => plan[level].length === TRUE_SHINY_CONFIG.roundsCount);
+    return TRUE_SHINY_LEVELS.every((level) => plan[level].length === this.gameConfig.trueShiny().roundsCount);
   }
 
   /**
@@ -174,7 +175,7 @@ export class TrueShinyService {
       this.HISTORY_GAME,
       '',
       now,
-      ANTI_REPEAT_WINDOW_DAYS.TRUE_SHINY,
+      this.gameConfig.antiRepeatWindow('TRUE_SHINY'),
     );
     let plan = this.buildPlan(pool, recent);
     if (!this.planComplete(plan)) {
@@ -227,7 +228,7 @@ export class TrueShinyService {
       throw new ConflictException('DAILY_ALREADY_COMPLETED');
     }
     const pool = await this.loadPool();
-    if (pool.length < TRUE_SHINY_CONFIG.roundsCount) {
+    if (pool.length < this.gameConfig.trueShiny().roundsCount) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
     const rounds = (await this.getDailyPlan(pool))[level];

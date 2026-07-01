@@ -12,7 +12,7 @@ import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
-import { ANTI_REPEAT_WINDOW_DAYS, SHINY_CONFIG } from './game-config';
+import { GameConfigService } from '../game-config/game-config.service';
 import type {
   ShinyChoiceResponse,
   ShinyLevel,
@@ -67,6 +67,7 @@ export class ShinyService {
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
     private readonly dailyResult: DailyResultService,
+    private readonly gameConfig: GameConfigService,
   ) {}
 
   private readonly HISTORY_GAME = 'SHINY';
@@ -142,7 +143,7 @@ export class ShinyService {
     used: Set<number>,
   ): RoundDef[] {
     const rounds: RoundDef[] = [];
-    for (let i = 0; i < SHINY_CONFIG.roundsCount; i++) {
+    for (let i = 0; i < this.gameConfig.shiny().roundsCount; i++) {
       const eligible = pool.filter((p) => !used.has(p.id));
       const group = this.pickDistinct(eligible, gridSize, rng);
       if (group.length < gridSize) break;
@@ -170,13 +171,13 @@ export class ShinyService {
     const used = new Set<number>(initialUsed);
     const plan = {} as Record<ShinyLevel, RoundDef[]>;
     for (const level of SHINY_LEVELS) {
-      plan[level] = this.buildRounds(pool, mode, SHINY_CONFIG.levels[level].gridSize, rng, used);
+      plan[level] = this.buildRounds(pool, mode, this.gameConfig.shiny().levels[level].gridSize, rng, used);
     }
     return plan;
   }
 
   private planComplete(plan: Record<ShinyLevel, RoundDef[]>): boolean {
-    return SHINY_LEVELS.every((level) => plan[level].length === SHINY_CONFIG.roundsCount);
+    return SHINY_LEVELS.every((level) => plan[level].length === this.gameConfig.shiny().roundsCount);
   }
 
   /**
@@ -197,7 +198,7 @@ export class ShinyService {
       this.HISTORY_GAME,
       mode,
       now,
-      ANTI_REPEAT_WINDOW_DAYS.SHINY,
+      this.gameConfig.antiRepeatWindow('SHINY'),
     );
     let plan = this.buildPlan(mode, pool, recent);
     if (!this.planComplete(plan)) {
@@ -257,7 +258,7 @@ export class ShinyService {
       throw new ConflictException('DAILY_ALREADY_COMPLETED');
     }
     const pool = await this.loadPool();
-    if (pool.length < SHINY_CONFIG.levels[level].gridSize) {
+    if (pool.length < this.gameConfig.shiny().levels[level].gridSize) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
     const rounds = (await this.getDailyPlan(mode, pool))[level];

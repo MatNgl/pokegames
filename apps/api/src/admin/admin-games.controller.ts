@@ -1,29 +1,28 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
 import { AdminGuard } from '../auth/admin.guard';
-import {
-  WHO_IS_IT_ADMIN_CONFIG,
-  WhoIsItAdminConfig,
-  MOTUS_ADMIN_CONFIG,
-  MotusAdminConfig,
-} from '../game/game-config';
+import { GameConfigService } from '../game-config/game-config.service';
+import type { AdminGameConfigEntry } from '@pokegames/shared-types';
 
 /**
- * Consultation des configurations de jeux. La config est aujourd'hui STATIQUE : elle vit dans
- * game-config.ts et est lue directement par les services. L'edition dynamique (POST) et l'ecran
- * admin viendront dans une phase dediee (un store de config mutable, injecte par les services et
- * ce controleur, remplacera alors la lecture des constantes). Ne pas exposer de POST tant que les
- * services lisent les constantes, sous peine d'un endpoint sans effet.
+ * Configuration dynamique des jeux (source de verite unique). Lecture et edition a chaud : les
+ * services de jeu lisent leur config via GameConfigService, plus aucune constante lue directement.
  */
 @UseGuards(AdminGuard)
 @Controller('admin/games')
 export class AdminGamesController {
-  @Get('who-is-it')
-  getWhoIsItConfig(): WhoIsItAdminConfig {
-    return WHO_IS_IT_ADMIN_CONFIG;
+  constructor(private readonly gameConfig: GameConfigService) {}
+
+  @Get('config')
+  async getAll(): Promise<AdminGameConfigEntry[]> {
+    return this.gameConfig.getAll();
   }
 
-  @Get('motus')
-  getMotusConfig(): MotusAdminConfig {
-    return MOTUS_ADMIN_CONFIG;
+  @Put('config/:key')
+  async update(
+    @Param('key') key: string,
+    @Body() body: { value: unknown },
+  ): Promise<{ ok: true }> {
+    await this.gameConfig.update(key, body.value);
+    return { ok: true };
   }
 }

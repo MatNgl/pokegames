@@ -17,6 +17,7 @@ import {
   getAdminUser,
   getAdminUsers,
 } from './admin-api';
+import { ConfigTab } from './config-tab';
 
 const TAB_BASE = 'rounded-control border-2 px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer';
 
@@ -38,7 +39,7 @@ function formatDate(iso: string): string {
 export function AdminPage() {
   const navigate = useNavigate();
   const { user, initializing } = useAuth();
-  const [tab, setTab] = useState<'dashboard' | 'users'>('dashboard');
+  const [tab, setTab] = useState<'dashboard' | 'users' | 'config'>('dashboard');
 
   if (initializing) {
     return (
@@ -91,10 +92,22 @@ export function AdminPage() {
           >
             Utilisateurs
           </button>
+          <button
+            type="button"
+            onClick={() => setTab('config')}
+            className={cn(
+              TAB_BASE,
+              tab === 'config'
+                ? 'border-primary-shadow bg-primary text-primary-foreground'
+                : 'border-border-strong bg-surface-2/60 text-muted',
+            )}
+          >
+            Configuration
+          </button>
         </div>
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : <UsersTab />}
+      {tab === 'dashboard' ? <DashboardTab /> : tab === 'users' ? <UsersTab /> : <ConfigTab />}
     </Shell>
   );
 }

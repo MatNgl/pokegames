@@ -11,7 +11,8 @@ import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
-import { ANTI_REPEAT_WINDOW_DAYS, INTRUDER_CONFIG, type IntruderHintMode } from './game-config';
+import { GameConfigService } from '../game-config/game-config.service';
+import { type IntruderHintMode } from './game-config';
 import type {
   IntruderChoiceResponse,
   IntruderLevel,
@@ -109,6 +110,7 @@ export class IntruderService {
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
     private readonly dailyResult: DailyResultService,
+    private readonly gameConfig: GameConfigService,
   ) {}
 
   private readonly HISTORY_GAME = 'INTRUDER';
@@ -473,10 +475,10 @@ export class IntruderService {
     rng: () => number,
     used: Set<number>,
   ): RoundDef[] {
-    const { gridSize, rules, hintMode } = INTRUDER_CONFIG.levels[level];
+    const { gridSize, rules, hintMode } = this.gameConfig.intruder().levels[level];
     const matchCount = gridSize - 1;
     const rounds: RoundDef[] = [];
-    for (let i = 0; i < INTRUDER_CONFIG.roundsCount; i++) {
+    for (let i = 0; i < this.gameConfig.intruder().roundsCount; i++) {
       // Exclut les Pokemon deja pris (dedup intra-session et entre niveaux du jour).
       const avail = pool.filter((p) => !used.has(p.id));
       const order = this.shuffle(rules, rng);
@@ -504,7 +506,7 @@ export class IntruderService {
   }
 
   private planComplete(plan: Record<IntruderLevel, RoundDef[]>): boolean {
-    return INTRUDER_LEVELS.every((level) => plan[level].length === INTRUDER_CONFIG.roundsCount);
+    return INTRUDER_LEVELS.every((level) => plan[level].length === this.gameConfig.intruder().roundsCount);
   }
 
   /**
@@ -521,7 +523,7 @@ export class IntruderService {
       this.HISTORY_GAME,
       '',
       now,
-      ANTI_REPEAT_WINDOW_DAYS.INTRUDER,
+      this.gameConfig.antiRepeatWindow('INTRUDER'),
     );
     let plan = this.buildPlan(pool, recent);
     if (!this.planComplete(plan)) {
@@ -579,7 +581,7 @@ export class IntruderService {
       throw new ConflictException('DAILY_ALREADY_COMPLETED');
     }
     const pool = await this.loadPool();
-    if (pool.length < INTRUDER_CONFIG.levels[level].gridSize) {
+    if (pool.length < this.gameConfig.intruder().levels[level].gridSize) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
     const rounds = (await this.getDailyPlan(pool))[level];

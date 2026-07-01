@@ -22,7 +22,7 @@ import {
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
-import { ANTI_REPEAT_WINDOW_DAYS, WHO_IS_IT_ADMIN_CONFIG } from './game-config';
+import { GameConfigService } from '../game-config/game-config.service';
 
 const WHO_IS_IT_LEVELS: WhoIsItLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
 
@@ -59,17 +59,18 @@ export class WhoIsItService {
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
     private readonly dailyResult: DailyResultService,
+    private readonly gameConfig: GameConfigService,
   ) {}
 
   private readonly HISTORY_GAME = 'WHO_IS_IT';
 
   // Zoom et rotation dependent du niveau et du nombre d'erreurs. Source unique : game-config.ts
-  // (WHO_IS_IT_ADMIN_CONFIG). Le zoom se reduit et l'angle se redresse a chaque erreur.
+  // (this.gameConfig.whoIsIt()). Le zoom se reduit et l'angle se redresse a chaque erreur.
   private computeVisuals(
     level: WhoIsItLevel = 'MOYEN',
     mistakes: number,
   ): { zoomRatio: number; rotationAngle: number } {
-    const cfg = WHO_IS_IT_ADMIN_CONFIG.levels[level] ?? WHO_IS_IT_ADMIN_CONFIG.levels.MOYEN;
+    const cfg = this.gameConfig.whoIsIt().levels[level] ?? this.gameConfig.whoIsIt().levels.MOYEN;
     const zoom = Math.max(1.0, cfg.initialZoomRatio - mistakes * cfg.zoomStepPerMistake);
     const angle = Math.max(0, cfg.initialRotationAngle - mistakes * cfg.rotationStepPerMistake);
     return { zoomRatio: Number(zoom.toFixed(2)), rotationAngle: Math.round(angle) };
@@ -119,7 +120,7 @@ export class WhoIsItService {
     const used = new Set<number>();
     const seriesByLevel = new Map<WhoIsItLevel, T[]>();
     for (const lvl of WHO_IS_IT_LEVELS) {
-      const gens = WHO_IS_IT_ADMIN_CONFIG.levels[lvl].allowedGenerations;
+      const gens = this.gameConfig.whoIsIt().levels[lvl].allowedGenerations;
       const recent = recentByLevel.get(lvl) ?? new Set<number>();
       const picks: T[] = [];
       for (const pokemon of perm) {
@@ -144,9 +145,9 @@ export class WhoIsItService {
     if (!WHO_IS_IT_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
-    const levelConfig = WHO_IS_IT_ADMIN_CONFIG.levels[level];
-    const totalRounds = config.roundsCount ?? WHO_IS_IT_ADMIN_CONFIG.roundsCount;
-    const startCapital = config.startCapital ?? WHO_IS_IT_ADMIN_CONFIG.startCapital;
+    const levelConfig = this.gameConfig.whoIsIt().levels[level];
+    const totalRounds = config.roundsCount ?? this.gameConfig.whoIsIt().roundsCount;
+    const startCapital = config.startCapital ?? this.gameConfig.whoIsIt().startCapital;
 
     // Catalogue complet, ordre stable (indispensable au tirage deterministe du jour).
     const pokemons = await this.prisma.pokemon.findMany({
@@ -185,7 +186,7 @@ export class WhoIsItService {
             this.HISTORY_GAME,
             lvl,
             now,
-            ANTI_REPEAT_WINDOW_DAYS.WHO_IS_IT,
+            this.gameConfig.antiRepeatWindow('WHO_IS_IT'),
           ),
         );
       }
@@ -230,7 +231,7 @@ export class WhoIsItService {
     const type1 = target.types.find((t) => t.slot === 1)?.type.nameFr ?? target.types[0]?.type.nameFr ?? 'Inconnu';
     // height est stocke en metres (ETL : "0,7 m" -> 0.7). Ne pas rediviser.
     const heightStr = target.height != null ? `${target.height.toFixed(1)} m` : 'Inconnue';
-    const hintCosts = WHO_IS_IT_ADMIN_CONFIG.hintCosts;
+    const hintCosts = this.gameConfig.whoIsIt().hintCosts;
 
     const hints: WhoIsItHint[] = [
       {

@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
+import { GameConfigService } from '../game-config/game-config.service';
+import { gameConfigMock } from '../game-config/game-config.mock';
 
 const pool = Array.from({ length: 12 }, (_, i) => ({
   id: i + 1,
@@ -55,6 +57,7 @@ describe('JustStatService', () => {
             record: jest.fn().mockResolvedValue(undefined),
           },
         },
+        { provide: GameConfigService, useValue: gameConfigMock() },
       ],
     }).compile();
 

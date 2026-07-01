@@ -7,6 +7,8 @@ import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
+import { GameConfigService } from '../game-config/game-config.service';
+import { gameConfigMock } from '../game-config/game-config.mock';
 
 // 3 niveaux x 5 manches = 15 Pokemon distincts requis (dedup inter-niveaux).
 const pool = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, nameFr: `Pokemon${i + 1}` }));
@@ -62,6 +64,7 @@ describe('TrueShinyService', () => {
             record: jest.fn().mockResolvedValue(undefined),
           },
         },
+        { provide: GameConfigService, useValue: gameConfigMock() },
       ],
     }).compile();
 

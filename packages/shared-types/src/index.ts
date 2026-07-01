@@ -86,6 +86,12 @@ export interface AdminUserDetail extends AdminUserSummary {
   recentGames: AdminAuditLogEntry[];
 }
 
+export interface AdminGameConfigEntry {
+  key: string;
+  value: unknown;
+  updatedAt: string;
+}
+
 export interface PokemonStats {
   hp: number;
   atk: number;

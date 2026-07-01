@@ -11,7 +11,7 @@ import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
-import { ANTI_REPEAT_WINDOW_DAYS, MOTUS_ADMIN_CONFIG } from './game-config';
+import { GameConfigService } from '../game-config/game-config.service';
 import type {
   MotusGuessResponse,
   MotusGuessRow,
@@ -59,6 +59,7 @@ export class MotusService {
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
     private readonly dailyResult: DailyResultService,
+    private readonly gameConfig: GameConfigService,
   ) {}
 
   /** Retire les accents et ne garde que les lettres A a Z (majuscules). */
@@ -119,7 +120,7 @@ export class MotusService {
     const used = new Set<number>();
     const plan = {} as Record<MotusLevel, MotusTarget | null>;
     for (const level of MOTUS_LEVELS) {
-      const cfg = MOTUS_ADMIN_CONFIG.levels[level];
+      const cfg = this.gameConfig.motus().levels[level];
       const filtered = targets.filter(
         (t) => t.word.length >= cfg.minWordLength && t.word.length <= cfg.maxWordLength,
       );
@@ -128,7 +129,7 @@ export class MotusService {
         this.HISTORY_GAME,
         level,
         now,
-        ANTI_REPEAT_WINDOW_DAYS.MOTUS,
+        this.gameConfig.antiRepeatWindow('MOTUS'),
       );
       let avail = base.filter((t) => !used.has(t.pokemonId) && !recent.has(t.pokemonId));
       if (avail.length === 0) avail = base.filter((t) => !used.has(t.pokemonId)); // repli cross-jours
@@ -152,7 +153,7 @@ export class MotusService {
   private toState(session: MotusSession): MotusRoundState {
     const level = session.level ?? 'MOYEN';
     // La 1re lettre est fournie selon le niveau (source unique : game-config.ts).
-    const hasFirstLetter = MOTUS_ADMIN_CONFIG.levels[level].provideFirstLetter;
+    const hasFirstLetter = this.gameConfig.motus().levels[level].provideFirstLetter;
     return {
       roundId: session.roundId,
       level,
@@ -203,7 +204,7 @@ export class MotusService {
       throw new NotFoundException('Aucun Pokémon disponible pour le Motus. Lancez le script ETL.');
     }
 
-    const maxAttempts = MOTUS_ADMIN_CONFIG.levels[level].maxAttempts;
+    const maxAttempts = this.gameConfig.motus().levels[level].maxAttempts;
     const target = (await this.getDailyPlan(targets))[level];
     if (!target) {
       throw new NotFoundException('Mot du jour introuvable');

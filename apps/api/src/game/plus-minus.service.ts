@@ -11,7 +11,7 @@ import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
-import { ANTI_REPEAT_WINDOW_DAYS, PLUS_MINUS_CONFIG } from './game-config';
+import { GameConfigService } from '../game-config/game-config.service';
 import type {
   PlusMinusChoiceResponse,
   PlusMinusContestant,
@@ -78,6 +78,7 @@ export class PlusMinusService {
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
     private readonly dailyResult: DailyResultService,
+    private readonly gameConfig: GameConfigService,
   ) {}
 
   private readonly HISTORY_GAME = 'PLUS_MINUS';
@@ -221,7 +222,7 @@ export class PlusMinusService {
     rng: () => number,
     used: Set<number>,
   ): Duel | null {
-    const { minDiff, maxDiff, ageMinDiff } = PLUS_MINUS_CONFIG.levels[level];
+    const { minDiff, maxDiff, ageMinDiff } = this.gameConfig.plusMinus().levels[level];
     for (const criterion of this.shuffle(CRITERIA, rng)) {
       // L'anciennete (numero de Pokedex) a sa propre echelle : ecart minimal dedie, sans plafond.
       const isAge = criterion === 'AGE';
@@ -267,7 +268,7 @@ export class PlusMinusService {
     used: Set<number>,
   ): Duel[] {
     const duels: Duel[] = [];
-    for (let round = 0; round < PLUS_MINUS_CONFIG.roundsCount; round++) {
+    for (let round = 0; round < this.gameConfig.plusMinus().roundsCount; round++) {
       const duel = this.buildDuelForLevel(pool, level, rng, used);
       if (duel) duels.push(duel);
     }
@@ -286,7 +287,7 @@ export class PlusMinusService {
   }
 
   private planComplete(plan: Record<PlusMinusLevel, Duel[]>): boolean {
-    return PLUS_MINUS_LEVELS.every((level) => plan[level].length === PLUS_MINUS_CONFIG.roundsCount);
+    return PLUS_MINUS_LEVELS.every((level) => plan[level].length === this.gameConfig.plusMinus().roundsCount);
   }
 
   /**
@@ -304,7 +305,7 @@ export class PlusMinusService {
       this.HISTORY_GAME,
       '',
       now,
-      ANTI_REPEAT_WINDOW_DAYS.PLUS_MINUS,
+      this.gameConfig.antiRepeatWindow('PLUS_MINUS'),
     );
     let plan = this.buildPlan(pool, recent);
     if (!this.planComplete(plan)) {

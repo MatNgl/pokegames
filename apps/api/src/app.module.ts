@@ -5,6 +5,7 @@ import { RedisModule } from './redis/redis.module';
 import { EtlModule } from './etl/etl.module';
 import { EventsModule } from './events/events.module';
 import { GameModule } from './game/game.module';
+import { GameConfigModule } from './game-config/game-config.module';
 import { HistoryModule } from './history/history.module';
 import { DailyResultModule } from './daily-result/daily-result.module';
 import { PokemonModule } from './pokemon/pokemon.module';
@@ -19,6 +20,7 @@ import { UsersModule } from './users/users.module';
     RedisModule,
     EtlModule,
     EventsModule,
+    GameConfigModule,
     GameModule,
     HistoryModule,
     DailyResultModule,

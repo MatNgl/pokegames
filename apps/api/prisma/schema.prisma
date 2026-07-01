@@ -131,6 +131,15 @@ model DailyPick {
 /// Resultat quotidien d'un joueur connecte pour un defi (jeu x scope x jour). Sert au verrou serveur
 /// de l'unicite quotidienne, a l'historique joueur et aux futurs classements. Une seule ligne par
 /// (utilisateur, jeu, scope, jour). Les invites ne sont pas persistes (localStorage cote client).
+/// Configuration dynamique des jeux : source de verite unique, editable via l'admin. Chargee en
+/// memoire au demarrage (seedee depuis les valeurs par defaut de game-config.ts si absente). Les
+/// services de jeu lisent leur config via GameConfigService, plus aucune constante lue directement.
+model GameConfig {
+  key       String   @id // "WHO_IS_IT", "MOTUS", "PLUS_MINUS", ..., "ANTI_REPEAT"
+  value     Json
+  updatedAt DateTime @updatedAt @default(now())
+}
+
 model DailyResult {
   id              String   @id @default(uuid())
   userId          String

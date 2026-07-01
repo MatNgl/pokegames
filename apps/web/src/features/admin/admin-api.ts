@@ -1,10 +1,20 @@
 import { api } from '@/lib/api';
 import type {
   AdminAuditLogEntry,
+  AdminGameConfigEntry,
   AdminStats,
   AdminUserDetail,
   AdminUserSummary,
 } from '@pokegames/shared-types';
+
+export async function getGameConfigs(): Promise<AdminGameConfigEntry[]> {
+  const res = await api.get<AdminGameConfigEntry[]>('/admin/games/config');
+  return res.data;
+}
+
+export async function updateGameConfig(key: string, value: unknown): Promise<void> {
+  await api.put(`/admin/games/config/${key}`, { value });
+}
 
 export async function getAdminStats(): Promise<AdminStats> {
   const res = await api.get<AdminStats>('/admin/audit/stats');

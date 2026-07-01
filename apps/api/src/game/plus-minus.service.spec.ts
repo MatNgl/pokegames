@@ -6,6 +6,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
+import { GameConfigService } from '../game-config/game-config.service';
+import { gameConfigMock } from '../game-config/game-config.mock';
 
 interface StoredDuelSide {
   id: number;
@@ -98,6 +100,7 @@ describe('PlusMinusService', () => {
             record: jest.fn().mockResolvedValue(undefined),
           },
         },
+        { provide: GameConfigService, useValue: gameConfigMock() },
       ],
     }).compile();
 

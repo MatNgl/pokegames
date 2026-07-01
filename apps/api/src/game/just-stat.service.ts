@@ -7,12 +7,8 @@ import { ConflictException } from '@nestjs/common';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
-import {
-  ANTI_REPEAT_DETAIL_WINDOW_DAYS,
-  ANTI_REPEAT_WINDOW_DAYS,
-  JUST_STAT_CONFIG,
-  JUST_STAT_DESCRIPTORS,
-} from './game-config';
+import { GameConfigService } from '../game-config/game-config.service';
+import { JUST_STAT_DESCRIPTORS } from './game-config';
 import type {
   JustStatDirection,
   JustStatGuessResponse,
@@ -69,6 +65,7 @@ export class JustStatService {
     private readonly eventEmitter: EventEmitter2,
     private readonly history: HistoryService,
     private readonly dailyResult: DailyResultService,
+    private readonly gameConfig: GameConfigService,
   ) {}
 
   private async recordIfFinished(session: JustStatSession): Promise<void> {
@@ -173,11 +170,11 @@ export class JustStatService {
   // Stats du jour : distinctes, en evitant celles des jours recents (dimension secondaire).
   private pickStats(rng: () => number, excludeStats: Set<string>, count: number): JustStatKey[] {
     const preferred = this.shuffle(
-      JUST_STAT_CONFIG.allowedStats.filter((s) => !excludeStats.has(s)),
+      this.gameConfig.justStat().allowedStats.filter((s) => !excludeStats.has(s)),
       rng,
     );
     const rest = this.shuffle(
-      JUST_STAT_CONFIG.allowedStats.filter((s) => excludeStats.has(s)),
+      this.gameConfig.justStat().allowedStats.filter((s) => excludeStats.has(s)),
       rng,
     );
     return [...preferred, ...rest].slice(0, count);
@@ -189,7 +186,7 @@ export class JustStatService {
     excludeIds: Set<number>,
     excludeStats: Set<string>,
   ): RoundDef[] {
-    const count = JUST_STAT_CONFIG.roundsCount;
+    const count = this.gameConfig.justStat().roundsCount;
     // Variete intra-session : stats distinctes et Pokemon distincts sur les manches du jour.
     const stats = this.pickStats(rng, excludeStats, count);
     const available = pool.filter((p) => !excludeIds.has(p.id));
@@ -226,16 +223,16 @@ export class JustStatService {
       this.HISTORY_GAME,
       '',
       now,
-      ANTI_REPEAT_WINDOW_DAYS.JUST_STAT,
+      this.gameConfig.antiRepeatWindow('JUST_STAT'),
     );
     const recentStats = await this.history.recentDetails(
       this.HISTORY_GAME,
       '',
       now,
-      ANTI_REPEAT_DETAIL_WINDOW_DAYS,
+      this.gameConfig.antiRepeatDetailWindow(),
     );
     let rounds = this.buildRounds(pool, this.makeRng(this.dailySeed()), recentIds, recentStats);
-    if (rounds.length < JUST_STAT_CONFIG.roundsCount) {
+    if (rounds.length < this.gameConfig.justStat().roundsCount) {
       rounds = this.buildRounds(pool, this.makeRng(this.dailySeed()), new Set<number>(), new Set<string>());
     }
 
@@ -276,9 +273,9 @@ export class JustStatService {
       statUnit: descriptor.unit,
       min: descriptor.min,
       max: descriptor.max,
-      timeLimitSeconds: JUST_STAT_CONFIG.timeLimitSeconds,
-      maxAttempts: JUST_STAT_CONFIG.maxAttempts,
-      attemptsRemaining: Math.max(0, JUST_STAT_CONFIG.maxAttempts - round.attemptsUsed),
+      timeLimitSeconds: this.gameConfig.justStat().timeLimitSeconds,
+      maxAttempts: this.gameConfig.justStat().maxAttempts,
+      attemptsRemaining: Math.max(0, this.gameConfig.justStat().maxAttempts - round.attemptsUsed),
     };
   }
 
@@ -290,7 +287,7 @@ export class JustStatService {
       throw new ConflictException('DAILY_ALREADY_COMPLETED');
     }
     const pool = await this.loadPool();
-    if (pool.length < JUST_STAT_CONFIG.roundsCount) {
+    if (pool.length < this.gameConfig.justStat().roundsCount) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
     const rounds = await this.getDailyRounds(pool);
@@ -364,7 +361,7 @@ export class JustStatService {
   private endedResponse(session: JustStatSession, round: RoundDef): JustStatGuessResponse {
     return {
       direction: round.solved ? 'CORRECT' : null,
-      attemptsRemaining: Math.max(0, JUST_STAT_CONFIG.maxAttempts - round.attemptsUsed),
+      attemptsRemaining: Math.max(0, this.gameConfig.justStat().maxAttempts - round.attemptsUsed),
       roundOver: true,
       correctValue: round.value,
       state: this.toState(session),
@@ -401,7 +398,7 @@ export class JustStatService {
       this.advanceAndMaybeFinish(session, round);
     } else {
       direction = guess < round.value ? 'HIGHER' : 'LOWER';
-      if (round.attemptsUsed >= JUST_STAT_CONFIG.maxAttempts) {
+      if (round.attemptsUsed >= this.gameConfig.justStat().maxAttempts) {
         this.advanceAndMaybeFinish(session, round);
       }
     }
@@ -411,7 +408,7 @@ export class JustStatService {
 
     return {
       direction,
-      attemptsRemaining: Math.max(0, JUST_STAT_CONFIG.maxAttempts - round.attemptsUsed),
+      attemptsRemaining: Math.max(0, this.gameConfig.justStat().maxAttempts - round.attemptsUsed),
       roundOver: round.over,
       correctValue: round.over ? round.value : null,
       state: this.toState(session),
@@ -436,7 +433,7 @@ export class JustStatService {
 
     return {
       direction: null,
-      attemptsRemaining: Math.max(0, JUST_STAT_CONFIG.maxAttempts - round.attemptsUsed),
+      attemptsRemaining: Math.max(0, this.gameConfig.justStat().maxAttempts - round.attemptsUsed),
       roundOver: true,
       correctValue: round.value,
       state: this.toState(session),

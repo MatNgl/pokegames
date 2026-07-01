@@ -6,6 +6,8 @@ import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
+import { GameConfigService } from '../game-config/game-config.service';
+import { gameConfigMock } from '../game-config/game-config.mock';
 import type { ShinyMode } from '@pokegames/shared-types';
 
 // Assez grand pour les 3 niveaux d'un mode sans repetition (5*3 + 5*4 + 5*6 = 65 Pokemon).
@@ -73,6 +75,7 @@ describe('ShinyService', () => {
             record: jest.fn().mockResolvedValue(undefined),
           },
         },
+        { provide: GameConfigService, useValue: gameConfigMock() },
       ],
     }).compile();
 

@@ -6,6 +6,8 @@ import { RedisService } from '../redis/redis.service';
 import { SpriteProxyService } from './sprite-proxy.service';
 import { HistoryService } from '../history/history.service';
 import { DailyResultService } from '../daily-result/daily-result.service';
+import { GameConfigService } from '../game-config/game-config.service';
+import { gameConfigMock } from '../game-config/game-config.mock';
 
 describe('WhoIsItService', () => {
   let service: WhoIsItService;
@@ -102,6 +104,7 @@ describe('WhoIsItService', () => {
             record: jest.fn().mockResolvedValue(undefined),
           },
         },
+        { provide: GameConfigService, useValue: gameConfigMock() },
       ],
     }).compile();
 
