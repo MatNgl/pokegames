@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import type { PlusMinusChoiceResponse, PlusMinusRoundState } from '@pokegames/shared-types';
+import type {
+  PlusMinusChoiceResponse,
+  PlusMinusCriterion,
+  PlusMinusRoundState,
+} from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +15,21 @@ import { Spinner } from '@/components/ui/spinner';
 import { API_ORIGIN } from '@/lib/env';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/lib/errors';
+import { CountUp } from './components/count-up';
 import { getPlusMinusRound, startPlusMinus, submitPlusMinusChoice } from './plus-minus-api';
+
+function formatValue(criterion: PlusMinusCriterion, value: number): string {
+  switch (criterion) {
+    case 'HEIGHT':
+      return `${value.toFixed(1)} m`;
+    case 'WEIGHT':
+      return `${value.toFixed(1)} kg`;
+    case 'AGE':
+      return `No ${Math.round(value)}`;
+    default:
+      return String(Math.round(value));
+  }
+}
 import {
   clearPlusMinus,
   loadPlusMinusDone,
@@ -27,6 +46,7 @@ interface EndInfo {
 
 export function PlusMinusPage() {
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [state, setState] = useState<PlusMinusRoundState | null>(null);
   const [reveal, setReveal] = useState<PlusMinusChoiceResponse | null>(null);
   const [chosen, setChosen] = useState<'A' | 'B' | null>(null);
@@ -129,11 +149,22 @@ export function PlusMinusPage() {
     const isCorrect = reveal !== null && reveal.correctChoice === side;
     const isWrongPick = reveal !== null && chosen === side && reveal.correctChoice !== side;
 
+    const animate =
+      reveal === null || reduceMotion
+        ? {}
+        : isCorrect
+          ? { scale: [1, 1.06, 1] }
+          : isWrongPick
+            ? { x: [0, -6, 6, -4, 4, 0] }
+            : {};
+
     return (
-      <button
+      <motion.button
         type="button"
         disabled={reveal !== null || busy}
         onClick={() => void onChoose(side)}
+        animate={animate}
+        transition={{ duration: 0.45 }}
         className={cn(
           'flex flex-1 flex-col items-center gap-2 rounded-card border-4 bg-white p-4 transition-colors duration-150',
           reveal === null && 'cursor-pointer hover:border-primary',
@@ -141,7 +172,9 @@ export function PlusMinusPage() {
             ? 'border-go bg-go/10'
             : isWrongPick
               ? 'border-danger bg-danger/10'
-              : 'border-border-strong',
+              : reveal !== null
+                ? 'border-border-strong opacity-70'
+                : 'border-border-strong',
         )}
       >
         <img
@@ -152,11 +185,15 @@ export function PlusMinusPage() {
         />
         <span className="text-center text-sm font-extrabold text-foreground">{contestant.name}</span>
         {value ? (
-          <span className="font-display text-xs text-primary">{value.displayValue}</span>
+          <CountUp
+            target={value.value}
+            format={(n) => formatValue(state.criterion, n)}
+            className={cn('font-display text-sm', isCorrect ? 'text-success' : 'text-foreground')}
+          />
         ) : (
           <span className="font-display text-xs text-muted">?</span>
         )}
-      </button>
+      </motion.button>
     );
   };
 
@@ -216,14 +253,17 @@ export function PlusMinusPage() {
 
               {reveal && (
                 <div className="flex flex-col items-center gap-3">
-                  <p
+                  <motion.p
+                    initial={reduceMotion ? false : { scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
                     className={cn(
-                      'text-sm font-bold',
+                      'font-display text-xs uppercase tracking-widest',
                       reveal.correct ? 'text-success' : 'text-danger',
                     )}
                   >
-                    {reveal.correct ? 'Bonne réponse !' : 'Raté !'}
-                  </p>
+                    {reveal.correct ? 'Bien vu !' : 'Raté !'}
+                  </motion.p>
                   <Button onClick={onContinue}>
                     {reveal.state.status === 'FINISHED' ? 'Voir le résultat' : 'Manche suivante'}
                   </Button>
