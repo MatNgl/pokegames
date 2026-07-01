@@ -187,14 +187,21 @@ export interface MotusGuessResponse {
 
 export type PlusMinusCriterion = 'HP' | 'HEIGHT' | 'WEIGHT' | 'ATK' | 'DEF' | 'SPEED' | 'AGE';
 
+export type PlusMinusLevel = 'FACILE' | 'MOYEN' | 'DIFFICILE' | 'EXTREME';
+
 export interface PlusMinusContestant {
   pokemonId: number;
   name: string;
   spriteUrl: string;
 }
 
+export interface PlusMinusStartRequest {
+  level: PlusMinusLevel;
+}
+
 export interface PlusMinusRoundState {
   roundId: string;
+  level: PlusMinusLevel;
   totalRounds: number;
   roundIndex: number; // manche courante (1 a totalRounds)
   correctCount: number;

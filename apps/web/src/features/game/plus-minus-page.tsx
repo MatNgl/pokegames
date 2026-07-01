@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import type {
   PlusMinusChoiceResponse,
   PlusMinusCriterion,
+  PlusMinusLevel,
   PlusMinusRoundState,
 } from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
@@ -17,6 +19,17 @@ import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
 import { CountUp } from './components/count-up';
+import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
+import { getPlusMinusRound, startPlusMinus, submitPlusMinusChoice } from './plus-minus-api';
+import {
+  clearPlusMinus,
+  loadPlusMinusDone,
+  loadPlusMinusSaved,
+  plusMinusDailyStatus,
+  plusMinusTodayKey,
+  savePlusMinus,
+  savePlusMinusDone,
+} from './plus-minus-storage';
 
 const PLUS_MINUS_RULES = [
   'Deux Pokémon, une question par manche.',
@@ -24,7 +37,20 @@ const PLUS_MINUS_RULES = [
   'La caractéristique change à chaque manche.',
   '10 manches : vise le meilleur score.',
 ];
-import { getPlusMinusRound, startPlusMinus, submitPlusMinusChoice } from './plus-minus-api';
+
+const LEVELS: { level: PlusMinusLevel; label: string; description: string }[] = [
+  { level: 'FACILE', label: 'Facile', description: 'Écart large, facile à trancher' },
+  { level: 'MOYEN', label: 'Moyen', description: 'Écart modéré' },
+  { level: 'DIFFICILE', label: 'Difficile', description: 'Écart faible' },
+  { level: 'EXTREME', label: 'Extrême', description: 'Valeurs très proches' },
+];
+
+const LEVEL_LABEL: Record<PlusMinusLevel, string> = {
+  FACILE: 'Facile',
+  MOYEN: 'Moyen',
+  DIFFICILE: 'Difficile',
+  EXTREME: 'Extrême',
+};
 
 function formatValue(criterion: PlusMinusCriterion, value: number): string {
   switch (criterion) {
@@ -38,14 +64,6 @@ function formatValue(criterion: PlusMinusCriterion, value: number): string {
       return String(Math.round(value));
   }
 }
-import {
-  clearPlusMinus,
-  loadPlusMinusDone,
-  loadPlusMinusSaved,
-  plusMinusTodayKey,
-  savePlusMinus,
-  savePlusMinusDone,
-} from './plus-minus-storage';
 
 interface EndInfo {
   correctCount: number;
@@ -53,6 +71,25 @@ interface EndInfo {
 }
 
 export function PlusMinusPage() {
+  const [level, setLevel] = useState<PlusMinusLevel | null>(null);
+
+  if (!level) {
+    return <PlusMinusLevelSelect onPick={setLevel} />;
+  }
+  return <PlusMinusGame key={level} level={level} onBack={() => setLevel(null)} />;
+}
+
+function PlusMinusLevelSelect({ onPick }: { onPick: (level: PlusMinusLevel) => void }) {
+  const options = useMemo<LevelOption<PlusMinusLevel>[]>(
+    () => LEVELS.map((l) => ({ ...l, status: plusMinusDailyStatus(l.level) })),
+    [],
+  );
+  return (
+    <LevelSelectScreen title="Plus ou Moins" rules={PLUS_MINUS_RULES} options={options} onPick={onPick} />
+  );
+}
+
+function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () => void }) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const [state, setState] = useState<PlusMinusRoundState | null>(null);
@@ -72,27 +109,27 @@ export function PlusMinusPage() {
     setEnded(false);
     setEndInfo(null);
     try {
-      const round = await startPlusMinus();
+      const round = await startPlusMinus(level);
       setState(round);
-      savePlusMinus(round.roundId, round.roundIndex);
+      savePlusMinus(level, round.roundId, round.roundIndex);
     } catch (err) {
-      clearPlusMinus();
+      clearPlusMinus(level);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [level]);
 
   const restoreOrStart = useCallback(async () => {
     const today = plusMinusTodayKey();
-    const done = loadPlusMinusDone();
+    const done = loadPlusMinusDone(level);
     if (done && done.date === today) {
       setEndInfo({ correctCount: done.correctCount, totalRounds: done.totalRounds });
       setEnded(true);
       setLoading(false);
       return;
     }
-    const saved = loadPlusMinusSaved();
+    const saved = loadPlusMinusSaved(level);
     if (!saved || saved.date !== today) {
       await start();
       return;
@@ -101,19 +138,19 @@ export function PlusMinusPage() {
     try {
       const round = await getPlusMinusRound(saved.roundId);
       if (round.status === 'FINISHED') {
-        savePlusMinusDone(round.correctCount, round.totalRounds);
+        savePlusMinusDone(level, round.correctCount, round.totalRounds);
         setEndInfo({ correctCount: round.correctCount, totalRounds: round.totalRounds });
         setEnded(true);
       } else {
         setState(round);
-        savePlusMinus(round.roundId, round.roundIndex);
+        savePlusMinus(level, round.roundId, round.roundIndex);
       }
       setLoading(false);
     } catch {
-      clearPlusMinus();
+      clearPlusMinus(level);
       await start();
     }
-  }, [start]);
+  }, [level, start]);
 
   useEffect(() => {
     void restoreOrStart();
@@ -128,7 +165,7 @@ export function PlusMinusPage() {
       const res = await submitPlusMinusChoice(state.roundId, choice);
       setReveal(res);
       if (res.state.status === 'FINISHED') {
-        savePlusMinusDone(res.state.correctCount, res.state.totalRounds);
+        savePlusMinusDone(level, res.state.correctCount, res.state.totalRounds);
       }
     } catch (err) {
       setChosen(null);
@@ -146,7 +183,7 @@ export function PlusMinusPage() {
       setEnded(true);
     } else {
       setState(next);
-      savePlusMinus(next.roundId, next.roundIndex);
+      savePlusMinus(level, next.roundId, next.roundIndex);
       setReveal(null);
       setChosen(null);
     }
@@ -227,6 +264,10 @@ export function PlusMinusPage() {
               <Button className="w-full" onClick={() => navigate('/')}>
                 Retour à l'accueil
               </Button>
+              <Button variant="secondary" size="sm" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4" />
+                Changer de niveau
+              </Button>
             </Card>
           ) : !state ? (
             <Card className="max-w-md p-6 text-center">
@@ -238,7 +279,20 @@ export function PlusMinusPage() {
           ) : (
             <Card className="flex w-full max-w-xl flex-col items-center gap-5 p-6">
               <div className="flex w-full items-start justify-between gap-4">
-                <h1 className="font-display text-sm leading-relaxed text-foreground">Plus ou Moins</h1>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    aria-label="Changer de niveau"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <h1 className="font-display text-sm leading-relaxed text-foreground">Plus ou Moins</h1>
+                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                    {LEVEL_LABEL[state.level]}
+                  </Badge>
+                </div>
                 <div className="flex items-center gap-2">
                   <Badge className="border-primary bg-primary text-primary-foreground">
                     {state.roundIndex}/{state.totalRounds}

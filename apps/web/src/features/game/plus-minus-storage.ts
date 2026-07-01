@@ -1,6 +1,14 @@
-// Persistance locale du defi "Plus ou Moins" quotidien (1 session par jour). L'etat detaille vit en Redis.
-const STORAGE_KEY = 'pokegames:plus-minus';
-const DONE_KEY = 'pokegames:plus-minus:done';
+import type { PlusMinusLevel } from '@pokegames/shared-types';
+
+// Persistance locale du defi "Plus ou Moins" quotidien (1 session par jour et par niveau).
+// L'etat detaille vit en Redis cote serveur.
+function storageKey(level: PlusMinusLevel): string {
+  return `pokegames:plus-minus:${level}`;
+}
+
+function doneKey(level: PlusMinusLevel): string {
+  return `pokegames:plus-minus:${level}:done`;
+}
 
 export function plusMinusTodayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -35,45 +43,49 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-export function loadPlusMinusSaved(): PlusMinusSaved | null {
-  const saved = readJson<PlusMinusSaved>(STORAGE_KEY);
+export function loadPlusMinusSaved(level: PlusMinusLevel): PlusMinusSaved | null {
+  const saved = readJson<PlusMinusSaved>(storageKey(level));
   if (saved && typeof saved.roundId === 'string' && typeof saved.date === 'string') {
     return saved;
   }
   return null;
 }
 
-export function savePlusMinus(roundId: string, roundIndex = 1): void {
-  writeJson(STORAGE_KEY, { date: plusMinusTodayKey(), roundId, roundIndex });
+export function savePlusMinus(level: PlusMinusLevel, roundId: string, roundIndex = 1): void {
+  writeJson(storageKey(level), { date: plusMinusTodayKey(), roundId, roundIndex });
 }
 
-export function clearPlusMinus(): void {
+export function clearPlusMinus(level: PlusMinusLevel): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey(level));
   } catch {
     // Rien a faire si le stockage est indisponible.
   }
 }
 
-export function loadPlusMinusDone(): PlusMinusDone | null {
-  const done = readJson<PlusMinusDone>(DONE_KEY);
+export function loadPlusMinusDone(level: PlusMinusLevel): PlusMinusDone | null {
+  const done = readJson<PlusMinusDone>(doneKey(level));
   if (done && typeof done.date === 'string' && typeof done.correctCount === 'number') {
     return done;
   }
   return null;
 }
 
-export function savePlusMinusDone(correctCount: number, totalRounds: number): void {
-  writeJson(DONE_KEY, { date: plusMinusTodayKey(), correctCount, totalRounds });
+export function savePlusMinusDone(
+  level: PlusMinusLevel,
+  correctCount: number,
+  totalRounds: number,
+): void {
+  writeJson(doneKey(level), { date: plusMinusTodayKey(), correctCount, totalRounds });
 }
 
 export type PlusMinusDailyStatus = 'idle' | 'in-progress' | 'done';
 
-export function plusMinusDailyStatus(): PlusMinusDailyStatus {
+export function plusMinusDailyStatus(level: PlusMinusLevel): PlusMinusDailyStatus {
   const today = plusMinusTodayKey();
-  const done = loadPlusMinusDone();
+  const done = loadPlusMinusDone(level);
   if (done && done.date === today) return 'done';
-  const saved = loadPlusMinusSaved();
+  const saved = loadPlusMinusSaved(level);
   if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }

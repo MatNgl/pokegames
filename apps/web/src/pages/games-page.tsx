@@ -174,7 +174,12 @@ export function GamesPage() {
       motusDailyStatus('DIFFICILE'),
       motusDailyStatus('EXTREME'),
     ]),
-    'plus-minus': plusMinusDailyStatus(),
+    'plus-minus': aggregateLevelStatus([
+      plusMinusDailyStatus('FACILE'),
+      plusMinusDailyStatus('MOYEN'),
+      plusMinusDailyStatus('DIFFICILE'),
+      plusMinusDailyStatus('EXTREME'),
+    ]),
     intruder: intruderDailyStatus(),
     shiny: shinyDailyStatus('FIND_SHINY'),
     'non-shiny': shinyDailyStatus('FIND_NON_SHINY'),

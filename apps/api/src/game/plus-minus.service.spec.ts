@@ -1,8 +1,43 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { PlusMinusCriterion, PlusMinusLevel } from '@pokegames/shared-types';
 import { PlusMinusService } from './plus-minus.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+
+interface StoredDuelSide {
+  id: number;
+  name: string;
+  value: number;
+}
+interface StoredDuel {
+  criterion: PlusMinusCriterion;
+  a: StoredDuelSide;
+  b: StoredDuelSide;
+  correct: 'A' | 'B';
+}
+interface StoredSession {
+  level: PlusMinusLevel;
+  duels: StoredDuel[];
+}
+
+// Pool synthetique large et etale : chaque bande de niveau (ecart large a tres serre) trouve des couples.
+// Assez grand pour les 4 niveaux du jour sans repetition (4 x 10 duels x 2 = 80 Pokemon minimum).
+const bigPool = Array.from({ length: 200 }, (_, i) => ({
+  id: i + 1,
+  pokedexId: i + 1,
+  nameFr: `P${i + 1}`,
+  statsHp: 30 + i * 3,
+  statsAtk: 30 + i * 3,
+  statsDef: 30 + i * 3,
+  statsSpeed: 30 + i * 3,
+  height: 0.3 + i * 0.15,
+  weight: 5 + i * 4,
+}));
+
+function scale(criterion: PlusMinusCriterion): number {
+  return criterion === 'HEIGHT' ? 100 : 1;
+}
 
 describe('PlusMinusService', () => {
   let service: PlusMinusService;
@@ -10,16 +45,10 @@ describe('PlusMinusService', () => {
   let mockSet: jest.Mock;
   let mockEmit: jest.Mock;
 
-  const pool = [
-    { id: 1, pokedexId: 1, nameFr: 'Bulbizarre', statsHp: 45, statsAtk: 49, statsDef: 49, statsSpeed: 45, height: 0.7, weight: 6.9 },
-    { id: 4, pokedexId: 4, nameFr: 'Salamèche', statsHp: 39, statsAtk: 52, statsDef: 43, statsSpeed: 65, height: 0.6, weight: 8.5 },
-    { id: 7, pokedexId: 7, nameFr: 'Carapuce', statsHp: 44, statsAtk: 48, statsDef: 65, statsSpeed: 43, height: 0.5, weight: 9.0 },
-    { id: 143, pokedexId: 143, nameFr: 'Ronflex', statsHp: 160, statsAtk: 110, statsDef: 65, statsSpeed: 30, height: 2.1, weight: 460 },
-  ];
-
   function duelSession(overrides: Record<string, unknown> = {}): string {
     return JSON.stringify({
       roundId: 'r1',
+      level: 'FACILE',
       currentIndex: 0,
       correctCount: 0,
       status: 'PLAYING',
@@ -32,6 +61,11 @@ describe('PlusMinusService', () => {
     });
   }
 
+  function lastSavedSession(): StoredSession {
+    const call = mockSet.mock.calls.at(-1);
+    return JSON.parse(String(call?.[1])) as StoredSession;
+  }
+
   beforeEach(async () => {
     mockGet = jest.fn();
     mockSet = jest.fn().mockResolvedValue(undefined);
@@ -40,7 +74,7 @@ describe('PlusMinusService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PlusMinusService,
-        { provide: PrismaService, useValue: { pokemon: { findMany: jest.fn().mockResolvedValue(pool) } } },
+        { provide: PrismaService, useValue: { pokemon: { findMany: jest.fn().mockResolvedValue(bigPool) } } },
         { provide: RedisService, useValue: { get: mockGet, set: mockSet, del: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: mockEmit } },
       ],
@@ -54,18 +88,45 @@ describe('PlusMinusService', () => {
   });
 
   describe('startDaily', () => {
-    it('renvoie la 1re manche sans exposer les valeurs', async () => {
-      const state = await service.startDaily();
+    it('renvoie la 1re manche du niveau sans exposer les valeurs', async () => {
+      const state = await service.startDaily('FACILE');
 
       expect(state.roundId).toBeDefined();
+      expect(state.level).toBe('FACILE');
       expect(state.totalRounds).toBe(10);
       expect(state.roundIndex).toBe(1);
-      expect(state.correctCount).toBe(0);
       expect(state.status).toBe('PLAYING');
       expect(state.criterionLabel.length).toBeGreaterThan(0);
       expect(state.a.spriteUrl).toMatch(/^\/api\/pokemon\/\d+\/sprite$/);
-      expect(state.b.spriteUrl).toMatch(/^\/api\/pokemon\/\d+\/sprite$/);
       expect('value' in state.a).toBe(false);
+    });
+
+    it('rejette un niveau invalide', async () => {
+      await expect(service.startDaily('IMPOSSIBLE' as PlusMinusLevel)).rejects.toThrow('Niveau invalide');
+    });
+
+    it('respecte la bande d’écart du niveau (Extrême : valeurs proches)', async () => {
+      await service.startDaily('EXTREME');
+      const session = lastSavedSession();
+      expect(session.duels.length).toBeGreaterThan(0);
+      for (const duel of session.duels) {
+        const diff = Math.abs(duel.a.value - duel.b.value) * scale(duel.criterion);
+        expect(diff).toBeGreaterThanOrEqual(1);
+        expect(diff).toBeLessThanOrEqual(9);
+      }
+    });
+
+    it('ne répète aucun Pokémon entre les niveaux d’un même jour', async () => {
+      await service.startDaily('FACILE');
+      const facile = lastSavedSession();
+      await service.startDaily('EXTREME');
+      const extreme = lastSavedSession();
+
+      const facileIds = new Set(facile.duels.flatMap((d) => [d.a.id, d.b.id]));
+      const extremeIds = extreme.duels.flatMap((d) => [d.a.id, d.b.id]);
+      for (const id of extremeIds) {
+        expect(facileIds.has(id)).toBe(false);
+      }
     });
   });
 

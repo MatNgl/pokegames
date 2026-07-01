@@ -1,13 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
+import { PLUS_MINUS_CONFIG } from './game-config';
 import type {
   PlusMinusChoiceResponse,
   PlusMinusContestant,
   PlusMinusCriterion,
+  PlusMinusLevel,
   PlusMinusReveal,
   PlusMinusRoundState,
 } from '@pokegames/shared-types';
@@ -39,6 +41,7 @@ interface Duel {
 
 interface PlusMinusSession {
   roundId: string;
+  level: PlusMinusLevel;
   duels: Duel[];
   currentIndex: number;
   correctCount: number;
@@ -49,13 +52,18 @@ interface PlusMinusSession {
 
 const CRITERIA: PlusMinusCriterion[] = ['HP', 'HEIGHT', 'WEIGHT', 'ATK', 'DEF', 'SPEED', 'AGE'];
 
+// Ordre fixe de construction du plan du jour. La dedup entre niveaux depend de cet ordre :
+// chaque niveau tire en excluant les Pokemon deja pris par les niveaux precedents.
+const PLUS_MINUS_LEVELS: PlusMinusLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
+
 @Injectable()
 export class PlusMinusService {
   private readonly REDIS_PREFIX = 'game_plusminus:';
   private readonly ROUND_TTL_SECONDS = 3600;
-  private readonly TOTAL_ROUNDS = 10;
 
   private poolCache: PoolPokemon[] | null = null;
+  // Plan du jour (tous niveaux) memoise : garantit le determinisme et la dedup inter-niveaux.
+  private planCache: { date: string; plan: Record<PlusMinusLevel, Duel[]> } | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -171,37 +179,105 @@ export class PlusMinusService {
     return seed || 1;
   }
 
-  private buildDuels(pool: PoolPokemon[], rng: () => number): Duel[] {
-    const duels: Duel[] = [];
-    for (let round = 0; round < this.TOTAL_ROUNDS; round++) {
-      const criterion = CRITERIA[Math.floor(rng() * CRITERIA.length)] ?? 'HP';
-      const eligible = pool.filter((p) => this.value(criterion, p) !== null);
+  // Ramene l'ecart brut d'une dimension a des "points" comparables aux seuils de niveau.
+  // La taille est en metres : on la ramene en centimetres (x100). Le reste est deja en points.
+  private dimensionScale(criterion: PlusMinusCriterion): number {
+    return criterion === 'HEIGHT' ? 100 : 1;
+  }
+
+  private shuffle<T>(items: T[], rng: () => number): T[] {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const a = copy[i];
+      const b = copy[j];
+      if (a !== undefined && b !== undefined) {
+        copy[i] = b;
+        copy[j] = a;
+      }
+    }
+    return copy;
+  }
+
+  /**
+   * Construit un duel respectant la bande d'ecart du niveau, en excluant les Pokemon deja
+   * utilises (dedup intra-session et entre niveaux du meme jour). Renvoie null si aucun couple
+   * ne convient pour ce niveau.
+   */
+  private buildDuelForLevel(
+    pool: PoolPokemon[],
+    level: PlusMinusLevel,
+    rng: () => number,
+    used: Set<number>,
+  ): Duel | null {
+    const { minDiff, maxDiff } = PLUS_MINUS_CONFIG.levels[level];
+    for (const criterion of this.shuffle(CRITERIA, rng)) {
+      const scale = this.dimensionScale(criterion);
+      const minRaw = minDiff / scale;
+      const maxRaw = maxDiff / scale;
+      const eligible = pool.filter((p) => this.value(criterion, p) !== null && !used.has(p.id));
       if (eligible.length < 2) continue;
 
-      let a = eligible[Math.floor(rng() * eligible.length)];
-      let b = eligible[Math.floor(rng() * eligible.length)];
-      let tries = 0;
-      while (
-        (!a || !b || a.id === b.id || this.value(criterion, a) === this.value(criterion, b)) &&
-        tries < 60
-      ) {
-        a = eligible[Math.floor(rng() * eligible.length)];
-        b = eligible[Math.floor(rng() * eligible.length)];
-        tries += 1;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const a = eligible[Math.floor(rng() * eligible.length)];
+        if (!a) continue;
+        const va = this.value(criterion, a);
+        if (va === null) continue;
+        const candidates = eligible.filter((p) => {
+          if (p.id === a.id) return false;
+          const vp = this.value(criterion, p);
+          if (vp === null) return false;
+          const diff = Math.abs(vp - va);
+          return diff >= minRaw && diff <= maxRaw;
+        });
+        const b = candidates[Math.floor(rng() * candidates.length)];
+        if (!b) continue;
+        const vb = this.value(criterion, b) ?? 0;
+        const aWins = this.higherWins(criterion) ? va > vb : va < vb;
+        used.add(a.id);
+        used.add(b.id);
+        return {
+          criterion,
+          a: { id: a.id, name: a.name, value: va },
+          b: { id: b.id, name: b.name, value: vb },
+          correct: aWins ? 'A' : 'B',
+        };
       }
-      if (!a || !b) continue;
+    }
+    return null;
+  }
 
-      const va = this.value(criterion, a) ?? 0;
-      const vb = this.value(criterion, b) ?? 0;
-      const aWins = this.higherWins(criterion) ? va > vb : va < vb;
-      duels.push({
-        criterion,
-        a: { id: a.id, name: a.name, value: va },
-        b: { id: b.id, name: b.name, value: vb },
-        correct: aWins ? 'A' : 'B',
-      });
+  private buildDuels(
+    pool: PoolPokemon[],
+    level: PlusMinusLevel,
+    rng: () => number,
+    used: Set<number>,
+  ): Duel[] {
+    const duels: Duel[] = [];
+    for (let round = 0; round < PLUS_MINUS_CONFIG.roundsCount; round++) {
+      const duel = this.buildDuelForLevel(pool, level, rng, used);
+      if (duel) duels.push(duel);
     }
     return duels;
+  }
+
+  /**
+   * Plan du jour complet : tous les niveaux construits dans un ordre fixe avec un meme RNG et un
+   * ensemble d'exclusion partage, de sorte qu'aucun Pokemon ne se repete entre les niveaux du jour.
+   */
+  private getDailyPlan(pool: PoolPokemon[]): Record<PlusMinusLevel, Duel[]> {
+    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    if (this.planCache && this.planCache.date === today) {
+      return this.planCache.plan;
+    }
+    const rng = this.makeRng(this.dailySeed());
+    const used = new Set<number>();
+    const plan = {} as Record<PlusMinusLevel, Duel[]>;
+    for (const level of PLUS_MINUS_LEVELS) {
+      plan[level] = this.buildDuels(pool, level, rng, used);
+    }
+    this.planCache = { date: today, plan };
+    return plan;
   }
 
   private contestant(side: DuelSide): PlusMinusContestant {
@@ -217,6 +293,7 @@ export class PlusMinusService {
     }
     return {
       roundId: session.roundId,
+      level: session.level,
       totalRounds: total,
       roundIndex: Math.min(session.currentIndex + 1, total),
       correctCount: session.correctCount,
@@ -228,12 +305,15 @@ export class PlusMinusService {
     };
   }
 
-  async startDaily(userId?: string): Promise<PlusMinusRoundState> {
+  async startDaily(level: PlusMinusLevel, userId?: string): Promise<PlusMinusRoundState> {
+    if (!PLUS_MINUS_LEVELS.includes(level)) {
+      throw new BadRequestException('Niveau invalide');
+    }
     const pool = await this.loadPool();
     if (pool.length < 2) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
-    const duels = this.buildDuels(pool, this.makeRng(this.dailySeed()));
+    const duels = this.getDailyPlan(pool)[level];
     if (duels.length === 0) {
       throw new NotFoundException('Impossible de générer les duels du jour');
     }
@@ -241,6 +321,7 @@ export class PlusMinusService {
     const roundId = uuidv4();
     const session: PlusMinusSession = {
       roundId,
+      level,
       duels,
       currentIndex: 0,
       correctCount: 0,

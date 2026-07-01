@@ -1,8 +1,12 @@
 import { api } from '@/lib/api';
-import type { PlusMinusChoiceResponse, PlusMinusRoundState } from '@pokegames/shared-types';
+import type {
+  PlusMinusChoiceResponse,
+  PlusMinusLevel,
+  PlusMinusRoundState,
+} from '@pokegames/shared-types';
 
-export async function startPlusMinus(): Promise<PlusMinusRoundState> {
-  const res = await api.post<PlusMinusRoundState>('/games/plus-minus/start', {});
+export async function startPlusMinus(level: PlusMinusLevel): Promise<PlusMinusRoundState> {
+  const res = await api.post<PlusMinusRoundState>('/games/plus-minus/start', { level });
   return res.data;
 }
 

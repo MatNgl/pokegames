@@ -6,6 +6,7 @@ import type {
   PlusMinusChoiceRequest,
   PlusMinusChoiceResponse,
   PlusMinusRoundState,
+  PlusMinusStartRequest,
 } from '@pokegames/shared-types';
 
 interface AuthenticatedUser {
@@ -18,8 +19,11 @@ export class PlusMinusController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Post('start')
-  async start(@Req() req: Request & { user?: AuthenticatedUser }): Promise<PlusMinusRoundState> {
-    return this.plusMinusService.startDaily(req.user?.id);
+  async start(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Body() body: PlusMinusStartRequest,
+  ): Promise<PlusMinusRoundState> {
+    return this.plusMinusService.startDaily(body.level, req.user?.id);
   }
 
   @Get('round/:roundId')

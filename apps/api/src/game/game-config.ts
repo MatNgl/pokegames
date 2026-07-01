@@ -1,4 +1,10 @@
-import type { JustStatKey, TrueShinyLevel, WhoIsItLevel, MotusLevel } from '@pokegames/shared-types';
+import type {
+  JustStatKey,
+  PlusMinusLevel,
+  TrueShinyLevel,
+  WhoIsItLevel,
+  MotusLevel,
+} from '@pokegames/shared-types';
 
 /**
  * Parametres de configuration des jeux, centralises et types. Ce sont les valeurs qui seront
@@ -54,6 +60,29 @@ export const MOTUS_ADMIN_CONFIG: MotusAdminConfig = {
     MOYEN: { minWordLength: 6, maxWordLength: 7, maxAttempts: 5, provideFirstLetter: true },
     DIFFICILE: { minWordLength: 5, maxWordLength: 8, maxAttempts: 6, provideFirstLetter: false },
     EXTREME: { minWordLength: 5, maxWordLength: 9, maxAttempts: 4, provideFirstLetter: false },
+  },
+};
+
+export interface PlusMinusLevelConfig {
+  // Bande d'ecart requise entre les deux valeurs du duel, exprimee en "points" (voir dimensionScale).
+  minDiff: number;
+  maxDiff: number;
+}
+
+export interface PlusMinusConfig {
+  roundsCount: number;
+  levels: Record<PlusMinusLevel, PlusMinusLevelConfig>;
+}
+
+// Ecart brut garanti entre les deux Pokemon d'un duel, par niveau (cf. regles du jeu).
+// Facile : ecart large (facile a trancher). Extreme : valeurs tres proches.
+export const PLUS_MINUS_CONFIG: PlusMinusConfig = {
+  roundsCount: 10,
+  levels: {
+    FACILE: { minDiff: 45, maxDiff: 9999 },
+    MOYEN: { minDiff: 25, maxDiff: 45 },
+    DIFFICILE: { minDiff: 10, maxDiff: 25 },
+    EXTREME: { minDiff: 1, maxDiff: 9 },
   },
 };
 
