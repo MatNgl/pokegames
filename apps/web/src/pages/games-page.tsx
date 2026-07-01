@@ -261,6 +261,11 @@ export function GamesPage() {
       <div className="flex min-h-screen flex-col">
         <AppHeader />
 
+        {/* Colonne de quetes a gauche (grands ecrans) : position fixe, ne decale pas les jeux. */}
+        <aside className="fixed left-4 top-20 z-20 hidden max-h-[calc(100vh-6rem)] w-64 overflow-auto xl:block">
+          <DailyQuestsPanel />
+        </aside>
+
         <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-4 pb-16 pt-8">
           <Logo className="text-2xl sm:text-4xl" />
           <p
@@ -270,11 +275,7 @@ export function GamesPage() {
             Tous les jours, devine un Pokémon
           </p>
 
-          <div className="mt-8 w-full">
-            <DailyQuestsPanel />
-          </div>
-
-          <div className="mt-4 grid w-full gap-4 sm:grid-cols-2">
+          <div className="mt-8 grid w-full gap-4 sm:grid-cols-2">
             {games.map((game) => {
               const status = game.dailyKey ? statuses[game.dailyKey] : undefined;
 
@@ -293,6 +294,11 @@ export function GamesPage() {
             })}
 
             <ShinyToggleCard statuses={statuses} />
+          </div>
+
+          {/* Petits ecrans : les quetes passent sous les jeux (jamais au-dessus). */}
+          <div className="mt-8 w-full xl:hidden">
+            <DailyQuestsPanel />
           </div>
         </main>
       </div>
