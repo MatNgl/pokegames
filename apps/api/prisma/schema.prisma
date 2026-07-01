@@ -109,3 +109,21 @@ model GameAuditLog {
   @@index([createdAt])
 }
 
+/// Historique des tirages quotidiens, global et partage par tous les joueurs (les defis sont
+/// deterministes et identiques pour tous). Sert a eviter de retomber sur les memes Pokemon
+/// (ou les memes stats) d'un jour a l'autre. Renseigne par HistoryService lors de la generation
+/// d'un defi ; interroge par les generateurs pour exclure les tirages recents.
+model DailyPick {
+  id        String   @id @default(uuid())
+  game      String // GameType : "WHO_IS_IT", "MOTUS", ...
+  scope     String   @default("") // mode ou niveau ("FIND_SHINY", "FACILE", ...), vide si sans objet
+  pickDate  DateTime @db.Date // date UTC du tirage
+  pokemonId Int? // Pokemon tire (null si non applicable)
+  detail    String? // dimension secondaire a varier (ex. stat "SPEED", critere "TYPE")
+  createdAt DateTime @default(now())
+
+  @@index([game, scope, pickDate])
+  @@index([game, scope, pokemonId])
+  @@index([game, scope, detail])
+}
+
