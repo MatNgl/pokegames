@@ -14,6 +14,8 @@ import { ShinyService } from './shiny.service';
 import { ShinyController } from './shiny.controller';
 import { JustStatService } from './just-stat.service';
 import { JustStatController } from './just-stat.controller';
+import { TrueShinyService } from './true-shiny.service';
+import { TrueShinyController } from './true-shiny.controller';
 
 @Module({
   imports: [PokemonModule],
@@ -25,6 +27,7 @@ import { JustStatController } from './just-stat.controller';
     IntruderController,
     ShinyController,
     JustStatController,
+    TrueShinyController,
   ],
   providers: [
     SpriteProxyService,
@@ -34,6 +37,7 @@ import { JustStatController } from './just-stat.controller';
     IntruderService,
     ShinyService,
     JustStatService,
+    TrueShinyService,
   ],
   exports: [
     SpriteProxyService,
@@ -43,6 +47,7 @@ import { JustStatController } from './just-stat.controller';
     IntruderService,
     ShinyService,
     JustStatService,
+    TrueShinyService,
   ],
 })
 export class GameModule {}

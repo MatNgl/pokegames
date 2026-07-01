@@ -305,6 +305,46 @@ export interface ShinyChoiceResponse {
 }
 
 /* ==========================================================================
+ * JEU 6 : TROUVE LE BON SHINY (SPRITE CHROMATIQUE INTACT)
+ * ========================================================================== */
+
+export type TrueShinyLevel = 'FACILE' | 'MOYEN' | 'DIFFICILE';
+
+export interface TrueShinyTile {
+  slot: number; // 0 a gridSize-1
+  imageUrl: string; // proxy opaque : image deja alteree (ou non) par le serveur, jamais en CSS
+}
+
+export interface TrueShinyRoundState {
+  roundId: string;
+  level: TrueShinyLevel;
+  totalRounds: number;
+  roundIndex: number; // manche courante (1 a totalRounds)
+  correctCount: number;
+  status: 'PLAYING' | 'FINISHED';
+  // Toutes les vignettes montrent le meme Pokemon shiny ; une seule est intacte, a trouver.
+  tiles: TrueShinyTile[];
+}
+
+export interface TrueShinyTileReveal {
+  slot: number;
+  isAnswer: boolean; // vignette intacte a trouver
+}
+
+export interface TrueShinyChoiceRequest {
+  roundId: string;
+  slot: number;
+}
+
+export interface TrueShinyChoiceResponse {
+  correct: boolean;
+  answerSlot: number;
+  pokemonName: string; // revele a la fin de la manche
+  reveals: TrueShinyTileReveal[];
+  state: TrueShinyRoundState;
+}
+
+/* ==========================================================================
  * JEU 7 : LA JUSTE STAT (FACON LE JUSTE PRIX)
  * ========================================================================== */
 

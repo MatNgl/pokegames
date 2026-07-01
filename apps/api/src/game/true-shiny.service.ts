@@ -1,0 +1,299 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
+import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
+import { PokemonService } from '../pokemon/pokemon.service';
+import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
+import { TRUE_SHINY_CONFIG } from './game-config';
+import type {
+  TrueShinyChoiceResponse,
+  TrueShinyLevel,
+  TrueShinyRoundState,
+  TrueShinyTileReveal,
+} from '@pokegames/shared-types';
+
+interface PoolPokemon {
+  id: number;
+  name: string;
+}
+
+interface SlotDef {
+  hue: number; // 0 = sprite intact (la reponse), sinon rotation de teinte du leurre
+}
+
+interface RoundDef {
+  pokemonId: number;
+  name: string;
+  slots: SlotDef[];
+  answerSlot: number;
+}
+
+interface TrueShinySession {
+  roundId: string;
+  level: TrueShinyLevel;
+  rounds: RoundDef[];
+  currentIndex: number;
+  correctCount: number;
+  status: 'PLAYING' | 'FINISHED';
+  startTime: number;
+  userId?: string;
+}
+
+const TRUE_SHINY_LEVELS: TrueShinyLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE'];
+
+@Injectable()
+export class TrueShinyService {
+  private readonly REDIS_PREFIX = 'game_trueshiny:';
+  private readonly ROUND_TTL_SECONDS = 3600;
+
+  private poolCache: PoolPokemon[] | null = null;
+  // Cache des vignettes deja traitees (octets), evite de relancer sharp a chaque requete.
+  private readonly tileCache = new Map<string, Buffer>();
+  private readonly TILE_CACHE_MAX = 800;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+    private readonly pokemonService: PokemonService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  private async loadPool(): Promise<PoolPokemon[]> {
+    if (this.poolCache) return this.poolCache;
+    const rows = await this.prisma.pokemon.findMany({
+      where: { spriteShiny: { not: null } },
+      select: { id: true, nameFr: true },
+      orderBy: { id: 'asc' },
+    });
+    this.poolCache = rows.map((row) => ({ id: row.id, name: row.nameFr }));
+    return this.poolCache;
+  }
+
+  private makeRng(seed: number): () => number {
+    let state = seed >>> 0;
+    return () => {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+  }
+
+  private dailySeed(level: TrueShinyLevel): number {
+    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    let seed = 23 + TRUE_SHINY_LEVELS.indexOf(level) * 7;
+    for (let i = 0; i < todayStr.length; i++) {
+      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
+    }
+    return seed || 1;
+  }
+
+  private shuffle<T>(items: T[], rng: () => number): T[] {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const a = copy[i];
+      const b = copy[j];
+      if (a !== undefined && b !== undefined) {
+        copy[i] = b;
+        copy[j] = a;
+      }
+    }
+    return copy;
+  }
+
+  private buildRounds(pool: PoolPokemon[], level: TrueShinyLevel, rng: () => number): RoundDef[] {
+    const { roundsCount, levels } = TRUE_SHINY_CONFIG;
+    const { gridSize, hueMin, hueMax } = levels[level];
+    const pokemons = this.shuffle(pool, rng).slice(0, roundsCount);
+    const rounds: RoundDef[] = [];
+    for (const p of pokemons) {
+      const answerSlot = Math.floor(rng() * gridSize);
+      const slots: SlotDef[] = [];
+      for (let s = 0; s < gridSize; s++) {
+        if (s === answerSlot) {
+          slots.push({ hue: 0 });
+          continue;
+        }
+        // Amplitude dans la plage du niveau, signe aleatoire, jamais nulle.
+        const amplitude = Math.round(hueMin + rng() * (hueMax - hueMin));
+        const sign = rng() < 0.5 ? -1 : 1;
+        slots.push({ hue: amplitude * sign });
+      }
+      rounds.push({ pokemonId: p.id, name: p.name, slots, answerSlot });
+    }
+    return rounds;
+  }
+
+  private toState(session: TrueShinySession): TrueShinyRoundState {
+    const total = session.rounds.length;
+    const idx = session.status === 'FINISHED' ? total - 1 : session.currentIndex;
+    const round = session.rounds[idx];
+    if (!round) {
+      throw new NotFoundException('Manche introuvable');
+    }
+    return {
+      roundId: session.roundId,
+      level: session.level,
+      totalRounds: total,
+      roundIndex: Math.min(session.currentIndex + 1, total),
+      correctCount: session.correctCount,
+      status: session.status,
+      tiles: round.slots.map((_, slot) => ({
+        slot,
+        imageUrl: `/api/games/true-shiny/tile/${session.roundId}/${idx}/${slot}`,
+      })),
+    };
+  }
+
+  async startDaily(level: TrueShinyLevel, userId?: string): Promise<TrueShinyRoundState> {
+    if (!TRUE_SHINY_LEVELS.includes(level)) {
+      throw new BadRequestException('Niveau invalide');
+    }
+    const pool = await this.loadPool();
+    if (pool.length < TRUE_SHINY_CONFIG.roundsCount) {
+      throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
+    }
+    const rounds = this.buildRounds(pool, level, this.makeRng(this.dailySeed(level)));
+    if (rounds.length === 0) {
+      throw new NotFoundException('Impossible de générer les manches du jour');
+    }
+
+    const roundId = uuidv4();
+    const session: TrueShinySession = {
+      roundId,
+      level,
+      rounds,
+      currentIndex: 0,
+      correctCount: 0,
+      status: 'PLAYING',
+      startTime: Date.now(),
+      ...(userId ? { userId } : {}),
+    };
+    await this.persist(session);
+    return this.toState(session);
+  }
+
+  async getRoundState(roundId: string): Promise<TrueShinyRoundState> {
+    return this.toState(await this.load(roundId));
+  }
+
+  private async load(roundId: string): Promise<TrueShinySession> {
+    const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
+    if (!raw) {
+      throw new NotFoundException('Partie introuvable ou expirée');
+    }
+    return JSON.parse(raw) as TrueShinySession;
+  }
+
+  private async persist(session: TrueShinySession): Promise<void> {
+    await this.redisService.set(
+      `${this.REDIS_PREFIX}${session.roundId}`,
+      JSON.stringify(session),
+      this.ROUND_TTL_SECONDS,
+    );
+  }
+
+  /**
+   * Sert une vignette deja traitee cote serveur (Regle 2 : jamais de filtre CSS client qui
+   * revelerait la carte intacte a l'inspection). L'URL n'expose ni le Pokemon ni la teinte.
+   */
+  async getTile(
+    roundId: string,
+    roundIndex: number,
+    slot: number,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const session = await this.load(roundId);
+    const round = session.rounds[roundIndex];
+    const slotDef = round?.slots[slot];
+    if (!round || !slotDef) {
+      throw new NotFoundException('Vignette introuvable');
+    }
+
+    const cacheKey = `${round.pokemonId}:${slotDef.hue}`;
+    const cached = this.tileCache.get(cacheKey);
+    if (cached) {
+      return { buffer: cached, contentType: 'image/png' };
+    }
+
+    const original = await this.pokemonService.getShinySprite(round.pokemonId);
+    // Toutes les vignettes (intacte comprise) passent par le meme encodeur sharp : ainsi la
+    // vignette intacte n'est pas un outlier d'encodage repérable a la taille des octets.
+    const pipeline = sharp(original.buffer);
+    const processed = slotDef.hue === 0 ? pipeline : pipeline.modulate({ hue: slotDef.hue });
+    const buffer = await processed.png().toBuffer();
+
+    this.tileCache.set(cacheKey, buffer);
+    if (this.tileCache.size > this.TILE_CACHE_MAX) {
+      const oldest = this.tileCache.keys().next().value;
+      if (oldest !== undefined) this.tileCache.delete(oldest);
+    }
+    return { buffer, contentType: 'image/png' };
+  }
+
+  private reveals(round: RoundDef): TrueShinyTileReveal[] {
+    return round.slots.map((_, slot) => ({ slot, isAnswer: slot === round.answerSlot }));
+  }
+
+  async submitChoice(
+    roundId: string,
+    slot: number,
+    userId?: string,
+  ): Promise<TrueShinyChoiceResponse> {
+    const session = await this.load(roundId);
+    if (userId && !session.userId) session.userId = userId;
+    const playedIndex = Math.min(session.currentIndex, session.rounds.length - 1);
+    const round = session.rounds[playedIndex];
+    if (!round) {
+      throw new NotFoundException('Manche introuvable');
+    }
+
+    if (session.status !== 'PLAYING') {
+      return {
+        correct: false,
+        answerSlot: round.answerSlot,
+        pokemonName: round.name,
+        reveals: this.reveals(round),
+        state: this.toState(session),
+      };
+    }
+
+    if (slot < 0 || slot >= round.slots.length) {
+      throw new NotFoundException('Vignette hors de cette manche');
+    }
+
+    const correct = slot === round.answerSlot;
+    if (correct) session.correctCount += 1;
+    session.currentIndex += 1;
+    if (session.currentIndex >= session.rounds.length) {
+      session.status = 'FINISHED';
+      const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
+      this.eventEmitter.emit(
+        'game.round.completed',
+        new GameRoundCompletedEvent(
+          session.roundId,
+          'TRUE_SHINY',
+          round.pokemonId,
+          round.name,
+          session.correctCount === session.rounds.length,
+          durationSeconds,
+          0,
+          session.correctCount,
+          String(slot),
+          session.userId,
+          false,
+        ),
+      );
+    }
+
+    await this.persist(session);
+
+    return {
+      correct,
+      answerSlot: round.answerSlot,
+      pokemonName: round.name,
+      reveals: this.reveals(round),
+      state: this.toState(session),
+    };
+  }
+}

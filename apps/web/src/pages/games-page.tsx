@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Gauge } from 'lucide-react';
+import { Gauge, Palette } from 'lucide-react';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
 import { Badge } from '@/components/ui/badge';
@@ -201,6 +201,13 @@ export function GamesPage() {
       iconNode: <Gauge className="h-7 w-7 shrink-0" />,
       available: true,
       dailyKey: 'just-stat',
+    },
+    {
+      title: 'Le Bon Shiny',
+      description: 'Repère le shiny authentique',
+      to: '/bon-shiny',
+      iconNode: <Palette className="h-7 w-7 shrink-0" />,
+      available: true,
     },
     { title: 'Qui est-ce', description: 'Déduction en duel', iconImg: quiEstCeImg, available: false },
   ];
