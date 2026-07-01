@@ -30,13 +30,16 @@ export interface TrueShinyConfig {
   levels: Record<TrueShinyLevel, TrueShinyLevelConfig>;
 }
 
-// Plus le niveau est dur, plus les leurres sont proches de l'original (rotation de teinte faible).
+// La difficulte vient du NOMBRE de vignettes, pas de la subtilite : on garde une alteration de
+// teinte marquee (identique a Facile) a tous les niveaux, sinon les differences deviennent
+// invisibles avec 5 ou 6 propositions. Les leurres restent des teintes franches (rose, rouge,
+// orange...) meme si le shiny officiel est proche d'une de ces teintes.
 export const TRUE_SHINY_CONFIG: TrueShinyConfig = {
   roundsCount: 5,
   levels: {
     FACILE: { gridSize: 3, hueMin: 60, hueMax: 180 },
-    MOYEN: { gridSize: 5, hueMin: 30, hueMax: 60 },
-    DIFFICILE: { gridSize: 6, hueMin: 12, hueMax: 25 },
+    MOYEN: { gridSize: 5, hueMin: 60, hueMax: 180 },
+    DIFFICILE: { gridSize: 6, hueMin: 60, hueMax: 180 },
   },
 };
 

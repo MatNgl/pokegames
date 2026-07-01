@@ -60,6 +60,7 @@ export function JustStatPage() {
   const [error, setError] = useState<string | null>(null);
   const stateRef = useRef<JustStatRoundState | null>(null);
   stateRef.current = state;
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const roundOver = result?.roundOver ?? false;
 
@@ -154,6 +155,14 @@ export function JustStatPage() {
     }, 1000);
     return () => window.clearInterval(id);
   }, [roundKey, roundOver, ended, onTimeout]);
+
+  // Redonne le focus au champ des qu'une manche est jouable (demarrage et apres chaque essai),
+  // pour saisir a la suite sans recliquer sur l'input.
+  useEffect(() => {
+    if (stateRef.current && !roundOver && !busy && !loading) {
+      inputRef.current?.focus();
+    }
+  }, [roundKey, roundOver, busy, loading]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -334,6 +343,7 @@ export function JustStatPage() {
                 <form onSubmit={onSubmit} className="flex w-full flex-col gap-2">
                   <div className="flex gap-2">
                     <Input
+                      ref={inputRef}
                       type="number"
                       inputMode="numeric"
                       value={input}

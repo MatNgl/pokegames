@@ -49,6 +49,16 @@ const LEVEL_LABEL: Record<TrueShinyLevel, string> = {
   DIFFICILE: 'Difficile',
 };
 
+// Decoupe les vignettes en rangees de 3 : 3 seules (facile), 3 + 2 centrees (moyen), 3 + 3 (difficile).
+// La rangee de 2 se centre naturellement dans les espaces des 3 du dessus.
+function chunk<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    rows.push(items.slice(i, i + size));
+  }
+  return rows;
+}
+
 function StatusChip({ status }: { status: TrueShinyDailyStatus }) {
   if (status === 'in-progress') {
     return <Badge className="border-[#b8860b] bg-accent text-foreground">En cours</Badge>;
@@ -111,7 +121,7 @@ function LevelSelect({ onPick }: { onPick: (level: TrueShinyLevel) => void }) {
                 </button>
               ))}
             </div>
-            <Button variant="secondary" className="w-full" onClick={() => navigate('/')}>
+            <Button className="w-full" onClick={() => navigate('/')}>
               Retour à l'accueil
             </Button>
           </Card>
@@ -292,14 +302,10 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
               <Button className="w-full" onClick={() => navigate('/')}>
                 Retour à l'accueil
               </Button>
-              <button
-                type="button"
-                onClick={onBack}
-                className="flex items-center gap-2 text-sm font-bold text-primary hover:underline"
-              >
+              <Button variant="secondary" size="sm" onClick={onBack}>
                 <ArrowLeft className="h-4 w-4" />
                 Changer de niveau
-              </button>
+              </Button>
             </Card>
           ) : !state ? (
             <Card className="max-w-md p-6 text-center">
@@ -323,6 +329,9 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <h1 className="font-display text-sm leading-relaxed text-foreground">Le Bon Shiny</h1>
+                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                    {LEVEL_LABEL[state.level]}
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className="border-primary bg-primary text-primary-foreground">
@@ -333,11 +342,15 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
               </div>
 
               <p className="text-center font-display text-xs leading-relaxed text-foreground sm:text-sm">
-                {LEVEL_LABEL[state.level]} : trouve le sprite intact
+                Trouve le shiny intact
               </p>
 
-              <div className="grid w-full grid-cols-3 justify-items-center gap-3">
-                {state.tiles.map((tile) => renderTile(tile.slot, tile.imageUrl))}
+              <div className="flex w-full flex-col items-center gap-3">
+                {chunk(state.tiles, 3).map((row, rowIndex) => (
+                  <div key={rowIndex} className="flex justify-center gap-3">
+                    {row.map((tile) => renderTile(tile.slot, tile.imageUrl))}
+                  </div>
+                ))}
               </div>
 
               {error && <p className="text-center text-sm font-semibold text-danger">{error}</p>}
