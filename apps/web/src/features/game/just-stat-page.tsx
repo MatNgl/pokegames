@@ -75,7 +75,7 @@ export function JustStatPage() {
     try {
       const round = await startJustStat();
       setState(round);
-      saveJustStat(round.roundId);
+      saveJustStat(round.roundId, round.roundIndex);
     } catch (err) {
       clearJustStat();
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
@@ -107,6 +107,7 @@ export function JustStatPage() {
         setEnded(true);
       } else {
         setState(round);
+        saveJustStat(round.roundId, round.roundIndex);
       }
       setLoading(false);
     } catch {
@@ -201,6 +202,7 @@ export function JustStatPage() {
       setEnded(true);
     } else {
       setState(next);
+      saveJustStat(next.roundId, next.roundIndex);
       setResult(null);
       setGuesses([]);
       setInput('');

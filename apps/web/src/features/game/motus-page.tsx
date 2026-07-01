@@ -92,7 +92,7 @@ function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void })
     try {
       const round = await startMotus(level);
       setState(round);
-      saveMotus(level, round.roundId);
+      saveMotus(level, round.roundId, round.attempts.length);
     } catch (err) {
       clearMotus(level);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le Motus du jour'));
@@ -122,6 +122,8 @@ function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void })
       if (round.status !== 'PLAYING' && round.answer) {
         setResultReady(true);
         saveMotusDone(level, round.status === 'WON', round.answer);
+      } else {
+        saveMotus(level, round.roundId, round.attempts.length);
       }
       setLoading(false);
     } catch {
@@ -170,6 +172,8 @@ function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void })
               const extraMs = res.state.status === 'WON' ? res.state.length * 80 + 500 : 350;
               window.setTimeout(() => setResultReady(true), flipMs + extraMs);
             }
+          } else {
+            saveMotus(level, res.state.roundId, res.state.attempts.length);
           }
         }
       } catch (err) {

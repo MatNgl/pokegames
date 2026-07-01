@@ -16,6 +16,7 @@ export function motusTodayKey(): string {
 interface MotusSaved {
   date: string;
   roundId: string;
+  attemptsCount?: number;
 }
 
 export interface MotusDone {
@@ -49,8 +50,8 @@ export function loadMotusSaved(level: MotusLevel): MotusSaved | null {
   return null;
 }
 
-export function saveMotus(level: MotusLevel, roundId: string): void {
-  writeJson(storageKey(level), { date: motusTodayKey(), roundId });
+export function saveMotus(level: MotusLevel, roundId: string, attemptsCount = 0): void {
+  writeJson(storageKey(level), { date: motusTodayKey(), roundId, attemptsCount });
 }
 
 export function clearMotus(level: MotusLevel): void {
@@ -80,6 +81,6 @@ export function motusDailyStatus(level: MotusLevel): MotusDailyStatus {
   const done = loadMotusDone(level);
   if (done && done.date === today) return 'done';
   const saved = loadMotusSaved(level);
-  if (saved && saved.date === today) return 'in-progress';
+  if (saved && saved.date === today && (saved.attemptsCount ?? 0) >= 1) return 'in-progress';
   return 'idle';
 }

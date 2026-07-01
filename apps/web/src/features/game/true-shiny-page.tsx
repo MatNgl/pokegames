@@ -153,7 +153,7 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
     try {
       const round = await startTrueShiny(level);
       setState(round);
-      saveTrueShiny(level, round.roundId);
+      saveTrueShiny(level, round.roundId, round.roundIndex);
     } catch (err) {
       clearTrueShiny(level);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
@@ -185,6 +185,7 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
         setEnded(true);
       } else {
         setState(round);
+        saveTrueShiny(level, round.roundId, round.roundIndex);
       }
       setLoading(false);
     } catch {
@@ -232,6 +233,7 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
       setEnded(true);
     } else {
       setState(next);
+      saveTrueShiny(level, next.roundId, next.roundIndex);
       setReveal(null);
       setChosenSlot(null);
     }

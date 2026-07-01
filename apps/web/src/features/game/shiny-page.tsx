@@ -82,7 +82,7 @@ export function ShinyPage({ mode }: ShinyPageProps) {
     try {
       const round = await startShiny(mode);
       setState(round);
-      saveShiny(mode, round.roundId);
+      saveShiny(mode, round.roundId, round.roundIndex);
     } catch (err) {
       clearShiny(mode);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
@@ -114,6 +114,7 @@ export function ShinyPage({ mode }: ShinyPageProps) {
         setEnded(true);
       } else {
         setState(round);
+        saveShiny(mode, round.roundId, round.roundIndex);
       }
       setLoading(false);
     } catch {
@@ -164,6 +165,7 @@ export function ShinyPage({ mode }: ShinyPageProps) {
       setEnded(true);
     } else {
       setState(next);
+      saveShiny(mode, next.roundId, next.roundIndex);
       setReveal(null);
       setChosenSlot(null);
     }

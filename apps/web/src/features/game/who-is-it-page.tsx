@@ -135,6 +135,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
           roundId: state.roundId,
           tried: [],
           totalAttempts: carriedAttempts,
+          roundIndex: state.roundIndex,
         });
         setSpriteVersion((v) => v + 1);
       } catch (err) {
@@ -231,7 +232,13 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
           zoomRatio: res.zoomRatio ?? round.zoomRatio,
           rotationAngle: res.rotationAngle ?? round.rotationAngle,
         });
-        saveGame(level, { date: todayKey(), roundId: round.roundId, tried: nextTried, totalAttempts });
+        saveGame(level, {
+          date: todayKey(),
+          roundId: round.roundId,
+          tried: nextTried,
+          totalAttempts,
+          roundIndex: round.roundIndex,
+        });
         setFeedback(res.message ?? "Ce n'est pas le bon Pokémon.");
         setShakeKey((k) => k + 1);
         setGuess('');

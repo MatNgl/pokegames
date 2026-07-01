@@ -9,6 +9,7 @@ export function plusMinusTodayKey(): string {
 interface PlusMinusSaved {
   date: string;
   roundId: string;
+  roundIndex?: number;
 }
 
 export interface PlusMinusDone {
@@ -42,8 +43,8 @@ export function loadPlusMinusSaved(): PlusMinusSaved | null {
   return null;
 }
 
-export function savePlusMinus(roundId: string): void {
-  writeJson(STORAGE_KEY, { date: plusMinusTodayKey(), roundId });
+export function savePlusMinus(roundId: string, roundIndex = 1): void {
+  writeJson(STORAGE_KEY, { date: plusMinusTodayKey(), roundId, roundIndex });
 }
 
 export function clearPlusMinus(): void {
@@ -73,6 +74,6 @@ export function plusMinusDailyStatus(): PlusMinusDailyStatus {
   const done = loadPlusMinusDone();
   if (done && done.date === today) return 'done';
   const saved = loadPlusMinusSaved();
-  if (saved && saved.date === today) return 'in-progress';
+  if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }

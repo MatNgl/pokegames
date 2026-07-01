@@ -17,6 +17,7 @@ export function shinyTodayKey(): string {
 interface ShinySaved {
   date: string;
   roundId: string;
+  roundIndex?: number;
 }
 
 export interface ShinyDone {
@@ -50,8 +51,8 @@ export function loadShinySaved(mode: ShinyMode): ShinySaved | null {
   return null;
 }
 
-export function saveShiny(mode: ShinyMode, roundId: string): void {
-  writeJson(storageKey(mode), { date: shinyTodayKey(), roundId });
+export function saveShiny(mode: ShinyMode, roundId: string, roundIndex = 1): void {
+  writeJson(storageKey(mode), { date: shinyTodayKey(), roundId, roundIndex });
 }
 
 export function clearShiny(mode: ShinyMode): void {
@@ -81,6 +82,6 @@ export function shinyDailyStatus(mode: ShinyMode): ShinyDailyStatus {
   const done = loadShinyDone(mode);
   if (done && done.date === today) return 'done';
   const saved = loadShinySaved(mode);
-  if (saved && saved.date === today) return 'in-progress';
+  if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }

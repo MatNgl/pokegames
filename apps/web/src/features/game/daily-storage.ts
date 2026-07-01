@@ -18,6 +18,7 @@ export interface SavedGame {
   roundId: string;
   tried: string[];
   totalAttempts: number;
+  roundIndex?: number;
 }
 
 export interface DailyDone {
@@ -50,6 +51,7 @@ export function loadSavedGame(level: WhoIsItLevel): SavedGame | null {
       roundId: saved.roundId,
       tried: Array.isArray(saved.tried) ? saved.tried : [],
       totalAttempts: typeof saved.totalAttempts === 'number' ? saved.totalAttempts : 0,
+      roundIndex: typeof saved.roundIndex === 'number' ? saved.roundIndex : 1,
     };
   }
   return null;
@@ -86,6 +88,6 @@ export function whoIsItDailyStatus(level: WhoIsItLevel): WhoIsItDailyStatus {
   const done = loadDailyDone(level);
   if (done && done.date === today) return 'done';
   const saved = loadSavedGame(level);
-  if (saved && saved.date === today) return 'in-progress';
+  if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }

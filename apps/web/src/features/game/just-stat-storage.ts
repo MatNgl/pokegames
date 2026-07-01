@@ -9,6 +9,7 @@ export function justStatTodayKey(): string {
 interface JustStatSaved {
   date: string;
   roundId: string;
+  roundIndex?: number;
 }
 
 export interface JustStatDone {
@@ -42,8 +43,8 @@ export function loadJustStatSaved(): JustStatSaved | null {
   return null;
 }
 
-export function saveJustStat(roundId: string): void {
-  writeJson(STORAGE_KEY, { date: justStatTodayKey(), roundId });
+export function saveJustStat(roundId: string, roundIndex = 1): void {
+  writeJson(STORAGE_KEY, { date: justStatTodayKey(), roundId, roundIndex });
 }
 
 export function clearJustStat(): void {
@@ -73,6 +74,6 @@ export function justStatDailyStatus(): JustStatDailyStatus {
   const done = loadJustStatDone();
   if (done && done.date === today) return 'done';
   const saved = loadJustStatSaved();
-  if (saved && saved.date === today) return 'in-progress';
+  if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }

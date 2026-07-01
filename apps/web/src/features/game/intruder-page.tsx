@@ -60,7 +60,7 @@ export function IntruderPage() {
     try {
       const round = await startIntruder();
       setState(round);
-      saveIntruder(round.roundId);
+      saveIntruder(round.roundId, round.roundIndex);
     } catch (err) {
       clearIntruder();
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
@@ -92,6 +92,7 @@ export function IntruderPage() {
         setEnded(true);
       } else {
         setState(round);
+        saveIntruder(round.roundId, round.roundIndex);
       }
       setLoading(false);
     } catch {
@@ -139,6 +140,7 @@ export function IntruderPage() {
       setEnded(true);
     } else {
       setState(next);
+      saveIntruder(next.roundId, next.roundIndex);
       setReveal(null);
       setChosenId(null);
     }

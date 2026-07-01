@@ -9,6 +9,7 @@ export function intruderTodayKey(): string {
 interface IntruderSaved {
   date: string;
   roundId: string;
+  roundIndex?: number;
 }
 
 export interface IntruderDone {
@@ -42,8 +43,8 @@ export function loadIntruderSaved(): IntruderSaved | null {
   return null;
 }
 
-export function saveIntruder(roundId: string): void {
-  writeJson(STORAGE_KEY, { date: intruderTodayKey(), roundId });
+export function saveIntruder(roundId: string, roundIndex = 1): void {
+  writeJson(STORAGE_KEY, { date: intruderTodayKey(), roundId, roundIndex });
 }
 
 export function clearIntruder(): void {
@@ -73,6 +74,6 @@ export function intruderDailyStatus(): IntruderDailyStatus {
   const done = loadIntruderDone();
   if (done && done.date === today) return 'done';
   const saved = loadIntruderSaved();
-  if (saved && saved.date === today) return 'in-progress';
+  if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }

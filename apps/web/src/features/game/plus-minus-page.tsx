@@ -74,7 +74,7 @@ export function PlusMinusPage() {
     try {
       const round = await startPlusMinus();
       setState(round);
-      savePlusMinus(round.roundId);
+      savePlusMinus(round.roundId, round.roundIndex);
     } catch (err) {
       clearPlusMinus();
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
@@ -106,6 +106,7 @@ export function PlusMinusPage() {
         setEnded(true);
       } else {
         setState(round);
+        savePlusMinus(round.roundId, round.roundIndex);
       }
       setLoading(false);
     } catch {
@@ -145,6 +146,7 @@ export function PlusMinusPage() {
       setEnded(true);
     } else {
       setState(next);
+      savePlusMinus(next.roundId, next.roundIndex);
       setReveal(null);
       setChosen(null);
     }

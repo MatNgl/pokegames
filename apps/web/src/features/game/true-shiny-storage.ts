@@ -16,6 +16,7 @@ export function trueShinyTodayKey(): string {
 interface TrueShinySaved {
   date: string;
   roundId: string;
+  roundIndex?: number;
 }
 
 export interface TrueShinyDone {
@@ -49,8 +50,8 @@ export function loadTrueShinySaved(level: TrueShinyLevel): TrueShinySaved | null
   return null;
 }
 
-export function saveTrueShiny(level: TrueShinyLevel, roundId: string): void {
-  writeJson(storageKey(level), { date: trueShinyTodayKey(), roundId });
+export function saveTrueShiny(level: TrueShinyLevel, roundId: string, roundIndex = 1): void {
+  writeJson(storageKey(level), { date: trueShinyTodayKey(), roundId, roundIndex });
 }
 
 export function clearTrueShiny(level: TrueShinyLevel): void {
@@ -84,6 +85,6 @@ export function trueShinyDailyStatus(level: TrueShinyLevel): TrueShinyDailyStatu
   const done = loadTrueShinyDone(level);
   if (done && done.date === today) return 'done';
   const saved = loadTrueShinySaved(level);
-  if (saved && saved.date === today) return 'in-progress';
+  if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }
