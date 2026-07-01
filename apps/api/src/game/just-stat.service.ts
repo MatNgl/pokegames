@@ -4,7 +4,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
-import { JUST_STAT_CONFIG, JUST_STAT_DESCRIPTORS } from './game-config';
+import { HistoryService } from '../history/history.service';
+import {
+  ANTI_REPEAT_DETAIL_WINDOW_DAYS,
+  ANTI_REPEAT_WINDOW_DAYS,
+  JUST_STAT_CONFIG,
+  JUST_STAT_DESCRIPTORS,
+} from './game-config';
 import type {
   JustStatDirection,
   JustStatGuessResponse,
@@ -51,11 +57,14 @@ export class JustStatService {
   private readonly ROUND_TTL_SECONDS = 3600;
 
   private poolCache: PoolPokemon[] | null = null;
+  private planCache: { date: string; rounds: RoundDef[] } | null = null;
+  private readonly HISTORY_GAME = 'JUST_STAT';
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly history: HistoryService,
   ) {}
 
   private async loadPool(): Promise<PoolPokemon[]> {
@@ -146,11 +155,30 @@ export class JustStatService {
     return copy;
   }
 
-  private buildRounds(pool: PoolPokemon[], rng: () => number): RoundDef[] {
+  // Stats du jour : distinctes, en evitant celles des jours recents (dimension secondaire).
+  private pickStats(rng: () => number, excludeStats: Set<string>, count: number): JustStatKey[] {
+    const preferred = this.shuffle(
+      JUST_STAT_CONFIG.allowedStats.filter((s) => !excludeStats.has(s)),
+      rng,
+    );
+    const rest = this.shuffle(
+      JUST_STAT_CONFIG.allowedStats.filter((s) => excludeStats.has(s)),
+      rng,
+    );
+    return [...preferred, ...rest].slice(0, count);
+  }
+
+  private buildRounds(
+    pool: PoolPokemon[],
+    rng: () => number,
+    excludeIds: Set<number>,
+    excludeStats: Set<string>,
+  ): RoundDef[] {
     const count = JUST_STAT_CONFIG.roundsCount;
     // Variete intra-session : stats distinctes et Pokemon distincts sur les manches du jour.
-    const stats = this.shuffle(JUST_STAT_CONFIG.allowedStats, rng).slice(0, count);
-    const pokemons = this.shuffle(pool, rng).slice(0, count);
+    const stats = this.pickStats(rng, excludeStats, count);
+    const available = pool.filter((p) => !excludeIds.has(p.id));
+    const pokemons = this.shuffle(available, rng).slice(0, count);
     const rounds: RoundDef[] = [];
     for (let i = 0; i < count; i++) {
       const p = pokemons[i];
@@ -166,6 +194,46 @@ export class JustStatService {
         over: false,
       });
     }
+    return rounds;
+  }
+
+  /**
+   * Manches du jour : Pokemon et stats distincts, en excluant les Pokemon tires ces derniers jours
+   * (repli sans historique si le pool devient insuffisant). Tirage enregistre une fois par jour.
+   */
+  private async getDailyRounds(pool: PoolPokemon[]): Promise<RoundDef[]> {
+    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    if (this.planCache && this.planCache.date === today) {
+      return this.planCache.rounds;
+    }
+    const now = new Date();
+    const recentIds = await this.history.recentPokemonIds(
+      this.HISTORY_GAME,
+      '',
+      now,
+      ANTI_REPEAT_WINDOW_DAYS.JUST_STAT,
+    );
+    const recentStats = await this.history.recentDetails(
+      this.HISTORY_GAME,
+      '',
+      now,
+      ANTI_REPEAT_DETAIL_WINDOW_DAYS,
+    );
+    let rounds = this.buildRounds(pool, this.makeRng(this.dailySeed()), recentIds, recentStats);
+    if (rounds.length < JUST_STAT_CONFIG.roundsCount) {
+      rounds = this.buildRounds(pool, this.makeRng(this.dailySeed()), new Set<number>(), new Set<string>());
+    }
+
+    if (!(await this.history.hasPicksFor(this.HISTORY_GAME, '', now))) {
+      await this.history.recordPicks(
+        this.HISTORY_GAME,
+        '',
+        now,
+        rounds.map((r) => ({ pokemonId: r.pokemonId, detail: r.stat })),
+      );
+    }
+
+    this.planCache = { date: today, rounds };
     return rounds;
   }
 
@@ -204,7 +272,7 @@ export class JustStatService {
     if (pool.length < JUST_STAT_CONFIG.roundsCount) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
-    const rounds = this.buildRounds(pool, this.makeRng(this.dailySeed()));
+    const rounds = await this.getDailyRounds(pool);
     if (rounds.length === 0) {
       throw new NotFoundException('Impossible de générer les manches du jour');
     }

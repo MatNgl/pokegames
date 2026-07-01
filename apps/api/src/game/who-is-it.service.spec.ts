@@ -4,6 +4,7 @@ import { WhoIsItService } from './who-is-it.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { SpriteProxyService } from './sprite-proxy.service';
+import { HistoryService } from '../history/history.service';
 
 describe('WhoIsItService', () => {
   let service: WhoIsItService;
@@ -85,6 +86,14 @@ describe('WhoIsItService', () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: SpriteProxyService, useValue: mockSpriteProxyService },
         { provide: EventEmitter2, useValue: { emit: mockEmit } },
+        {
+          provide: HistoryService,
+          useValue: {
+            recentPokemonIds: jest.fn().mockResolvedValue(new Set<number>()),
+            hasPicksFor: jest.fn().mockResolvedValue(false),
+            recordPicks: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

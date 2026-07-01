@@ -5,7 +5,9 @@ import { TrueShinyService } from './true-shiny.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
+import { HistoryService } from '../history/history.service';
 
+// 3 niveaux x 5 manches = 15 Pokemon distincts requis (dedup inter-niveaux).
 const pool = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, nameFr: `Pokemon${i + 1}` }));
 
 // Signature magique d'un fichier PNG.
@@ -44,6 +46,14 @@ describe('TrueShinyService', () => {
         { provide: RedisService, useValue: { get: mockGet, set: mockSet, del: jest.fn() } },
         { provide: PokemonService, useValue: { getShinySprite: mockGetShinySprite } },
         { provide: EventEmitter2, useValue: { emit: mockEmit } },
+        {
+          provide: HistoryService,
+          useValue: {
+            recentPokemonIds: jest.fn().mockResolvedValue(new Set<number>()),
+            hasPicksFor: jest.fn().mockResolvedValue(false),
+            recordPicks: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

@@ -15,7 +15,8 @@ import {
   WhoIsItLevel,
 } from '@pokegames/shared-types';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
-import { WHO_IS_IT_ADMIN_CONFIG } from './game-config';
+import { HistoryService } from '../history/history.service';
+import { ANTI_REPEAT_WINDOW_DAYS, WHO_IS_IT_ADMIN_CONFIG } from './game-config';
 
 const WHO_IS_IT_LEVELS: WhoIsItLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
 
@@ -50,7 +51,10 @@ export class WhoIsItService {
     private readonly spriteProxy: SpriteProxyService,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly history: HistoryService,
   ) {}
+
+  private readonly HISTORY_GAME = 'WHO_IS_IT';
 
   // Zoom et rotation dependent du niveau et du nombre d'erreurs. Source unique : game-config.ts
   // (WHO_IS_IT_ADMIN_CONFIG). Le zoom se reduit et l'angle se redresse a chaque erreur.
@@ -88,11 +92,11 @@ export class WhoIsItService {
    * chaque niveau, dans l'ordre, des Pokemon non encore utilises et compatibles avec ses generations.
    * Garantit qu'aucun Pokemon n'est partage entre deux niveaux le meme jour, ni repete dans une serie.
    */
-  private buildDailySeries<T extends { id: number; generation: number }>(
+  private buildDailySeriesAll<T extends { id: number; generation: number }>(
     all: T[],
-    level: WhoIsItLevel,
     roundsCount: number,
-  ): T[] {
+    recentByLevel: Map<WhoIsItLevel, Set<number>>,
+  ): Map<WhoIsItLevel, T[]> {
     const rng = this.makeRng(this.dailyShuffleSeed());
     const perm = [...all];
     for (let i = perm.length - 1; i > 0; i--) {
@@ -109,17 +113,19 @@ export class WhoIsItService {
     const seriesByLevel = new Map<WhoIsItLevel, T[]>();
     for (const lvl of WHO_IS_IT_LEVELS) {
       const gens = WHO_IS_IT_ADMIN_CONFIG.levels[lvl].allowedGenerations;
+      const recent = recentByLevel.get(lvl) ?? new Set<number>();
       const picks: T[] = [];
       for (const pokemon of perm) {
         if (picks.length >= roundsCount) break;
-        if (used.has(pokemon.id)) continue;
+        if (used.has(pokemon.id)) continue; // dedup entre niveaux du jour
+        if (recent.has(pokemon.id)) continue; // anti-repetition cross-jours (par niveau)
         if (!gens.includes(pokemon.generation)) continue;
         picks.push(pokemon);
         used.add(pokemon.id);
       }
       seriesByLevel.set(lvl, picks);
     }
-    return seriesByLevel.get(level) ?? [];
+    return seriesByLevel;
   }
 
   /**
@@ -153,10 +159,37 @@ export class WhoIsItService {
     type PokemonWithTypes = (typeof pokemons)[number];
     let target: PokemonWithTypes | undefined;
     if (mode === 'DAILY') {
-      // Serie du jour propre au niveau : DISJOINTE entre tous les niveaux (chaque niveau tire des
-      // Pokemon differents ce jour-la) et sans repetition dans la serie.
-      const series = this.buildDailySeries(pokemons, level, totalRounds);
+      // Serie du jour propre au niveau : DISJOINTE entre niveaux (meme jour), sans repetition dans
+      // la serie, et sans reproposer un Pokemon tire ces derniers jours (anti-repetition par niveau).
+      const now = new Date();
+      const recentByLevel = new Map<WhoIsItLevel, Set<number>>();
+      for (const lvl of WHO_IS_IT_LEVELS) {
+        recentByLevel.set(
+          lvl,
+          await this.history.recentPokemonIds(
+            this.HISTORY_GAME,
+            lvl,
+            now,
+            ANTI_REPEAT_WINDOW_DAYS.WHO_IS_IT,
+          ),
+        );
+      }
+      let seriesByLevel = this.buildDailySeriesAll(pokemons, totalRounds, recentByLevel);
+      // Repli sans historique si l'exclusion rend la serie du niveau incomplete.
+      if ((seriesByLevel.get(level)?.length ?? 0) < totalRounds) {
+        seriesByLevel = this.buildDailySeriesAll(pokemons, totalRounds, new Map());
+      }
+      const series = seriesByLevel.get(level) ?? [];
       target = series[roundIndex - 1] ?? series[0];
+
+      if (!(await this.history.hasPicksFor(this.HISTORY_GAME, level, now))) {
+        await this.history.recordPicks(
+          this.HISTORY_GAME,
+          level,
+          now,
+          series.map((p) => ({ pokemonId: p.id })),
+        );
+      }
     } else {
       const eligibleGenerations =
         config.generations && config.generations.length > 0

@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
-import { MOTUS_ADMIN_CONFIG } from './game-config';
+import { HistoryService } from '../history/history.service';
+import { ANTI_REPEAT_WINDOW_DAYS, MOTUS_ADMIN_CONFIG } from './game-config';
 import type {
   MotusGuessResponse,
   MotusGuessRow,
@@ -43,11 +44,14 @@ export class MotusService {
 
   private targetsCache: MotusTarget[] | null = null;
   private validWordsCache: Set<string> | null = null;
+  private planCache: { date: string; plan: Record<MotusLevel, MotusTarget | null> } | null = null;
+  private readonly HISTORY_GAME = 'MOTUS';
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly history: HistoryService,
   ) {}
 
   /** Retire les accents et ne garde que les lettres A a Z (majuscules). */
@@ -93,6 +97,49 @@ export class MotusService {
       seed = (seed * 31 + todayStr.charCodeAt(i) + level.charCodeAt(0) * 17) % 2147483647;
     }
     return Math.abs(seed) % count;
+  }
+
+  /**
+   * Mot du jour par niveau : distinct entre niveaux (meme jour) et sans reproposer un mot tire ces
+   * derniers jours (anti-repetition par niveau). Repli si l'exclusion vide le pool. Enregistre 1 fois/jour.
+   */
+  private async getDailyPlan(targets: MotusTarget[]): Promise<Record<MotusLevel, MotusTarget | null>> {
+    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    if (this.planCache && this.planCache.date === today) {
+      return this.planCache.plan;
+    }
+    const now = new Date();
+    const used = new Set<number>();
+    const plan = {} as Record<MotusLevel, MotusTarget | null>;
+    for (const level of MOTUS_LEVELS) {
+      const cfg = MOTUS_ADMIN_CONFIG.levels[level];
+      const filtered = targets.filter(
+        (t) => t.word.length >= cfg.minWordLength && t.word.length <= cfg.maxWordLength,
+      );
+      const base = filtered.length > 0 ? filtered : targets;
+      const recent = await this.history.recentPokemonIds(
+        this.HISTORY_GAME,
+        level,
+        now,
+        ANTI_REPEAT_WINDOW_DAYS.MOTUS,
+      );
+      let avail = base.filter((t) => !used.has(t.pokemonId) && !recent.has(t.pokemonId));
+      if (avail.length === 0) avail = base.filter((t) => !used.has(t.pokemonId)); // repli cross-jours
+      if (avail.length === 0) avail = base; // repli total
+      const pick = avail.length > 0 ? (avail[this.dailyIndex(avail.length, level)] ?? null) : null;
+      plan[level] = pick;
+      if (pick) used.add(pick.pokemonId);
+    }
+
+    for (const level of MOTUS_LEVELS) {
+      const pick = plan[level];
+      if (pick && !(await this.history.hasPicksFor(this.HISTORY_GAME, level, now))) {
+        await this.history.recordPicks(this.HISTORY_GAME, level, now, [{ pokemonId: pick.pokemonId }]);
+      }
+    }
+
+    this.planCache = { date: today, plan };
+    return plan;
   }
 
   private toState(session: MotusSession): MotusRoundState {
@@ -146,15 +193,8 @@ export class MotusService {
       throw new NotFoundException('Aucun Pokémon disponible pour le Motus. Lancez le script ETL.');
     }
 
-    // Longueurs et nombre d'essais du niveau (source unique : game-config.ts).
-    const cfg = MOTUS_ADMIN_CONFIG.levels[level];
-    const minLen = cfg.minWordLength;
-    const maxLen = cfg.maxWordLength;
-    const maxAttempts = cfg.maxAttempts;
-
-    const filtered = targets.filter((t) => t.word.length >= minLen && t.word.length <= maxLen);
-    const pool = filtered.length > 0 ? filtered : targets;
-    const target = pool[this.dailyIndex(pool.length, level)];
+    const maxAttempts = MOTUS_ADMIN_CONFIG.levels[level].maxAttempts;
+    const target = (await this.getDailyPlan(targets))[level];
     if (!target) {
       throw new NotFoundException('Mot du jour introuvable');
     }

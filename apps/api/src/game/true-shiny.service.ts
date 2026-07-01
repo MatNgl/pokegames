@@ -6,7 +6,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
-import { TRUE_SHINY_CONFIG } from './game-config';
+import { HistoryService } from '../history/history.service';
+import { ANTI_REPEAT_WINDOW_DAYS, TRUE_SHINY_CONFIG } from './game-config';
 import type {
   TrueShinyChoiceResponse,
   TrueShinyLevel,
@@ -49,6 +50,8 @@ export class TrueShinyService {
   private readonly ROUND_TTL_SECONDS = 3600;
 
   private poolCache: PoolPokemon[] | null = null;
+  private planCache: { date: string; plan: Record<TrueShinyLevel, RoundDef[]> } | null = null;
+  private readonly HISTORY_GAME = 'TRUE_SHINY';
   // Cache des vignettes deja traitees (octets), evite de relancer sharp a chaque requete.
   private readonly tileCache = new Map<string, Buffer>();
   private readonly TILE_CACHE_MAX = 800;
@@ -58,6 +61,7 @@ export class TrueShinyService {
     private readonly redisService: RedisService,
     private readonly pokemonService: PokemonService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly history: HistoryService,
   ) {}
 
   private async loadPool(): Promise<PoolPokemon[]> {
@@ -102,10 +106,17 @@ export class TrueShinyService {
     return copy;
   }
 
-  private buildRounds(pool: PoolPokemon[], level: TrueShinyLevel, rng: () => number): RoundDef[] {
+  private buildRounds(
+    pool: PoolPokemon[],
+    level: TrueShinyLevel,
+    rng: () => number,
+    used: Set<number>,
+  ): RoundDef[] {
     const { roundsCount, levels } = TRUE_SHINY_CONFIG;
     const { gridSize, hueMin, hueMax } = levels[level];
-    const pokemons = this.shuffle(pool, rng).slice(0, roundsCount);
+    const available = pool.filter((p) => !used.has(p.id));
+    const pokemons = this.shuffle(available, rng).slice(0, roundsCount);
+    for (const p of pokemons) used.add(p.id);
     const rounds: RoundDef[] = [];
     for (const p of pokemons) {
       const answerSlot = Math.floor(rng() * gridSize);
@@ -123,6 +134,61 @@ export class TrueShinyService {
       rounds.push({ pokemonId: p.id, name: p.name, slots, answerSlot });
     }
     return rounds;
+  }
+
+  private buildPlan(
+    pool: PoolPokemon[],
+    initialUsed: Set<number>,
+  ): Record<TrueShinyLevel, RoundDef[]> {
+    const rng = this.makeRng(this.dailySeed('FACILE'));
+    const used = new Set<number>(initialUsed);
+    const plan = {} as Record<TrueShinyLevel, RoundDef[]>;
+    for (const level of TRUE_SHINY_LEVELS) {
+      plan[level] = this.buildRounds(pool, level, rng, used);
+    }
+    return plan;
+  }
+
+  private planComplete(plan: Record<TrueShinyLevel, RoundDef[]>): boolean {
+    return TRUE_SHINY_LEVELS.every((level) => plan[level].length === TRUE_SHINY_CONFIG.roundsCount);
+  }
+
+  /**
+   * Plan du jour : dedup entre niveaux (meme jour) + anti-repetition cross-jours via l'historique.
+   * Repli sans historique si un niveau devient incomplet. Tirage enregistre une fois par jour.
+   */
+  private async getDailyPlan(pool: PoolPokemon[]): Promise<Record<TrueShinyLevel, RoundDef[]>> {
+    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    if (this.planCache && this.planCache.date === today) {
+      return this.planCache.plan;
+    }
+    const now = new Date();
+    const recent = await this.history.recentPokemonIds(
+      this.HISTORY_GAME,
+      '',
+      now,
+      ANTI_REPEAT_WINDOW_DAYS.TRUE_SHINY,
+    );
+    let plan = this.buildPlan(pool, recent);
+    if (!this.planComplete(plan)) {
+      plan = this.buildPlan(pool, new Set<number>());
+    }
+
+    if (!(await this.history.hasPicksFor(this.HISTORY_GAME, '', now))) {
+      const ids = new Set<number>();
+      for (const level of TRUE_SHINY_LEVELS) {
+        for (const round of plan[level]) ids.add(round.pokemonId);
+      }
+      await this.history.recordPicks(
+        this.HISTORY_GAME,
+        '',
+        now,
+        [...ids].map((id) => ({ pokemonId: id })),
+      );
+    }
+
+    this.planCache = { date: today, plan };
+    return plan;
   }
 
   private toState(session: TrueShinySession): TrueShinyRoundState {
@@ -154,7 +220,7 @@ export class TrueShinyService {
     if (pool.length < TRUE_SHINY_CONFIG.roundsCount) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
-    const rounds = this.buildRounds(pool, level, this.makeRng(this.dailySeed(level)));
+    const rounds = (await this.getDailyPlan(pool))[level];
     if (rounds.length === 0) {
       throw new NotFoundException('Impossible de générer les manches du jour');
     }

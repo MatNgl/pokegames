@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JustStatService } from './just-stat.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { HistoryService } from '../history/history.service';
 
 const pool = Array.from({ length: 12 }, (_, i) => ({
   id: i + 1,
@@ -37,6 +38,15 @@ describe('JustStatService', () => {
         },
         { provide: RedisService, useValue: { get: mockGet, set: mockSet, del: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: mockEmit } },
+        {
+          provide: HistoryService,
+          useValue: {
+            recentPokemonIds: jest.fn().mockResolvedValue(new Set<number>()),
+            recentDetails: jest.fn().mockResolvedValue(new Set<string>()),
+            hasPicksFor: jest.fn().mockResolvedValue(false),
+            recordPicks: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
