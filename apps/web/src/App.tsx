@@ -9,6 +9,7 @@ import { IntruderPage } from '@/features/game/intruder-page';
 import { ShinyPage } from '@/features/game/shiny-page';
 import { JustStatPage } from '@/features/game/just-stat-page';
 import { TrueShinyPage } from '@/features/game/true-shiny-page';
+import { HistoryPage } from '@/features/daily/history-page';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/non-shiny" element={<ShinyPage mode="FIND_NON_SHINY" />} />
         <Route path="/juste-stat" element={<JustStatPage />} />
         <Route path="/bon-shiny" element={<TrueShinyPage />} />
+        <Route path="/historique" element={<HistoryPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
