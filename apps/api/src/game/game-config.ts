@@ -1,4 +1,6 @@
 import type {
+  IntruderLevel,
+  IntruderRule,
   JustStatKey,
   PlusMinusLevel,
   ShinyLevel,
@@ -99,6 +101,34 @@ export const JUST_STAT_CONFIG: JustStatConfig = {
   timeLimitSeconds: 20,
   maxAttempts: 15,
   allowedStats: ['HP', 'ATK', 'DEF', 'SPE_ATK', 'SPE_DEF', 'SPEED', 'HEIGHT_CM', 'WEIGHT_KG'],
+};
+
+// Mode d'indice pre-reponse par niveau : explicite (donne le critere), domaine (oriente sans
+// donner la valeur), ou uniquement pour les criteres de stat (sinon aucun indice).
+export type IntruderHintMode = 'EXPLICIT' | 'DOMAIN' | 'STAT_ONLY';
+
+export interface IntruderLevelConfig {
+  gridSize: number; // nombre de Pokemon affiches
+  rules: IntruderRule[]; // criteres autorises a ce niveau
+  hintMode: IntruderHintMode;
+}
+
+export interface IntruderConfig {
+  roundsCount: number;
+  levels: Record<IntruderLevel, IntruderLevelConfig>;
+}
+
+export const INTRUDER_CONFIG: IntruderConfig = {
+  roundsCount: 5,
+  levels: {
+    FACILE: { gridSize: 4, rules: ['GENERATION', 'TYPE'], hintMode: 'EXPLICIT' },
+    MOYEN: { gridSize: 5, rules: ['STAT', 'EVOLUTION'], hintMode: 'DOMAIN' },
+    DIFFICILE: {
+      gridSize: 6,
+      rules: ['GENERATION', 'TYPE', 'STAT', 'EVOLUTION', 'MEGA'],
+      hintMode: 'STAT_ONLY',
+    },
+  },
 };
 
 export interface ShinyLevelConfig {

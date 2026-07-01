@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import type {
   IntruderChoiceResponse,
+  IntruderLevel,
   IntruderMemberReveal,
   IntruderRoundState,
 } from '@pokegames/shared-types';
@@ -16,9 +18,11 @@ import { API_ORIGIN } from '@/lib/env';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
+import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
 import { getIntruderRound, startIntruder, submitIntruderChoice } from './intruder-api';
 import {
   clearIntruder,
+  intruderDailyStatus,
   intruderTodayKey,
   loadIntruderDone,
   loadIntruderSaved,
@@ -27,11 +31,28 @@ import {
 } from './intruder-storage';
 
 const INTRUDER_RULES = [
-  'Quatre Pokémon, trois partagent un point commun.',
+  'Plusieurs Pokémon, tous partagent un point commun sauf un.',
   'Clique sur l’intrus, celui qui ne partage pas ce trait.',
   'Le trait commun change à chaque manche (type, génération, statistique...).',
-  '10 manches : vise le meilleur score.',
+  '5 manches : vise le meilleur score.',
 ];
+
+const LEVELS: { level: IntruderLevel; label: string; description: string }[] = [
+  { level: 'FACILE', label: 'Facile', description: '4 cartes, indice explicite' },
+  { level: 'MOYEN', label: 'Moyen', description: '5 cartes, domaine indiqué' },
+  { level: 'DIFFICILE', label: 'Difficile', description: '6 cartes, indice minimal' },
+];
+
+const LEVEL_LABEL: Record<IntruderLevel, string> = {
+  FACILE: 'Facile',
+  MOYEN: 'Moyen',
+  DIFFICILE: 'Difficile',
+};
+
+// 4 cartes -> 2 colonnes (2x2), 5 -> 3 colonnes (3+2), 6 -> 3 colonnes (3x2).
+function gridColsClass(count: number): string {
+  return count === 4 ? 'grid-cols-2' : 'grid-cols-3';
+}
 
 interface EndInfo {
   correctCount: number;
@@ -39,6 +60,23 @@ interface EndInfo {
 }
 
 export function IntruderPage() {
+  const [level, setLevel] = useState<IntruderLevel | null>(null);
+
+  if (!level) {
+    return <IntruderLevelSelect onPick={setLevel} />;
+  }
+  return <IntruderGame key={level} level={level} onBack={() => setLevel(null)} />;
+}
+
+function IntruderLevelSelect({ onPick }: { onPick: (level: IntruderLevel) => void }) {
+  const options = useMemo<LevelOption<IntruderLevel>[]>(
+    () => LEVELS.map((l) => ({ ...l, status: intruderDailyStatus(l.level) })),
+    [],
+  );
+  return <LevelSelectScreen title="L'Intrus" rules={INTRUDER_RULES} options={options} onPick={onPick} />;
+}
+
+function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => void }) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const [state, setState] = useState<IntruderRoundState | null>(null);
@@ -58,27 +96,27 @@ export function IntruderPage() {
     setEnded(false);
     setEndInfo(null);
     try {
-      const round = await startIntruder();
+      const round = await startIntruder(level);
       setState(round);
-      saveIntruder(round.roundId, round.roundIndex);
+      saveIntruder(level, round.roundId, round.roundIndex);
     } catch (err) {
-      clearIntruder();
+      clearIntruder(level);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [level]);
 
   const restoreOrStart = useCallback(async () => {
     const today = intruderTodayKey();
-    const done = loadIntruderDone();
+    const done = loadIntruderDone(level);
     if (done && done.date === today) {
       setEndInfo({ correctCount: done.correctCount, totalRounds: done.totalRounds });
       setEnded(true);
       setLoading(false);
       return;
     }
-    const saved = loadIntruderSaved();
+    const saved = loadIntruderSaved(level);
     if (!saved || saved.date !== today) {
       await start();
       return;
@@ -87,19 +125,19 @@ export function IntruderPage() {
     try {
       const round = await getIntruderRound(saved.roundId);
       if (round.status === 'FINISHED') {
-        saveIntruderDone(round.correctCount, round.totalRounds);
+        saveIntruderDone(level, round.correctCount, round.totalRounds);
         setEndInfo({ correctCount: round.correctCount, totalRounds: round.totalRounds });
         setEnded(true);
       } else {
         setState(round);
-        saveIntruder(round.roundId, round.roundIndex);
+        saveIntruder(level, round.roundId, round.roundIndex);
       }
       setLoading(false);
     } catch {
-      clearIntruder();
+      clearIntruder(level);
       await start();
     }
-  }, [start]);
+  }, [level, start]);
 
   useEffect(() => {
     void restoreOrStart();
@@ -122,7 +160,7 @@ export function IntruderPage() {
       const res = await submitIntruderChoice(state.roundId, pokemonId);
       setReveal(res);
       if (res.state.status === 'FINISHED') {
-        saveIntruderDone(res.state.correctCount, res.state.totalRounds);
+        saveIntruderDone(level, res.state.correctCount, res.state.totalRounds);
       }
     } catch (err) {
       setChosenId(null);
@@ -140,7 +178,7 @@ export function IntruderPage() {
       setEnded(true);
     } else {
       setState(next);
-      saveIntruder(next.roundId, next.roundIndex);
+      saveIntruder(level, next.roundId, next.roundIndex);
       setReveal(null);
       setChosenId(null);
     }
@@ -239,6 +277,10 @@ export function IntruderPage() {
               <Button className="w-full" onClick={() => navigate('/')}>
                 Retour à l'accueil
               </Button>
+              <Button variant="secondary" size="sm" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4" />
+                Changer de niveau
+              </Button>
             </Card>
           ) : !state ? (
             <Card className="max-w-md p-6 text-center">
@@ -252,7 +294,20 @@ export function IntruderPage() {
           ) : (
             <Card className="flex w-full max-w-xl flex-col items-center gap-5 p-6">
               <div className="flex w-full items-start justify-between gap-4">
-                <h1 className="font-display text-sm leading-relaxed text-foreground">L'Intrus</h1>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    aria-label="Changer de niveau"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <h1 className="font-display text-sm leading-relaxed text-foreground">L'Intrus</h1>
+                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                    {LEVEL_LABEL[state.level]}
+                  </Badge>
+                </div>
                 <div className="flex items-center gap-2">
                   <Badge className="border-primary bg-primary text-primary-foreground">
                     {state.roundIndex}/{state.totalRounds}
@@ -261,11 +316,16 @@ export function IntruderPage() {
                 </div>
               </div>
 
-              <p className="text-center font-display text-xs leading-relaxed text-foreground sm:text-sm">
-                {state.prompt}
-              </p>
+              <div className="flex flex-col items-center gap-1">
+                <p className="text-center font-display text-xs leading-relaxed text-foreground sm:text-sm">
+                  {state.prompt}
+                </p>
+                {state.hint && (
+                  <p className="text-center text-sm font-semibold text-primary">{state.hint}</p>
+                )}
+              </div>
 
-              <div className="grid w-full grid-cols-2 gap-3">
+              <div className={cn('grid w-full gap-3', gridColsClass(state.members.length))}>
                 {state.members.map((m, index) =>
                   renderTile(m.pokemonId, m.name, m.spriteUrl, index),
                 )}
@@ -286,9 +346,7 @@ export function IntruderPage() {
                   >
                     {reveal.correct ? 'Bien vu !' : 'Raté !'}
                   </motion.p>
-                  <p className="text-center text-sm font-bold text-foreground">
-                    {reveal.commonLabel}
-                  </p>
+                  <p className="text-center text-sm font-bold text-foreground">{reveal.commonLabel}</p>
                   <Button onClick={onContinue}>
                     {reveal.state.status === 'FINISHED' ? 'Voir le résultat' : 'Manche suivante'}
                   </Button>

@@ -1,11 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
+import { INTRUDER_CONFIG, type IntruderHintMode } from './game-config';
 import type {
   IntruderChoiceResponse,
+  IntruderLevel,
   IntruderMember,
   IntruderMemberReveal,
   IntruderRoundState,
@@ -40,15 +42,17 @@ interface StoredReveal {
 
 interface RoundDef {
   rule: IntruderRule;
-  memberIds: number[]; // 4 Pokemon melanges
+  memberIds: number[]; // gridSize Pokemon melanges
   names: Record<number, string>;
   intruderId: number;
   commonLabel: string;
+  hint: string | null; // indice pre-reponse (selon le niveau)
   reveals: StoredReveal[];
 }
 
 interface IntruderSession {
   roundId: string;
+  level: IntruderLevel;
   rounds: RoundDef[];
   currentIndex: number;
   correctCount: number;
@@ -73,16 +77,23 @@ const STAT_DESCRIPTORS: StatDescriptor[] = [
 
 const STAT_THRESHOLDS = [50, 60, 70, 80, 90, 100, 110, 120];
 
-const RULES: IntruderRule[] = ['GENERATION', 'TYPE', 'STAT', 'EVOLUTION', 'MEGA'];
+const INTRUDER_LEVELS: IntruderLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE'];
+
+interface HintExtra {
+  gen?: number;
+  typeName?: string;
+  statLabel?: string;
+}
 
 @Injectable()
 export class IntruderService {
   private readonly REDIS_PREFIX = 'game_intruder:';
   private readonly ROUND_TTL_SECONDS = 3600;
-  private readonly TOTAL_ROUNDS = 10;
   private readonly PROMPT = 'Trouve l’intrus';
 
   private poolCache: PoolPokemon[] | null = null;
+  // Plan du jour (tous niveaux) memoise : determinisme + dedup inter-niveaux.
+  private planCache: { date: string; plan: Record<IntruderLevel, RoundDef[]> } | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -179,11 +190,50 @@ export class IntruderService {
     return copy;
   }
 
+  /** Indice pre-reponse selon le niveau. N'indique jamais quel Pokemon est l'intrus. */
+  private hintFor(hintMode: IntruderHintMode, rule: IntruderRule, extra: HintExtra): string | null {
+    if (hintMode === 'EXPLICIT') {
+      switch (rule) {
+        case 'GENERATION':
+          return `Trouve celui qui n'est pas de la génération ${extra.gen}`;
+        case 'TYPE':
+          return `Trouve celui qui n'est pas de type ${extra.typeName}`;
+        case 'EVOLUTION':
+          return "Trouve celui dont le stade d'évolution diffère";
+        case 'MEGA':
+          return 'Trouve celui qui ne peut pas méga-évoluer';
+        case 'STAT':
+          return extra.statLabel ? `Regarde du côté de la ${extra.statLabel}` : null;
+        default:
+          return null;
+      }
+    }
+    if (hintMode === 'DOMAIN') {
+      switch (rule) {
+        case 'STAT':
+          return extra.statLabel ? `Indice : regarde du côté de la ${extra.statLabel}` : null;
+        case 'EVOLUTION':
+          return "Indice : regarde les stades d'évolution";
+        case 'GENERATION':
+          return 'Indice : compare les générations';
+        case 'TYPE':
+          return 'Indice : compare les types';
+        case 'MEGA':
+          return 'Indice : pense aux méga-évolutions';
+        default:
+          return null;
+      }
+    }
+    // STAT_ONLY : indice fourni uniquement si le critere est une stat.
+    return rule === 'STAT' && extra.statLabel ? `Indice : regarde du côté de la ${extra.statLabel}` : null;
+  }
+
   private assemble(
     rule: IntruderRule,
     matching: PoolPokemon[],
     intruder: PoolPokemon,
     commonLabel: string,
+    hint: string | null,
     detailOf: (p: PoolPokemon) => Omit<StoredReveal, 'pokemonId' | 'name' | 'isIntruder'>,
     rng: () => number,
   ): RoundDef {
@@ -205,25 +255,31 @@ export class IntruderService {
       names,
       intruderId: intruder.id,
       commonLabel,
+      hint,
       reveals,
     };
   }
 
-  private buildGeneration(pool: PoolPokemon[], rng: () => number): RoundDef | null {
+  private buildGeneration(
+    pool: PoolPokemon[],
+    matchCount: number,
+    hintMode: IntruderHintMode,
+    rng: () => number,
+  ): RoundDef | null {
     const byGen = new Map<number, PoolPokemon[]>();
     for (const p of pool) {
       const list = byGen.get(p.generation) ?? [];
       list.push(p);
       byGen.set(p.generation, list);
     }
-    const eligible = [...byGen.entries()].filter(([, list]) => list.length >= 3);
+    const eligible = [...byGen.entries()].filter(([, list]) => list.length >= matchCount);
     const picked = eligible[Math.floor(rng() * eligible.length)];
     if (!picked) return null;
     const [gen, group] = picked;
     const others = pool.filter((p) => p.generation !== gen);
     if (others.length === 0) return null;
-    const matching = this.pickDistinct(group, 3, rng);
-    if (matching.length < 3) return null;
+    const matching = this.pickDistinct(group, matchCount, rng);
+    if (matching.length < matchCount) return null;
     const intruder = this.pickDistinct(others, 1, rng)[0];
     if (!intruder) return null;
     return this.assemble(
@@ -231,12 +287,18 @@ export class IntruderService {
       matching,
       intruder,
       `Même génération : Génération ${gen}`,
+      this.hintFor(hintMode, 'GENERATION', { gen }),
       (p) => ({ detail: `Génération ${p.generation}` }),
       rng,
     );
   }
 
-  private buildType(pool: PoolPokemon[], rng: () => number): RoundDef | null {
+  private buildType(
+    pool: PoolPokemon[],
+    matchCount: number,
+    hintMode: IntruderHintMode,
+    rng: () => number,
+  ): RoundDef | null {
     const typed = pool.filter((p) => p.primaryTypeName !== null);
     const byType = new Map<string, PoolPokemon[]>();
     for (const p of typed) {
@@ -245,14 +307,14 @@ export class IntruderService {
       list.push(p);
       byType.set(key, list);
     }
-    const eligible = [...byType.entries()].filter(([, list]) => list.length >= 3);
+    const eligible = [...byType.entries()].filter(([, list]) => list.length >= matchCount);
     const picked = eligible[Math.floor(rng() * eligible.length)];
     if (!picked) return null;
     const [typeName, group] = picked;
     const others = typed.filter((p) => p.primaryTypeName !== typeName);
     if (others.length === 0) return null;
-    const matching = this.pickDistinct(group, 3, rng);
-    if (matching.length < 3) return null;
+    const matching = this.pickDistinct(group, matchCount, rng);
+    if (matching.length < matchCount) return null;
     const intruder = this.pickDistinct(others, 1, rng)[0];
     if (!intruder) return null;
     return this.assemble(
@@ -260,6 +322,7 @@ export class IntruderService {
       matching,
       intruder,
       `Même type principal : ${typeName}`,
+      this.hintFor(hintMode, 'TYPE', { typeName }),
       (p) => ({
         detail: p.primaryTypeName ?? 'Type inconnu',
         ...(p.primaryTypeImage ? { typeImage: p.primaryTypeImage } : {}),
@@ -268,21 +331,26 @@ export class IntruderService {
     );
   }
 
-  private buildStat(pool: PoolPokemon[], rng: () => number): RoundDef | null {
+  private buildStat(
+    pool: PoolPokemon[],
+    matchCount: number,
+    hintMode: IntruderHintMode,
+    rng: () => number,
+  ): RoundDef | null {
     for (let attempt = 0; attempt < 40; attempt++) {
       const descriptor = STAT_DESCRIPTORS[Math.floor(rng() * STAT_DESCRIPTORS.length)];
       const threshold = STAT_THRESHOLDS[Math.floor(rng() * STAT_THRESHOLDS.length)];
       if (!descriptor || threshold === undefined) continue;
       const below = pool.filter((p) => this.statValue(p, descriptor.key) < threshold);
       const atOrAbove = pool.filter((p) => this.statValue(p, descriptor.key) >= threshold);
-      const majorityBelow = below.length >= 3 && atOrAbove.length >= 1;
-      const majorityAbove = atOrAbove.length >= 3 && below.length >= 1;
+      const majorityBelow = below.length >= matchCount && atOrAbove.length >= 1;
+      const majorityAbove = atOrAbove.length >= matchCount && below.length >= 1;
       if (!majorityBelow && !majorityAbove) continue;
       const useBelow = majorityBelow && (!majorityAbove || rng() < 0.5);
       const group = useBelow ? below : atOrAbove;
       const others = useBelow ? atOrAbove : below;
-      const matching = this.pickDistinct(group, 3, rng);
-      if (matching.length < 3) continue;
+      const matching = this.pickDistinct(group, matchCount, rng);
+      if (matching.length < matchCount) continue;
       const intruder = this.pickDistinct(others, 1, rng)[0];
       if (!intruder) continue;
       const commonLabel = useBelow
@@ -293,6 +361,7 @@ export class IntruderService {
         matching,
         intruder,
         commonLabel,
+        this.hintFor(hintMode, 'STAT', { statLabel: descriptor.label }),
         (p) => ({ detail: `${descriptor.label} : ${this.statValue(p, descriptor.key)}` }),
         rng,
       );
@@ -300,17 +369,22 @@ export class IntruderService {
     return null;
   }
 
-  private buildEvolution(pool: PoolPokemon[], rng: () => number): RoundDef | null {
+  private buildEvolution(
+    pool: PoolPokemon[],
+    matchCount: number,
+    hintMode: IntruderHintMode,
+    rng: () => number,
+  ): RoundDef | null {
     const finals = pool.filter((p) => p.isFinalEvolution);
     const nonFinals = pool.filter((p) => !p.isFinalEvolution);
-    const canFinalMajority = finals.length >= 3 && nonFinals.length >= 1;
-    const canNonFinalMajority = nonFinals.length >= 3 && finals.length >= 1;
+    const canFinalMajority = finals.length >= matchCount && nonFinals.length >= 1;
+    const canNonFinalMajority = nonFinals.length >= matchCount && finals.length >= 1;
     if (!canFinalMajority && !canNonFinalMajority) return null;
     const useFinal = canFinalMajority && (!canNonFinalMajority || rng() < 0.5);
     const group = useFinal ? finals : nonFinals;
     const others = useFinal ? nonFinals : finals;
-    const matching = this.pickDistinct(group, 3, rng);
-    if (matching.length < 3) return null;
+    const matching = this.pickDistinct(group, matchCount, rng);
+    if (matching.length < matchCount) return null;
     const intruder = this.pickDistinct(others, 1, rng)[0];
     if (!intruder) return null;
     const commonLabel = useFinal
@@ -321,17 +395,23 @@ export class IntruderService {
       matching,
       intruder,
       commonLabel,
+      this.hintFor(hintMode, 'EVOLUTION', {}),
       (p) => ({ detail: p.isFinalEvolution ? 'Forme finale' : 'Peut encore évoluer' }),
       rng,
     );
   }
 
-  private buildMega(pool: PoolPokemon[], rng: () => number): RoundDef | null {
+  private buildMega(
+    pool: PoolPokemon[],
+    matchCount: number,
+    hintMode: IntruderHintMode,
+    rng: () => number,
+  ): RoundDef | null {
     const withMega = pool.filter((p) => p.hasMega);
     const withoutMega = pool.filter((p) => !p.hasMega);
-    if (withMega.length < 3 || withoutMega.length < 1) return null;
-    const matching = this.pickDistinct(withMega, 3, rng);
-    if (matching.length < 3) return null;
+    if (withMega.length < matchCount || withoutMega.length < 1) return null;
+    const matching = this.pickDistinct(withMega, matchCount, rng);
+    if (matching.length < matchCount) return null;
     const intruder = this.pickDistinct(withoutMega, 1, rng)[0];
     if (!intruder) return null;
     return this.assemble(
@@ -339,6 +419,7 @@ export class IntruderService {
       matching,
       intruder,
       'Trois Pokémon capables de méga-évoluer, un intrus qui ne le peut pas',
+      this.hintFor(hintMode, 'MEGA', {}),
       (p) => ({
         detail: p.hasMega ? 'Méga-évolution' : 'Aucune méga-évolution',
         ...(p.hasMega ? { megaSpriteUrl: `/api/pokemon/${p.id}/mega-sprite` } : {}),
@@ -350,36 +431,69 @@ export class IntruderService {
   private buildRoundForRule(
     rule: IntruderRule,
     pool: PoolPokemon[],
+    matchCount: number,
+    hintMode: IntruderHintMode,
     rng: () => number,
   ): RoundDef | null {
     switch (rule) {
       case 'GENERATION':
-        return this.buildGeneration(pool, rng);
+        return this.buildGeneration(pool, matchCount, hintMode, rng);
       case 'TYPE':
-        return this.buildType(pool, rng);
+        return this.buildType(pool, matchCount, hintMode, rng);
       case 'STAT':
-        return this.buildStat(pool, rng);
+        return this.buildStat(pool, matchCount, hintMode, rng);
       case 'EVOLUTION':
-        return this.buildEvolution(pool, rng);
+        return this.buildEvolution(pool, matchCount, hintMode, rng);
       case 'MEGA':
-        return this.buildMega(pool, rng);
+        return this.buildMega(pool, matchCount, hintMode, rng);
       default:
         return null;
     }
   }
 
-  private buildRounds(pool: PoolPokemon[], rng: () => number): RoundDef[] {
+  private buildRounds(
+    pool: PoolPokemon[],
+    level: IntruderLevel,
+    rng: () => number,
+    used: Set<number>,
+  ): RoundDef[] {
+    const { gridSize, rules, hintMode } = INTRUDER_CONFIG.levels[level];
+    const matchCount = gridSize - 1;
     const rounds: RoundDef[] = [];
-    for (let i = 0; i < this.TOTAL_ROUNDS; i++) {
-      const order = this.shuffle(RULES, rng);
+    for (let i = 0; i < INTRUDER_CONFIG.roundsCount; i++) {
+      // Exclut les Pokemon deja pris (dedup intra-session et entre niveaux du jour).
+      const avail = pool.filter((p) => !used.has(p.id));
+      const order = this.shuffle(rules, rng);
       let round: RoundDef | null = null;
       for (const rule of order) {
-        round = this.buildRoundForRule(rule, pool, rng);
+        round = this.buildRoundForRule(rule, avail, matchCount, hintMode, rng);
         if (round) break;
       }
-      if (round) rounds.push(round);
+      if (round) {
+        rounds.push(round);
+        for (const id of round.memberIds) used.add(id);
+      }
     }
     return rounds;
+  }
+
+  /**
+   * Plan du jour complet : les 3 niveaux construits dans un ordre fixe avec un meme RNG et un
+   * ensemble d'exclusion partage, pour qu'aucun Pokemon ne se repete entre les niveaux du jour.
+   */
+  private getDailyPlan(pool: PoolPokemon[]): Record<IntruderLevel, RoundDef[]> {
+    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    if (this.planCache && this.planCache.date === today) {
+      return this.planCache.plan;
+    }
+    const rng = this.makeRng(this.dailySeed());
+    const used = new Set<number>();
+    const plan = {} as Record<IntruderLevel, RoundDef[]>;
+    for (const level of INTRUDER_LEVELS) {
+      plan[level] = this.buildRounds(pool, level, rng, used);
+    }
+    this.planCache = { date: today, plan };
+    return plan;
   }
 
   private member(id: number, name: string): IntruderMember {
@@ -395,21 +509,26 @@ export class IntruderService {
     }
     return {
       roundId: session.roundId,
+      level: session.level,
       totalRounds: total,
       roundIndex: Math.min(session.currentIndex + 1, total),
       correctCount: session.correctCount,
       status: session.status,
       prompt: this.PROMPT,
+      hint: round.hint,
       members: round.memberIds.map((id) => this.member(id, round.names[id] ?? '')),
     };
   }
 
-  async startDaily(userId?: string): Promise<IntruderRoundState> {
+  async startDaily(level: IntruderLevel, userId?: string): Promise<IntruderRoundState> {
+    if (!INTRUDER_LEVELS.includes(level)) {
+      throw new BadRequestException('Niveau invalide');
+    }
     const pool = await this.loadPool();
-    if (pool.length < 4) {
+    if (pool.length < INTRUDER_CONFIG.levels[level].gridSize) {
       throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
-    const rounds = this.buildRounds(pool, this.makeRng(this.dailySeed()));
+    const rounds = this.getDailyPlan(pool)[level];
     if (rounds.length === 0) {
       throw new NotFoundException('Impossible de générer les manches du jour');
     }
@@ -417,6 +536,7 @@ export class IntruderService {
     const roundId = uuidv4();
     const session: IntruderSession = {
       roundId,
+      level,
       rounds,
       currentIndex: 0,
       correctCount: 0,

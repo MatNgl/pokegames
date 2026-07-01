@@ -238,20 +238,29 @@ export interface PlusMinusChoiceResponse {
 
 export type IntruderRule = 'GENERATION' | 'TYPE' | 'STAT' | 'EVOLUTION' | 'MEGA';
 
+export type IntruderLevel = 'FACILE' | 'MOYEN' | 'DIFFICILE';
+
 export interface IntruderMember {
   pokemonId: number;
   name: string;
   spriteUrl: string;
 }
 
+export interface IntruderStartRequest {
+  level: IntruderLevel;
+}
+
 export interface IntruderRoundState {
   roundId: string;
+  level: IntruderLevel;
   totalRounds: number;
   roundIndex: number; // manche courante (1 a totalRounds)
   correctCount: number;
   status: 'PLAYING' | 'FINISHED';
   prompt: string; // consigne affichee ("Trouve l'intrus")
-  members: IntruderMember[]; // 4 Pokemon melanges, la regle et l'intrus restent secrets
+  // Indice pre-reponse selon le niveau (explicite en Facile, domaine en Moyen, null si non fourni).
+  hint: string | null;
+  members: IntruderMember[]; // gridSize Pokemon melanges, la regle et l'intrus restent secrets
 }
 
 export interface IntruderMemberReveal {

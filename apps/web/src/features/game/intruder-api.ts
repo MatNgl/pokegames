@@ -1,8 +1,12 @@
 import { api } from '@/lib/api';
-import type { IntruderChoiceResponse, IntruderRoundState } from '@pokegames/shared-types';
+import type {
+  IntruderChoiceResponse,
+  IntruderLevel,
+  IntruderRoundState,
+} from '@pokegames/shared-types';
 
-export async function startIntruder(): Promise<IntruderRoundState> {
-  const res = await api.post<IntruderRoundState>('/games/intruder/start', {});
+export async function startIntruder(level: IntruderLevel): Promise<IntruderRoundState> {
+  const res = await api.post<IntruderRoundState>('/games/intruder/start', { level });
   return res.data;
 }
 

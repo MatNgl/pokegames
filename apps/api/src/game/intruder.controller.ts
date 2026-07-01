@@ -6,6 +6,7 @@ import type {
   IntruderChoiceRequest,
   IntruderChoiceResponse,
   IntruderRoundState,
+  IntruderStartRequest,
 } from '@pokegames/shared-types';
 
 interface AuthenticatedUser {
@@ -18,8 +19,11 @@ export class IntruderController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Post('start')
-  async start(@Req() req: Request & { user?: AuthenticatedUser }): Promise<IntruderRoundState> {
-    return this.intruderService.startDaily(req.user?.id);
+  async start(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Body() body: IntruderStartRequest,
+  ): Promise<IntruderRoundState> {
+    return this.intruderService.startDaily(body.level, req.user?.id);
   }
 
   @Get('round/:roundId')

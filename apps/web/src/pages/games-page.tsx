@@ -180,7 +180,11 @@ export function GamesPage() {
       plusMinusDailyStatus('DIFFICILE'),
       plusMinusDailyStatus('EXTREME'),
     ]),
-    intruder: intruderDailyStatus(),
+    intruder: aggregateLevelStatus([
+      intruderDailyStatus('FACILE'),
+      intruderDailyStatus('MOYEN'),
+      intruderDailyStatus('DIFFICILE'),
+    ]),
     shiny: aggregateLevelStatus([
       shinyDailyStatus('FIND_SHINY', 'FACILE'),
       shinyDailyStatus('FIND_SHINY', 'MOYEN'),

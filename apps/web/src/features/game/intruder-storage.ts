@@ -1,6 +1,14 @@
-// Persistance locale du defi "L'Intrus" quotidien (1 session par jour). L'etat detaille vit en Redis.
-const STORAGE_KEY = 'pokegames:intruder';
-const DONE_KEY = 'pokegames:intruder:done';
+import type { IntruderLevel } from '@pokegames/shared-types';
+
+// Persistance locale du defi "L'Intrus" quotidien (1 session par jour et par niveau).
+// L'etat detaille vit en Redis cote serveur.
+function storageKey(level: IntruderLevel): string {
+  return `pokegames:intruder:${level}`;
+}
+
+function doneKey(level: IntruderLevel): string {
+  return `pokegames:intruder:${level}:done`;
+}
 
 export function intruderTodayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -35,45 +43,49 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-export function loadIntruderSaved(): IntruderSaved | null {
-  const saved = readJson<IntruderSaved>(STORAGE_KEY);
+export function loadIntruderSaved(level: IntruderLevel): IntruderSaved | null {
+  const saved = readJson<IntruderSaved>(storageKey(level));
   if (saved && typeof saved.roundId === 'string' && typeof saved.date === 'string') {
     return saved;
   }
   return null;
 }
 
-export function saveIntruder(roundId: string, roundIndex = 1): void {
-  writeJson(STORAGE_KEY, { date: intruderTodayKey(), roundId, roundIndex });
+export function saveIntruder(level: IntruderLevel, roundId: string, roundIndex = 1): void {
+  writeJson(storageKey(level), { date: intruderTodayKey(), roundId, roundIndex });
 }
 
-export function clearIntruder(): void {
+export function clearIntruder(level: IntruderLevel): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey(level));
   } catch {
     // Rien a faire si le stockage est indisponible.
   }
 }
 
-export function loadIntruderDone(): IntruderDone | null {
-  const done = readJson<IntruderDone>(DONE_KEY);
+export function loadIntruderDone(level: IntruderLevel): IntruderDone | null {
+  const done = readJson<IntruderDone>(doneKey(level));
   if (done && typeof done.date === 'string' && typeof done.correctCount === 'number') {
     return done;
   }
   return null;
 }
 
-export function saveIntruderDone(correctCount: number, totalRounds: number): void {
-  writeJson(DONE_KEY, { date: intruderTodayKey(), correctCount, totalRounds });
+export function saveIntruderDone(
+  level: IntruderLevel,
+  correctCount: number,
+  totalRounds: number,
+): void {
+  writeJson(doneKey(level), { date: intruderTodayKey(), correctCount, totalRounds });
 }
 
 export type IntruderDailyStatus = 'idle' | 'in-progress' | 'done';
 
-export function intruderDailyStatus(): IntruderDailyStatus {
+export function intruderDailyStatus(level: IntruderLevel): IntruderDailyStatus {
   const today = intruderTodayKey();
-  const done = loadIntruderDone();
+  const done = loadIntruderDone(level);
   if (done && done.date === today) return 'done';
-  const saved = loadIntruderSaved();
+  const saved = loadIntruderSaved(level);
   if (saved && saved.date === today && (saved.roundIndex ?? 1) > 1) return 'in-progress';
   return 'idle';
 }

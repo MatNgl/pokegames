@@ -1,54 +1,49 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { IntruderLevel } from '@pokegames/shared-types';
 import { IntruderService } from './intruder.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
-interface RawPokemon {
-  id: number;
-  pokedexId: number;
-  nameFr: string;
-  generation: number;
-  statsHp: number;
-  statsAtk: number;
-  statsDef: number;
-  statsSpeAtk: number;
-  statsSpeDef: number;
-  statsSpeed: number;
-  isFinalEvolution: boolean;
-  hasMega: boolean;
-  types: { slot: number; type: { nameFr: string; image: string } }[];
+const TYPES = ['Feu', 'Eau', 'Plante', 'Électrik', 'Roche', 'Insecte'];
+
+// Pool synthetique riche : chaque regle (generation, type, stat, evolution, mega) et chaque
+// taille de grille (4 a 6) trouve des groupes, avec de quoi couvrir les 3 niveaux sans repetition.
+const bigPool = Array.from({ length: 120 }, (_, i) => {
+  const typeName = TYPES[i % TYPES.length] ?? 'Feu';
+  return {
+    id: i + 1,
+    pokedexId: i + 1,
+    nameFr: `P${i + 1}`,
+    generation: (i % 9) + 1,
+    statsHp: 30 + (i % 20) * 6,
+    statsAtk: 30 + (i % 15) * 6,
+    statsDef: 30 + (i % 18) * 5,
+    statsSpeAtk: 30 + (i % 12) * 7,
+    statsSpeDef: 30 + (i % 14) * 6,
+    statsSpeed: 20 + (i % 25) * 5,
+    isFinalEvolution: i % 2 === 0,
+    hasMega: i % 4 === 0,
+    types: [{ slot: 1, type: { nameFr: typeName, image: `https://img/${typeName}.png` } }],
+  };
+});
+
+interface StoredRound {
+  memberIds: number[];
 }
-
-type SlotType = { slot: number; type: { nameFr: string; image: string } }[];
-
-function feu(): SlotType {
-  return [{ slot: 1, type: { nameFr: 'Feu', image: 'https://img/feu.png' } }];
+interface StoredSession {
+  rounds: StoredRound[];
 }
-
-function eau(): SlotType {
-  return [{ slot: 1, type: { nameFr: 'Eau', image: 'https://img/eau.png' } }];
-}
-
-// Pool volontairement varie pour couvrir toutes les regles (generation, type, stat, evolution, mega).
-const pool: RawPokemon[] = [
-  { id: 3, pokedexId: 3, nameFr: 'Florizarre', generation: 1, statsHp: 80, statsAtk: 82, statsDef: 83, statsSpeAtk: 100, statsSpeDef: 100, statsSpeed: 80, isFinalEvolution: true, hasMega: true, types: eau() },
-  { id: 6, pokedexId: 6, nameFr: 'Dracaufeu', generation: 1, statsHp: 78, statsAtk: 84, statsDef: 78, statsSpeAtk: 109, statsSpeDef: 85, statsSpeed: 100, isFinalEvolution: true, hasMega: true, types: feu() },
-  { id: 9, pokedexId: 9, nameFr: 'Tortank', generation: 1, statsHp: 79, statsAtk: 83, statsDef: 100, statsSpeAtk: 85, statsSpeDef: 105, statsSpeed: 78, isFinalEvolution: true, hasMega: true, types: eau() },
-  { id: 65, pokedexId: 65, nameFr: 'Alakazam', generation: 1, statsHp: 55, statsAtk: 50, statsDef: 45, statsSpeAtk: 135, statsSpeDef: 95, statsSpeed: 120, isFinalEvolution: true, hasMega: true, types: feu() },
-  { id: 4, pokedexId: 4, nameFr: 'Salamèche', generation: 1, statsHp: 39, statsAtk: 52, statsDef: 43, statsSpeAtk: 60, statsSpeDef: 50, statsSpeed: 65, isFinalEvolution: false, hasMega: false, types: feu() },
-  { id: 5, pokedexId: 5, nameFr: 'Reptincel', generation: 1, statsHp: 58, statsAtk: 64, statsDef: 58, statsSpeAtk: 80, statsSpeDef: 65, statsSpeed: 80, isFinalEvolution: false, hasMega: false, types: feu() },
-  { id: 155, pokedexId: 155, nameFr: 'Héricendre', generation: 2, statsHp: 39, statsAtk: 52, statsDef: 43, statsSpeAtk: 60, statsSpeDef: 50, statsSpeed: 65, isFinalEvolution: false, hasMega: false, types: feu() },
-  { id: 158, pokedexId: 158, nameFr: 'Kaiminus', generation: 2, statsHp: 50, statsAtk: 65, statsDef: 64, statsSpeAtk: 44, statsSpeDef: 48, statsSpeed: 43, isFinalEvolution: false, hasMega: false, types: eau() },
-  { id: 252, pokedexId: 252, nameFr: 'Arcko', generation: 3, statsHp: 40, statsAtk: 45, statsDef: 35, statsSpeAtk: 65, statsSpeDef: 55, statsSpeed: 70, isFinalEvolution: false, hasMega: false, types: eau() },
-  { id: 254, pokedexId: 254, nameFr: 'Jungko', generation: 3, statsHp: 70, statsAtk: 85, statsDef: 65, statsSpeAtk: 105, statsSpeDef: 85, statsSpeed: 120, isFinalEvolution: true, hasMega: true, types: eau() },
-];
 
 describe('IntruderService', () => {
   let service: IntruderService;
   let mockGet: jest.Mock;
   let mockSet: jest.Mock;
   let mockEmit: jest.Mock;
+
+  function lastSaved(): StoredSession {
+    return JSON.parse(String(mockSet.mock.calls.at(-1)?.[1])) as StoredSession;
+  }
 
   beforeEach(async () => {
     mockGet = jest.fn();
@@ -60,7 +55,7 @@ describe('IntruderService', () => {
         IntruderService,
         {
           provide: PrismaService,
-          useValue: { pokemon: { findMany: jest.fn().mockResolvedValue(pool) } },
+          useValue: { pokemon: { findMany: jest.fn().mockResolvedValue(bigPool) } },
         },
         { provide: RedisService, useValue: { get: mockGet, set: mockSet, del: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: mockEmit } },
@@ -75,28 +70,51 @@ describe('IntruderService', () => {
   });
 
   describe('startDaily', () => {
-    it('renvoie la 1re manche avec 4 membres et sans révéler l’intrus', async () => {
-      const state = await service.startDaily();
+    it('Facile : 5 grilles de 4 membres, indice explicite, intrus caché', async () => {
+      const state = await service.startDaily('FACILE');
 
       expect(state.roundId).toBeDefined();
-      expect(state.totalRounds).toBe(10);
+      expect(state.level).toBe('FACILE');
+      expect(state.totalRounds).toBe(5);
       expect(state.roundIndex).toBe(1);
-      expect(state.correctCount).toBe(0);
       expect(state.status).toBe('PLAYING');
       expect(state.members).toHaveLength(4);
+      expect(state.hint).toBeTruthy();
       for (const m of state.members) {
         expect(m.spriteUrl).toMatch(/^\/api\/pokemon\/\d+\/sprite$/);
-        expect(m.name.length).toBeGreaterThan(0);
       }
-      // La reponse publique ne doit contenir ni l'intrus ni la regle.
       const serialized = JSON.stringify(state);
-      expect(serialized).not.toContain('intruder');
+      expect(serialized).not.toContain('intruderId');
       expect(serialized).not.toContain('commonLabel');
     });
 
-    it('est déterministe pour une même journée', async () => {
-      const first = await service.startDaily();
-      const second = await service.startDaily();
+    it('adapte la taille de grille au niveau (Moyen 5, Difficile 6)', async () => {
+      const moyen = await service.startDaily('MOYEN');
+      expect(moyen.members).toHaveLength(5);
+      const difficile = await service.startDaily('DIFFICILE');
+      expect(difficile.members).toHaveLength(6);
+    });
+
+    it('rejette un niveau invalide', async () => {
+      await expect(service.startDaily('IMPOSSIBLE' as IntruderLevel)).rejects.toThrow('Niveau invalide');
+    });
+
+    it('ne répète aucun Pokémon entre les niveaux d’un même jour', async () => {
+      await service.startDaily('FACILE');
+      const facile = lastSaved();
+      await service.startDaily('DIFFICILE');
+      const difficile = lastSaved();
+
+      const facileIds = new Set(facile.rounds.flatMap((r) => r.memberIds));
+      const difficileIds = difficile.rounds.flatMap((r) => r.memberIds);
+      for (const id of difficileIds) {
+        expect(facileIds.has(id)).toBe(false);
+      }
+    });
+
+    it('est déterministe pour une même journée et un même niveau', async () => {
+      const first = await service.startDaily('FACILE');
+      const second = await service.startDaily('FACILE');
       expect(second.members.map((m) => m.pokemonId)).toEqual(first.members.map((m) => m.pokemonId));
     });
   });
@@ -105,6 +123,7 @@ describe('IntruderService', () => {
     function session(overrides: Record<string, unknown> = {}): string {
       return JSON.stringify({
         roundId: 'r1',
+        level: 'FACILE',
         currentIndex: 0,
         correctCount: 0,
         status: 'PLAYING',
@@ -116,11 +135,12 @@ describe('IntruderService', () => {
             names: { 6: 'Dracaufeu', 4: 'Salamèche', 5: 'Reptincel', 3: 'Florizarre' },
             intruderId: 3,
             commonLabel: 'Même type principal : Feu',
+            hint: "Trouve celui qui n'est pas de type Feu",
             reveals: [
-              { pokemonId: 6, name: 'Dracaufeu', isIntruder: false, detail: 'Feu', typeImage: 'https://img/feu.png' },
-              { pokemonId: 4, name: 'Salamèche', isIntruder: false, detail: 'Feu', typeImage: 'https://img/feu.png' },
-              { pokemonId: 5, name: 'Reptincel', isIntruder: false, detail: 'Feu', typeImage: 'https://img/feu.png' },
-              { pokemonId: 3, name: 'Florizarre', isIntruder: true, detail: 'Eau', typeImage: 'https://img/eau.png' },
+              { pokemonId: 6, name: 'Dracaufeu', isIntruder: false, detail: 'Feu' },
+              { pokemonId: 4, name: 'Salamèche', isIntruder: false, detail: 'Feu' },
+              { pokemonId: 5, name: 'Reptincel', isIntruder: false, detail: 'Feu' },
+              { pokemonId: 3, name: 'Florizarre', isIntruder: true, detail: 'Eau' },
             ],
           },
           {
@@ -129,6 +149,7 @@ describe('IntruderService', () => {
             names: { 3: 'Florizarre', 6: 'Dracaufeu', 9: 'Tortank', 155: 'Héricendre' },
             intruderId: 155,
             commonLabel: 'Même génération : Génération 1',
+            hint: "Trouve celui qui n'est pas de la génération 1",
             reveals: [
               { pokemonId: 3, name: 'Florizarre', isIntruder: false, detail: 'Génération 1' },
               { pokemonId: 6, name: 'Dracaufeu', isIntruder: false, detail: 'Génération 1' },
