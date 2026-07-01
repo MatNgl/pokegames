@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
 import { DailyDoneCard } from './components/daily-done-card';
+import { NumericPad } from './components/numeric-pad';
 import { getJustStatRound, guessJustStat, startJustStat, timeoutJustStat } from './just-stat-api';
 import {
   clearJustStat,
@@ -171,8 +172,7 @@ export function JustStatPage() {
     }
   }, [roundKey, roundOver, busy, loading]);
 
-  const onSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitGuess = async () => {
     if (!state || busy || roundOver) return;
     const value = Number.parseInt(input, 10);
     if (!Number.isFinite(value)) {
@@ -198,6 +198,11 @@ export function JustStatPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    void submitGuess();
   };
 
   const onContinue = () => {
@@ -252,7 +257,7 @@ export function JustStatPage() {
               </Button>
             </Card>
           ) : (
-            <Card className="flex w-full max-w-md flex-col items-center gap-4 p-6">
+            <Card className="flex w-full max-w-md flex-col items-center gap-4 p-4 sm:p-6">
               <div className="flex w-full items-start justify-between gap-4">
                 <h1 className="font-display text-sm leading-relaxed text-foreground">La Juste Stat</h1>
                 <div className="flex items-center gap-2">
@@ -350,8 +355,8 @@ export function JustStatPage() {
                   </Button>
                 </div>
               ) : (
-                <form onSubmit={onSubmit} className="flex w-full flex-col gap-2">
-                  <div className="flex gap-2">
+                <form onSubmit={onSubmit} className="flex w-full flex-col items-center gap-3">
+                  <div className="flex w-full gap-2">
                     <Input
                       ref={inputRef}
                       type="number"
@@ -359,14 +364,26 @@ export function JustStatPage() {
                       value={input}
                       autoFocus
                       disabled={busy}
-                      onChange={(e) => setInput(e.target.value)}
+                      onChange={(e) => setInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
                       placeholder="Ta valeur"
                       aria-label="Valeur proposée"
+                      className="text-center font-display"
                     />
-                    <Button type="submit" disabled={busy || input.trim() === ''}>
+                    <Button type="submit" disabled={busy || input.trim() === ''} className="hidden sm:inline-flex">
                       {busy ? <Spinner className="h-4 w-4" /> : 'Valider'}
                     </Button>
                   </div>
+                  <NumericPad
+                    onDigit={(d) => {
+                      if (busy || roundOver) return;
+                      setError(null);
+                      setInput((v) => (v.length >= 4 ? v : v + d));
+                    }}
+                    onBackspace={() => setInput((v) => v.slice(0, -1))}
+                    onSubmit={() => void submitGuess()}
+                    disabled={busy}
+                    canSubmit={input.trim() !== ''}
+                  />
                   <p className="min-h-5 text-center text-sm font-semibold text-danger">
                     {error ?? ''}
                   </p>

@@ -262,7 +262,7 @@ export function GamesPage() {
         <AppHeader />
 
         {/* Colonne de quetes a gauche (grands ecrans) : position fixe, ne decale pas les jeux. */}
-        <aside className="fixed left-4 top-20 z-20 hidden max-h-[calc(100vh-6rem)] w-64 overflow-auto xl:block">
+        <aside className="fixed left-4 top-20 z-20 hidden max-h-[calc(100vh-6rem)] w-72 overflow-auto xl:block 2xl:w-80">
           <DailyQuestsPanel />
         </aside>
 

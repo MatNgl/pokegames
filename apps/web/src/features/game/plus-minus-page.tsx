@@ -285,7 +285,7 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
               </Button>
             </Card>
           ) : (
-            <Card className="flex w-full max-w-xl flex-col items-center gap-5 p-6">
+            <Card className="flex w-full max-w-xl flex-col items-center gap-4 p-4 sm:gap-5 sm:p-6">
               <div className="flex w-full items-start justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <button
