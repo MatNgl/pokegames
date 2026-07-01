@@ -46,6 +46,46 @@ export interface LeaderboardResponse {
   entries: LeaderboardEntry[];
 }
 
+/* ==========================================================================
+ * Admin (dashboard, gestion utilisateurs, configuration dynamique)
+ * ========================================================================== */
+
+export interface AdminStats {
+  totalUsers: number;
+  totalGames: number;
+  successfulGames: number;
+  successRatePct: number;
+}
+
+export interface AdminAuditLogEntry {
+  id: string;
+  gameType: string;
+  userId: string | null;
+  targetNameFr: string;
+  userGuess: string | null;
+  isSuccess: boolean;
+  scoreEarned: number;
+  durationSeconds: number;
+  hintsUsedCount: number;
+  createdAt: string;
+}
+
+export interface AdminUserSummary {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  gamesPlayed: number;
+  totalTimeSeconds: number;
+}
+
+export interface AdminUserDetail extends AdminUserSummary {
+  eloScore: number;
+  dailyResultsCount: number;
+  recentGames: AdminAuditLogEntry[];
+}
+
 export interface PokemonStats {
   hp: number;
   atk: number;

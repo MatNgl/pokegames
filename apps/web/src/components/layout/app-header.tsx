@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { History, ListChecks, LogOut, Menu, Trophy, X } from 'lucide-react';
+import { History, ListChecks, LogOut, Menu, Shield, Trophy, X } from 'lucide-react';
 import { FolderKanbanIcon } from '@/components/ui/icons/folder-kanban-icon';
 import { SettingsIcon } from '@/components/ui/icons/settings-icon';
 import { Logo } from '@/components/brand/logo';
@@ -117,6 +117,11 @@ export function AppHeader() {
         <button type="button" className={iconButtonClass} title="Paramètres (bientôt)" aria-label="Paramètres">
           <SettingsIcon size={20} />
         </button>
+        {user?.role === 'ADMIN' && (
+          <Link to="/admin" className={iconButtonClass} title="Administration" aria-label="Administration">
+            <Shield className="h-5 w-5" />
+          </Link>
+        )}
         {user ? (
           <div className="flex items-center gap-2 pl-2">
             <span className="text-sm font-medium text-foreground">{user.username}</span>
@@ -203,6 +208,15 @@ export function AppHeader() {
               <span className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-muted/60">
                 <FolderKanbanIcon size={16} /> Pokédex (bientôt)
               </span>
+              {user?.role === 'ADMIN' && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-foreground hover:bg-surface-2"
+                >
+                  <Shield className="h-4 w-4" /> Administration
+                </Link>
+              )}
               {user ? (
                 <button
                   type="button"

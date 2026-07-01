@@ -12,6 +12,7 @@ import { TrueShinyPage } from '@/features/game/true-shiny-page';
 import { HistoryPage } from '@/features/daily/history-page';
 import { LeaderboardPage } from '@/features/daily/leaderboard-page';
 import { QuestsPage } from '@/features/daily/quests-page';
+import { AdminPage } from '@/features/admin/admin-page';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/historique" element={<HistoryPage />} />
         <Route path="/classements" element={<LeaderboardPage />} />
         <Route path="/quetes" element={<QuestsPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

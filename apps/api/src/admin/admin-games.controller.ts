@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { AdminGuard } from '../auth/admin.guard';
 import {
   WHO_IS_IT_ADMIN_CONFIG,
   WhoIsItAdminConfig,
@@ -13,6 +14,7 @@ import {
  * ce controleur, remplacera alors la lecture des constantes). Ne pas exposer de POST tant que les
  * services lisent les constantes, sous peine d'un endpoint sans effet.
  */
+@UseGuards(AdminGuard)
 @Controller('admin/games')
 export class AdminGamesController {
   @Get('who-is-it')
