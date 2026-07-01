@@ -53,6 +53,22 @@ export class PokemonService {
     return this.fetchSprite(pokemon.megaSpriteRegular);
   }
 
+  /**
+   * Sprite chromatique (shiny) d'un Pokemon, servi par le backend (Regle 3). Utilise par le jeu
+   * Trouve le shiny. 404 si le Pokemon n'a pas de version shiny (evite d'afficher un sprite normal
+   * comme s'il etait shiny).
+   */
+  async getShinySprite(pokemonId: number): Promise<{ buffer: Buffer; contentType: string }> {
+    const pokemon = await this.prisma.pokemon.findUnique({
+      where: { id: pokemonId },
+      select: { spriteShiny: true },
+    });
+    if (!pokemon?.spriteShiny) {
+      throw new NotFoundException('Sprite shiny introuvable');
+    }
+    return this.fetchSprite(pokemon.spriteShiny);
+  }
+
   private async fetchSprite(url: string): Promise<{ buffer: Buffer; contentType: string }> {
     const cached = this.spriteCache.get(url);
     if (cached) {

@@ -50,6 +50,7 @@ export type GameType =
   | 'MOTUS'
   | 'PLUS_MINUS'
   | 'INTRUDER'
+  | 'SHINY'
   | 'GUESS_WHO';
 
 export type GameStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
@@ -254,6 +255,51 @@ export interface IntruderChoiceResponse {
   reveals: IntruderMemberReveal[];
   // Etat apres avancement : manche suivante si PLAYING, sinon partie terminee.
   state: IntruderRoundState;
+}
+
+/* ==========================================================================
+ * JEU 5 : TROUVE LE SHINY (REPERE LA CHROMATIQUE)
+ * ========================================================================== */
+
+// FIND_SHINY : 2 Pokemon normaux + 1 shiny, trouver le shiny.
+// FIND_NON_SHINY : 2 Pokemon shiny + 1 normal, trouver celui qui n'est pas shiny.
+export type ShinyMode = 'FIND_SHINY' | 'FIND_NON_SHINY';
+
+export interface ShinyTile {
+  slot: number; // 0 a 2
+  imageUrl: string; // proxy opaque : ne revele jamais si la vignette est shiny
+}
+
+export interface ShinyRoundState {
+  roundId: string;
+  mode: ShinyMode;
+  totalRounds: number;
+  roundIndex: number; // manche courante (1 a totalRounds)
+  correctCount: number;
+  status: 'PLAYING' | 'FINISHED';
+  prompt: string; // consigne selon le mode
+  tiles: ShinyTile[]; // 3 Pokemon differents, l'intrus chromatique reste secret
+}
+
+export interface ShinyTileReveal {
+  slot: number;
+  pokemonId: number;
+  name: string;
+  isShiny: boolean;
+  isAnswer: boolean; // vignette a trouver (le shiny en normal, le normal en reverse)
+}
+
+export interface ShinyChoiceRequest {
+  roundId: string;
+  slot: number;
+}
+
+export interface ShinyChoiceResponse {
+  correct: boolean;
+  answerSlot: number;
+  reveals: ShinyTileReveal[];
+  // Etat apres avancement : manche suivante si PLAYING, sinon partie terminee.
+  state: ShinyRoundState;
 }
 
 /* ==========================================================================

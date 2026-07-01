@@ -56,4 +56,14 @@ describe('PokemonService', () => {
 
     await expect(service.getMegaSprite(99999)).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('renvoie 404 pour le sprite shiny d’un Pokémon sans version shiny', async () => {
+    mockFindUnique.mockResolvedValue({ spriteShiny: null });
+
+    await expect(service.getShinySprite(129)).rejects.toBeInstanceOf(NotFoundException);
+    expect(mockFindUnique).toHaveBeenCalledWith({
+      where: { id: 129 },
+      select: { spriteShiny: true },
+    });
+  });
 });
