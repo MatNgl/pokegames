@@ -7,6 +7,7 @@ import { MotusPage } from '@/features/game/motus-page';
 import { PlusMinusPage } from '@/features/game/plus-minus-page';
 import { IntruderPage } from '@/features/game/intruder-page';
 import { ShinyPage } from '@/features/game/shiny-page';
+import { JustStatPage } from '@/features/game/just-stat-page';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/intrus" element={<IntruderPage />} />
         <Route path="/shiny" element={<ShinyPage mode="FIND_SHINY" />} />
         <Route path="/non-shiny" element={<ShinyPage mode="FIND_NON_SHINY" />} />
+        <Route path="/juste-stat" element={<JustStatPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

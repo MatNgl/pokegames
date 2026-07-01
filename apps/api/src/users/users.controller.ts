@@ -28,6 +28,13 @@ export class UsersController {
     return this.usersService.getPlayerHistory(req.user.id, Number(limit) || 20);
   }
 
+  @Get('online')
+  async getOnlineCount(@Query('clientId') clientId?: string, @Req() req?: Request) {
+    const id = clientId || req?.ip || 'anonymous';
+    const count = await this.usersService.recordOnlinePlayer(id);
+    return { count };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMyProfile(@Req() req: Request & { user?: AuthenticatedUser }) {

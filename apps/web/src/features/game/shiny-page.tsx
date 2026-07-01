@@ -34,7 +34,7 @@ interface ShinyPageProps {
 
 const MODE_TITLE: Record<ShinyMode, string> = {
   FIND_SHINY: 'Trouve le shiny',
-  FIND_NON_SHINY: 'Trouve le non-shiny',
+  FIND_NON_SHINY: 'Trouve le non shiny',
 };
 
 const MODE_RULES: Record<ShinyMode, string[]> = {

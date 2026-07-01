@@ -51,6 +51,8 @@ export type GameType =
   | 'PLUS_MINUS'
   | 'INTRUDER'
   | 'SHINY'
+  | 'TRUE_SHINY'
+  | 'JUST_STAT'
   | 'GUESS_WHO';
 
 export type GameStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
@@ -300,6 +302,63 @@ export interface ShinyChoiceResponse {
   reveals: ShinyTileReveal[];
   // Etat apres avancement : manche suivante si PLAYING, sinon partie terminee.
   state: ShinyRoundState;
+}
+
+/* ==========================================================================
+ * JEU 7 : LA JUSTE STAT (FACON LE JUSTE PRIX)
+ * ========================================================================== */
+
+export type JustStatKey =
+  | 'HP'
+  | 'ATK'
+  | 'DEF'
+  | 'SPE_ATK'
+  | 'SPE_DEF'
+  | 'SPEED'
+  | 'HEIGHT_CM'
+  | 'WEIGHT_KG';
+
+export type JustStatDirection = 'HIGHER' | 'LOWER' | 'CORRECT';
+
+export interface JustStatPokemon {
+  id: number;
+  name: string;
+  spriteUrl: string;
+}
+
+export interface JustStatRoundState {
+  roundId: string;
+  totalRounds: number;
+  roundIndex: number; // manche courante (1 a totalRounds)
+  correctCount: number;
+  status: 'PLAYING' | 'FINISHED';
+  pokemon: JustStatPokemon;
+  stat: JustStatKey;
+  statLabel: string; // libelle affiche (ex. "Vitesse")
+  statUnit: string; // unite affichee ("", "cm", "kg")
+  min: number; // borne basse indicative pour l'interface (ne revele pas la reponse)
+  max: number; // borne haute indicative
+  timeLimitSeconds: number;
+  maxAttempts: number;
+  attemptsRemaining: number;
+}
+
+export interface JustStatGuessRequest {
+  roundId: string;
+  guessValue: number;
+}
+
+// Reponse a une proposition (guess) ou a un temps ecoule (timeout, direction null).
+export interface JustStatGuessResponse {
+  direction: JustStatDirection | null;
+  attemptsRemaining: number;
+  roundOver: boolean; // vrai si la manche est terminee (trouvee, plus d'essais, ou temps ecoule)
+  correctValue: number | null; // revele uniquement quand roundOver est vrai
+  state: JustStatRoundState; // manche courante si !roundOver, sinon suivante ou partie terminee
+}
+
+export interface JustStatTimeoutRequest {
+  roundId: string;
 }
 
 /* ==========================================================================

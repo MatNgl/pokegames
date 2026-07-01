@@ -12,6 +12,8 @@ import { IntruderService } from './intruder.service';
 import { IntruderController } from './intruder.controller';
 import { ShinyService } from './shiny.service';
 import { ShinyController } from './shiny.controller';
+import { JustStatService } from './just-stat.service';
+import { JustStatController } from './just-stat.controller';
 
 @Module({
   imports: [PokemonModule],
@@ -22,6 +24,7 @@ import { ShinyController } from './shiny.controller';
     PlusMinusController,
     IntruderController,
     ShinyController,
+    JustStatController,
   ],
   providers: [
     SpriteProxyService,
@@ -30,6 +33,7 @@ import { ShinyController } from './shiny.controller';
     PlusMinusService,
     IntruderService,
     ShinyService,
+    JustStatService,
   ],
   exports: [
     SpriteProxyService,
@@ -38,6 +42,7 @@ import { ShinyController } from './shiny.controller';
     PlusMinusService,
     IntruderService,
     ShinyService,
+    JustStatService,
   ],
 })
 export class GameModule {}
