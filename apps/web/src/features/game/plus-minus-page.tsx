@@ -15,7 +15,15 @@ import { Spinner } from '@/components/ui/spinner';
 import { API_ORIGIN } from '@/lib/env';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/lib/errors';
+import { HelpPopover } from '@/components/ui/help-popover';
 import { CountUp } from './components/count-up';
+
+const PLUS_MINUS_RULES = [
+  'Deux Pokémon, une question par manche.',
+  'Clique sur celui qui a la plus grande valeur.',
+  'La caractéristique change à chaque manche.',
+  '10 manches : vise le meilleur score.',
+];
 import { getPlusMinusRound, startPlusMinus, submitPlusMinusChoice } from './plus-minus-api';
 
 function formatValue(criterion: PlusMinusCriterion, value: number): string {
@@ -229,14 +237,18 @@ export function PlusMinusPage() {
             <Card className="flex w-full max-w-xl flex-col items-center gap-5 p-6">
               <div className="flex w-full items-start justify-between gap-4">
                 <div>
-                  <h1 className="text-lg font-extrabold text-foreground">Plus ou Moins</h1>
-                  <p className="text-sm font-semibold text-muted">
-                    Défi du jour, manche {state.roundIndex} sur {state.totalRounds}
+                  <h1 className="font-display text-sm leading-relaxed text-foreground">Plus ou Moins</h1>
+                  <p className="mt-1 text-sm font-semibold text-muted">
+                    {state.correctCount} bonne{state.correctCount > 1 ? 's' : ''} réponse
+                    {state.correctCount > 1 ? 's' : ''}
                   </p>
                 </div>
-                <Badge className="border-primary bg-primary text-primary-foreground">
-                  {state.correctCount} bonne{state.correctCount > 1 ? 's' : ''}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className="border-primary bg-primary text-primary-foreground">
+                    {state.roundIndex}/{state.totalRounds}
+                  </Badge>
+                  <HelpPopover ariaLabel="Règles de Plus ou Moins" rules={PLUS_MINUS_RULES} />
+                </div>
               </div>
 
               <p className="text-center font-display text-xs leading-relaxed text-foreground sm:text-sm">

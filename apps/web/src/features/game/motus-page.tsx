@@ -240,7 +240,7 @@ export function MotusPage() {
               <div className="flex w-full items-start justify-between gap-4">
                 <div>
                   <h1 className="font-display text-sm leading-relaxed text-foreground">Poké-Motus</h1>
-                  <p className="mt-1 text-sm font-semibold text-muted">Mot du jour, {state.length} lettres</p>
+                  <p className="mt-1 text-sm font-semibold text-muted">{state.length} lettres</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className="border-primary bg-primary text-primary-foreground">
