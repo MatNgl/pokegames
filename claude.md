@@ -105,23 +105,33 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 
 **Format général (décision actée) :** les jeux du site sont centrés sur le **défi quotidien** : une seule session par jour et par joueur, série déterministe identique pour tous (graine du jour). Cela vaut pour tous les modes solo. Seul le jeu multijoueur (« Qui est-ce ? ») échappe à cette règle (parties à la demande). L'unicité par jour est garantie côté client en v1 et devra être verrouillée côté serveur (par compte et par date) ensuite.
 
+**Niveaux de difficulté (décision actée) :** plusieurs jeux ont 3 ou 4 niveaux (Facile, Moyen, Difficile, parfois Extrême). Chaque couple (jeu x niveau) est un **défi quotidien distinct** : série déterministe propre, une session par jour et par niveau, persistance et statut séparés. Le joueur choisit son niveau via un **écran de choix intermédiaire** (carte d'accueil, puis écran listant les niveaux avec leur statut Terminé / En cours, puis la partie). Les jeux sans niveau (La Juste Stat) vont directement à la partie. Les valeurs par niveau vivent dans la config serveur (voir Paramètres admin).
+
+**Anti-répétition (décision actée) :** pour ne pas retomber sur les mêmes Pokémon (ni les mêmes stats ou critères) d'un jour à l'autre, un **historique global des tirages** est persisté dans la table `DailyPick` (globale, partagée par tous, puisque les défis sont déterministes et identiques pour tous). Les générateurs **excluent** les Pokémon et les dimensions secondaires (stat, critère) sortis les jours précédents (fenêtre glissante sur N jours), et **à l'intérieur d'une même session** on ne rejoue jamais deux fois le même Pokémon ni trop souvent la même stat. Brique de base livrée : `HistoryService` (`recordPicks`, `hasPicksFor`, `recentPokemonIds`, `recentDetails`), à brancher jeu par jeu (exclusion au tirage, puis `recordPicks` une fois le tirage du jour figé).
+
+**Paramètres admin (config centralisée, décision actée) :** tous les paramètres réglables des jeux (nombre de manches, seuils d'écart, longueurs de mot, tailles de grille, teintes, niveaux, stats autorisées, chrono...) sont centralisés et typés dans `apps/api/src/game/game-config.ts`. C'est aujourd'hui la source unique côté serveur ; ils seront exposés à l'édition via `/admin/games/*` (endpoints puis écran admin) dans une phase dédiée.
+
+**Anti-triche des vignettes (décision actée) :** deux mécanismes coexistent. La Silhouette utilise le proxy masqué `/api/sprites/:sessionHash` (silhouette puis couleur selon l'état serveur). Les jeux qui affichent plusieurs vignettes secrètes (Trouve le shiny, Le Bon Shiny) utilisent un **proxy opaque par slot** propre au jeu (ex. `/api/games/true-shiny/tile/:roundId/:round/:slot`) : l'URL n'expose ni le Pokémon, ni la nature shiny, ni la transformation. Les jeux à sprites visibles (Plus ou Moins, La Juste Stat, L'Intrus) servent les sprites en clair via `/api/pokemon/:id/sprite`, car l'identité n'est pas le secret (le secret est la bonne réponse, jamais envoyée avant le choix).
+
 ### 1. Quel est ce Pokémon ? (*Who's That Pokémon*)
 * **Concept :** le joueur fait face à la silhouette masquée d'un Pokémon et doit deviner son nom français.
 * **Réponse :** saisie libre avec autocomplétion proposant des noms valides. La validation est faite côté serveur, jamais par comparaison côté client. Le nom saisi est normalisé avant comparaison au nom français canonique (minuscules, accents neutralisés, tirets et espaces normalisés ; cas particuliers comme les symboles de genre gérés).
 * **Tentatives :** illimitées par défaut. Il n'y a pas d'échec : la manche se termine quand le joueur trouve. Un plafond de tentatives optionnel peut être imposé en admin (au-delà, la manche se clôt et la réponse est révélée).
-* **Indices (échelle fixe) :** chaque mauvaise réponse ouvre le palier d'indice suivant. Au palier courant, le joueur choisit de révéler l'indice (pour s'aider) ou de continuer à deviner. L'ordre des indices est fixe et réglable en admin. Ordre par défaut : couleur floutée, Type 1, Type 2, Génération, couleur défloutée (déflou progressif), puis première lettre (l'indice le plus fort en dernier). Côté front, les indices sont des **icônes compactes à largeur fixe à droite de la silhouette** (révéler une valeur ne décale jamais l'image), verrouillées tant que non débloquées, cliquables une fois disponibles. L'icône des indices de couleur utilise l'asset `couleur_reveal.png`.
+* **Indices (échelle fixe, débloqués à chaque essai) :** chaque mauvaise réponse ouvre le palier d'indice suivant. Ordre fixe (réglable en admin) : **Type 1** (après la 1re erreur), **Taille exacte** (après la 2e), **Génération** (après la 3e), **aperçu couleur flouté** (après la 4e). Au palier courant, le joueur choisit de révéler l'indice ou de continuer à deviner. Côté front, les indices sont des **icônes compactes à largeur fixe à droite de la silhouette** (révéler une valeur ne décale jamais l'image), verrouillées tant que non débloquées, cliquables une fois disponibles. L'icône des indices de couleur utilise l'asset `couleur_reveal.png`.
+* **Niveaux :** **Facile** (générations 1 à 3, silhouette noire plein cadre, zoom 100 %, sans rotation), **Moyen** (toutes générations, zoom ciblé sur une zone, dézoom progressif à chaque erreur), **Difficile** (toutes générations, zoom + rotation d'environ 30° redressée à chaque erreur), **Extrême** (catalogue élargi incluant méga-évolutions, formes régionales et spéciales, zoom fort + angle aléatoire, dézoom et redressement progressifs). Les facteurs `zoomRatio` et `rotationAngle` sont **calculés exclusivement côté serveur** (state machine) et transmis dans le DTO de la manche ; le client applique ces transformations sans jamais posséder les coordonnées réelles ni le sprite couleur avant la résolution. Valeurs exactes par niveau dans `game-config.ts` (`WHO_IS_IT_ADMIN_CONFIG`).
 * **Révélation de couleur (anti-triche) :** les niveaux de couleur ne dévoilent jamais le vrai sprite côté client. Le serveur sert des variantes masquées par niveau (`colorLevel`) : silhouette noire (0), couleur très floutée (1), couleur défloutée (2), via le proxy `/api/sprites/:sessionHash`. Le sprite net n'est servi qu'après résolution de la manche.
 * **Décompte (essais, pas de points) :** on ne compte **pas de points**, seulement le **nombre d'essais** (réponses soumises) cumulé sur les manches de la partie. Objectif : deviner les Pokémon en le moins d'essais possible. Les indices aident sans pénalité chiffrée. Le nombre de manches par partie est réglable en admin (défaut 5).
 * **Mode (défi quotidien) :** une partie = N manches enchaînées (défaut 5) sur la **série déterministe du jour**, identique pour tous (graine de la date). **Une seule session par jour** : une fois terminée, on affiche le **nombre d'essais total** et on **ramène à l'accueil** (pas de Rejouer le même jour, message « reviens demain »). Un classement du jour comparant le nombre d'essais (le plus faible gagne) pourra être ajouté.
 * **Persistance :** la partie en cours est sauvegardée côté client (identifiant de manche + essais déjà tentés + total) et restaurée via `GET /api/games/who-is-it/round/:id` ; un refresh retrouve le même Pokémon, l'étape et les essais. L'autocomplétion exclut les mauvaises réponses déjà soumises pour la silhouette courante et se réinitialise à la manche suivante.
-* **Paramètres admin :** nombre de manches (classique), plafond de tentatives par manche, ordre des indices, taille du défi quotidien. Toute modification est journalisée (audit admin).
+* **Paramètres admin (`/admin/games/who-is-it`) :** `roundsCount` (défaut 5), `startCapital` (héritage, le score est en essais), `hintCosts` (coût par palier d'indice), `zoomStepPerMistake` (dézoom par erreur), `allowedGenerationsByLevel` (catalogue par niveau), angle et pas de rotation par niveau. Centralisés dans `game-config.ts`. Toute modification sera journalisée (audit admin).
 * **Endpoints :** `POST /api/games/who-is-it/start` (démarre une manche, accepte `roundIndex`), `GET /api/games/who-is-it/round/:roundId` (état d'une manche), `POST /api/games/who-is-it/guess` (soumet une réponse), `POST /api/games/who-is-it/hint` (révèle l'indice du palier courant). `GET /api/pokemon/names` alimente l'autocomplétion.
 * **Anti-Triche :** l'URL `/api/sprites/:sessionHash` ne révèle ni nom ni `pokedexId`. L'identité du Pokémon, l'état masqué et la validation vivent exclusivement côté serveur (state machine + Redis). Le client n'émet que des actions (`SUBMIT_GUESS`, `REVEAL_HINT`) et rend les états renvoyés. À la résolution, le serveur renvoie l'état final et le sprite couleur démasqué.
 
 ### 2. Poké-Motus (*Wordle Pokémon*)
-* **Concept :** deviner le nom d'un Pokémon en **6 essais**, avec un retour coloré par lettre, à la Wordle.
+* **Concept :** deviner le nom d'un Pokémon en un nombre d'essais dépendant du niveau (4 à 6), avec un retour coloré par lettre, à la Wordle.
 * **Mot du jour :** **un seul mot par jour** (défi quotidien, série déterministe identique pour tous via la graine de la date). La cible est un Pokémon dont le nom (accents retirés, lettres A à Z uniquement, un seul mot) fait **entre 5 et 9 lettres**.
-* **Indices de départ :** la **première lettre est donnée** (indice façon Motus) ainsi que la **longueur** (nombre de cases). La première lettre est fournie par le serveur dans l'état de la manche (`firstLetter`) : le client ne peut pas la deviner seul, et le reste du mot reste caché jusqu'à la fin.
+* **Indices de départ (selon le niveau) :** la **longueur** (nombre de cases) est toujours donnée. La **première lettre** n'est fournie qu'aux niveaux Facile et Moyen (champ serveur `firstLetter`, `null` sinon) : le client ne peut pas la deviner seul, et le reste du mot reste caché jusqu'à la fin.
+* **Niveaux :** **Facile** (5 ou 6 lettres, 1re lettre donnée, 6 essais), **Moyen** (6 ou 7 lettres, 1re lettre donnée, 5 essais), **Difficile** (5 à 8 lettres, sans 1re lettre, 6 essais), **Extrême** (5 à 9 lettres, sans 1re lettre, 4 essais). Valeurs dans `game-config.ts` (`MOTUS_ADMIN_CONFIG`).
 * **Saisie :**
   * La première case affiche la lettre donnée, fixe (non éditable). Le joueur tape les lettres suivantes. **Auto-soumission dès que la ligne est pleine** (la proposition envoyée inclut la première lettre).
   * La proposition doit **obligatoirement être un vrai Pokémon** de la même longueur (comparaison **sans accents**, lettres seules). Sinon la ligne est **rejetée sans consommer d'essai** (petite secousse) et le joueur corrige.
@@ -133,24 +143,55 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * **Fin :** victoire si trouvé en 6 essais ou moins, sinon défaite (la réponse est alors révélée). Comme tous les jeux solo, **une seule session par jour** ; en fin de partie, retour à l'accueil.
 * **Endpoints :** `POST /api/games/motus/start` (récupère le mot du jour), `GET /api/games/motus/round/:roundId` (état), `POST /api/games/motus/guess` (soumet une proposition).
 * **Anti-Triche :** le mot mystère reste **exclusivement dans Redis** côté serveur jusqu'à la victoire ou l'épuisement des essais. Le client ne reçoit que la longueur, le patron de couleurs par tentative et le statut ; jamais le mot tant que la partie n'est pas finie. La validité d'une proposition (est-ce un Pokémon de la bonne longueur) est vérifiée côté serveur.
+* **Paramètres admin (`/admin/games/motus`) :** `maxAttemptsByLevel`, `minLengthByLevel`, `maxLengthByLevel`, `provideFirstLetterByLevel`. Centralisés dans `game-config.ts`.
 
 ### 3. Plus ou Moins (*Duel de caractéristiques*)
-* **Concept :** un **duel** par manche. Deux Pokémon sont affichés (sprite + nom), une question porte sur une caractéristique, le joueur clique sur celui qui a la plus grande valeur.
+* **Concept :** un **duel** par manche. Deux Pokémon (sprite + nom), une question sur une caractéristique. Le joueur clique sur celui qui a la **plus grande** valeur, ou parfois la **plus petite** : le sens recherché (plus ou moins) est signalé visuellement par un repère de couleur, pour lever toute ambiguïté.
 * **Format :** **10 manches fixes** par partie, score = nombre de bonnes réponses. Défi quotidien (série déterministe identique pour tous, graine du jour), **une seule session par jour**, fin → retour à l'accueil.
 * **Valeur variable à chaque manche :** la caractéristique change à chaque duel, parmi PV, Taille, Poids, Attaque, Défense, Vitesse et Ancienneté (numéro de Pokédex, le plus ancien = le plus petit numéro). Les deux Pokémon d'un duel ont des valeurs distinctes (pas d'égalité).
+* **Niveaux (écart brut garanti entre les deux valeurs) :** **Facile** écart minimal de 45 points (ou 50 cm / 50 kg), **Moyen** écart entre 25 et 45 (mêmes stades d'évolution possibles), **Difficile** écart entre 10 et 25, **Extrême** écart inférieur ou égal à 9 (ex. 102 contre 100). Seuils par niveau dans `game-config.ts`.
 * **Sprites :** affichés en clair (jeu non masqué) via l'endpoint public `GET /api/pokemon/:id/sprite` (le client n'appelle jamais Tyradex directement, cf. Règle 3 ; le backend proxie et met en cache).
 * **Endpoints :** `POST /api/games/plus-minus/start` (duels du jour), `GET /api/games/plus-minus/round/:roundId` (état), `POST /api/games/plus-minus/choice` (soumet A ou B).
 * **Anti-Triche :** les **valeurs exactes ne sont jamais envoyées avant le choix**. Le client ne reçoit que la question et les deux Pokémon (id, nom, URL de sprite). Le serveur (Redis) détient les valeurs et la bonne réponse, valide le choix, puis renvoie les deux valeurs révélées et la manche suivante.
+* **Paramètres admin (`/admin/games/plus-minus`) :** `roundsCount` (défaut 10), `minDiffThresholdByLevel`, `maxDiffThresholdByLevel`, `enabledStatsList`. Centralisés dans `game-config.ts`.
 
 ### 4. L'Intrus (*Odd One Out*)
-* **Concept :** 4 Pokémon sont présentés à l'écran. 3 d'entre eux partagent un point commun secret (ex: tous de Type Eau, tous de 2ème Génération, tous ont 3 stades d'évolution, tous ont une statistique de Vitesse > 100). Le joueur doit identifier l'intrus.
-* **Mécanique :**
-  * Le serveur génère une règle secrète, sélectionne 3 Pokémon respectant la règle et 1 intrus.
-  * Le frontend reçoit un tableau anonymisé de 4 Pokémon (`[{ id: 'option-1', name: '...', spriteUrl: '...' }, ...]`).
-  * Le joueur clique sur l'intrus (`POST /api/games/intruder/guess`).
-* **Anti-Triche :** La règle secrète ("Même type principal") n'est pas transmise dans le payload initial pour empêcher un script client d'analyser automatiquement les attributs communs.
+* **Concept :** plusieurs Pokémon sont présentés (4 à 6 selon le niveau). Tous sauf un partagent un **critère secret** ; le joueur identifie et sélectionne l'intrus.
+* **Format :** défi quotidien, plusieurs grilles par jour (cible spec : 5 grilles ; l'implémentation actuelle en enchaîne 10, à réaligner). Le trait commun est **révélé** après la réponse (image du type, valeur de stat, ou sprite de méga-évolution), toujours en affichage progressif.
+* **Règles (critère secret) :** **génération**, **type principal**, **seuil de statistique** (ex. « les 3 ont moins de 100 en Vitesse »), **stade / forme finale d'évolution**, **méga-évolution** (portée par la forme finale de la lignée, vérifiée via l'ETL). La méga se révèle avec le sprite de méga.
+* **Niveaux :** **Facile** (4 Pokémon, comparaison Type ou Génération, aucun critère de stat, **indice explicite** dès le départ, ex. « Trouve celui qui n'est pas de type Eau »), **Moyen** (5 Pokémon, stat ou morphologie, **domaine indiqué**, ex. « L'un a moins de 80 en Vitesse »), **Difficile** (6 Pokémon, indice fourni **uniquement** si le critère est une stat, sinon aucun indice ; le backend garantit qu'aucune autre stat ne présente d'écart notable pour ne pas induire en erreur).
+* **Moteur d'isolation :** le service vérifie par intersection que **seul le critère cible isole un unique Pokémon** dans la grille (pas d'ambiguïté possible entre plusieurs critères).
+* **Sprites :** affichés en clair (les noms sont visibles, c'est le principe) via `GET /api/pokemon/:id/sprite`.
+* **Endpoints :** `POST /api/games/intruder/start`, `GET /api/games/intruder/round/:roundId`, `POST /api/games/intruder/choice` (soumet le `pokemonId` choisi).
+* **Anti-Triche :** le **critère secret et l'intrus ne sont jamais transmis** avant la réponse. Le client reçoit une grille anonyme (id, nom, sprite) ; règle, intrus et trait commun vivent en Redis et ne sont renvoyés qu'après le choix.
+* **Paramètres admin (`/admin/games/intruder`) :** `gridSizeByLevel`, `statModeMinDiff`, `enableHintsByLevel`. Centralisés dans `game-config.ts`.
 
-### 5. Qui est-ce ? (*Poké-Guess / 20 Questions*)
+### 5. Trouve le shiny (et Trouve le non-shiny)
+* **Concept :** plusieurs cartes affichent des Pokémon différents. En mode **Shiny**, un seul est sous sa forme chromatique (shiny), les autres sont normaux : trouver le shiny. En mode **Non-Shiny** (inversé), tous sont shiny sauf un normal : trouver celui qui ne l'est pas.
+* **Format :** **5 manches par session**, **sessions distinctes par mode** (deux défis quotidiens indépendants, un statut par mode). Bascule flèche entre les deux modes dans le jeu, et carte bleue dédiée au mode inversé sur l'accueil.
+* **Niveaux :** **Facile** 3 cartes, **Moyen** 4 cartes, **Difficile** 6 cartes. La difficulté vient du **nombre** de cartes.
+* **Sprites obligatoirement chromatiques :** seuls les Pokémon dotés d'un sprite shiny sont éligibles (jamais un sprite normal montré comme shiny).
+* **Endpoints :** `POST /api/games/shiny/start` (avec `mode`), `GET /api/games/shiny/round/:roundId`, `POST /api/games/shiny/choice` (slot), proxy vignette `GET /api/games/shiny/tile/:roundId/:round/:slot`.
+* **Anti-Triche :** toutes les images passent par le **proxy opaque par slot** ; aucune mention « shiny » ou « regular » dans les URL ou le JSON. Les cartes étant des espèces différentes, la taille des octets ne trahit pas la réponse.
+* **Paramètres admin (`/admin/games/shiny`) :** `roundsCount`, `gridSizeByLevel`.
+
+### 6. Trouve le bon shiny
+* **Concept :** toutes les cartes affichent **le même Pokémon shiny**. Toutes sauf une ont subi une **altération colorimétrique** (rotation de teinte). Le joueur repère l'unique sprite chromatique **officiel intact**. La couleur normale n'est **jamais** affichée.
+* **Format :** **5 manches par jour**, un Pokémon distinct par manche. Écran de choix de niveau (défi quotidien par niveau).
+* **Niveaux :** **Facile** 3 cartes (2 fausses, 1 vraie), **Moyen** 5 cartes, **Difficile** 6 cartes. **Décision :** l'altération reste **marquée à tous les niveaux** (teintes franches), la difficulté vient du nombre de cartes, pas de la subtilité (sinon les différences deviennent invisibles avec 5 ou 6 propositions).
+* **Endpoints :** `POST /api/games/true-shiny/start` (avec `level`), `GET /api/games/true-shiny/round/:roundId`, `POST /api/games/true-shiny/choice` (slot), proxy vignette `GET /api/games/true-shiny/tile/:roundId/:round/:slot`.
+* **Anti-Triche :** **aucun filtre CSS client** (`filter: hue-rotate` proscrit, l'inspection DOM révélerait la carte intacte). L'altération est **générée par sharp côté serveur** dans le proxy ; chaque slot renvoie un flux binaire déjà modifié. Toutes les vignettes, **intacte comprise**, passent par le même encodeur sharp pour que l'intacte ne soit pas repérable par la taille des octets.
+* **Paramètres admin (`/admin/games/true-shiny`) :** `gridSizeByLevel`, `hueShiftMinByLevel`, `hueShiftMaxByLevel`.
+
+### 7. La Juste Stat (façon *Le Juste Prix*)
+* **Concept :** un Pokémon (visuel + nom) est présenté, le joueur devine la **valeur exacte** d'une caractéristique imposée (PV, Attaque, Défense, Attaque Spéciale, Défense Spéciale, Vitesse, Taille en cm, Poids en kg). À chaque proposition, le serveur indique **PLUS HAUT** (flèche verte) ou **PLUS BAS** (flèche rouge), ou correct.
+* **Format :** **3 manches par jour**, mode unique, chrono de **20 secondes** par manche (temps écoulé = manche perdue, valeur révélée). Le champ garde le focus pour saisir à la suite.
+* **Variété intra-session :** les 3 manches varient le Pokémon (3 distincts) et la stat tirée (3 distinctes), pour ne jamais deviner deux fois la même stat ni le même Pokémon dans une session.
+* **Endpoints :** `POST /api/games/just-stat/start`, `GET /api/games/just-stat/round/:roundId`, `POST /api/games/just-stat/guess` (`{ guessValue }` renvoie `{ direction: 'HIGHER' | 'LOWER' | 'CORRECT', attemptsRemaining, ... }`), `POST /api/games/just-stat/timeout`.
+* **Anti-Triche :** la valeur exacte est conservée **en Redis** ; le client ne reçoit que le libellé de la stat, des bornes indicatives, la direction et le nombre d'essais restants. La valeur n'est révélée qu'à la fin de la manche.
+* **Paramètres admin (`/admin/games/just-stat`) :** `roundsCount` (défaut 3), `timeLimitSecondsByLevel`, `allowedStatsByLevel`. Centralisés dans `game-config.ts` (`JUST_STAT_CONFIG`).
+
+### 8. Qui est-ce ? (*Poké-Guess / 20 Questions*)
 * **Concept :** Jeu de déduction tactique en solo (contre une IA de filtrage) ou en multijoueur (1v1).
 * **Mécanique :**
   * Chaque joueur dispose d'une grille de 24 Pokémon. Le serveur assigne secrètement un Pokémon cible à chaque joueur.
@@ -206,6 +247,17 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 5. **Easter eggs** (jeu parallèle de collection) : back + tests. Apparitions et collecte validées serveur, alimentation du Pokédex personnel, silhouettes via le proxy masqué (voir section 5).
 6. **Qui est-ce ?** (multijoueur 1v1, le seul multi) : back + tests. Dernier, car il introduit le temps réel Socket.io et le matchmaking.
 7. **Front complet + tests front** une fois tous les back livrés.
+
+### Évolution de la méthode (au fil de l'eau)
+En pratique, on livre désormais **chaque jeu de bout en bout** (backend puis front) plutôt que tous les backends d'abord, chaque jeu étant validé par `npm run verify`, puis commité et poussé.
+
+### État d'avancement
+* **Jeux livrés (back + front, testés) :** Quel est ce Pokémon (silhouette), Poké-Motus, Plus ou Moins, L'Intrus, Trouve le shiny / non-shiny, Le Bon Shiny, La Juste Stat. Chacun : état serveur en Redis, anti-triche, événement d'audit `game.round.completed`, tests Jest.
+* **Accueil :** cartes des jeux (icônes PNG), carte shiny à bascule (Shiny / Non-Shiny), badges de statut quotidien.
+* **Données enrichies (ETL) :** colonnes ajoutées sur `Pokemon` pour L'Intrus et Le Bon Shiny (`evolutionStage`, `isFinalEvolution`, `hasMega`, sprites de méga) ; sprite shiny requis pour les jeux chromatiques.
+* **Anti-répétition :** fondation livrée (table `DailyPick`, `HistoryService`), **branchement dans les générateurs à faire**.
+* **Niveaux de difficulté :** en cours d'ajout jeu par jeu. Le Bon Shiny (3 niveaux) et l'écran de choix de niveau sont livrés ; La Juste Stat est en mode unique. Silhouette, Motus, Plus ou Moins, L'Intrus et le réalignement de Trouve le shiny (5 manches, 3 niveaux) restent à finaliser.
+* **Reste à construire :** Qui est-ce (multi 1v1, Socket.io), Easter eggs, endpoints + écran admin `/admin/games/*`, verrouillage serveur de l'unicité quotidienne (par compte et par date).
 
 ---
 
