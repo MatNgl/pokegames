@@ -14,6 +14,7 @@ import { shinyDailyStatus } from '@/features/game/shiny-storage';
 import { justStatDailyStatus } from '@/features/game/just-stat-storage';
 import { motusDailyStatus } from '@/features/game/motus-storage';
 import { trueShinyDailyStatus } from '@/features/game/true-shiny-storage';
+import { DailyQuestsPanel } from '@/features/daily/daily-quests-panel';
 import whoIsItImg from '@/assets/games/who-is-it.png';
 import pokeMotusImg from '@/assets/games/poke-motus.png';
 import plusMinusImg from '@/assets/games/plus-minus.png';
@@ -269,7 +270,11 @@ export function GamesPage() {
             Tous les jours, devine un Pokémon
           </p>
 
-          <div className="mt-8 grid w-full gap-4 sm:grid-cols-2">
+          <div className="mt-8 w-full">
+            <DailyQuestsPanel />
+          </div>
+
+          <div className="mt-4 grid w-full gap-4 sm:grid-cols-2">
             {games.map((game) => {
               const status = game.dailyKey ? statuses[game.dailyKey] : undefined;
 
