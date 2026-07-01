@@ -168,6 +168,50 @@ export interface MotusGuessResponse {
 }
 
 /* ==========================================================================
+ * JEU 3 : PLUS OU MOINS (DUEL DE CARACTÉRISTIQUES)
+ * ========================================================================== */
+
+export type PlusMinusCriterion = 'HP' | 'HEIGHT' | 'WEIGHT' | 'ATK' | 'DEF' | 'SPEED' | 'AGE';
+
+export interface PlusMinusContestant {
+  pokemonId: number;
+  name: string;
+  spriteUrl: string;
+}
+
+export interface PlusMinusRoundState {
+  roundId: string;
+  totalRounds: number;
+  roundIndex: number; // manche courante (1 a totalRounds)
+  correctCount: number;
+  status: 'PLAYING' | 'FINISHED';
+  criterion: PlusMinusCriterion;
+  criterionLabel: string; // question de la manche courante
+  a: PlusMinusContestant; // valeurs jamais envoyees avant le choix
+  b: PlusMinusContestant;
+}
+
+export interface PlusMinusChoiceRequest {
+  roundId: string;
+  choice: 'A' | 'B';
+}
+
+export interface PlusMinusReveal {
+  pokemonId: number;
+  value: number;
+  displayValue: string; // valeur formatee (ex. "6.9 kg", "No 25")
+}
+
+export interface PlusMinusChoiceResponse {
+  correct: boolean;
+  correctChoice: 'A' | 'B';
+  revealA: PlusMinusReveal;
+  revealB: PlusMinusReveal;
+  // Etat apres avancement : manche suivante si PLAYING, sinon partie terminee.
+  state: PlusMinusRoundState;
+}
+
+/* ==========================================================================
  * AUTHENTIFICATION & UTILISATEURS (AUTH / USERS)
  * ========================================================================== */
 

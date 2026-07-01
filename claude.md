@@ -134,11 +134,13 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * **Endpoints :** `POST /api/games/motus/start` (récupère le mot du jour), `GET /api/games/motus/round/:roundId` (état), `POST /api/games/motus/guess` (soumet une proposition).
 * **Anti-Triche :** le mot mystère reste **exclusivement dans Redis** côté serveur jusqu'à la victoire ou l'épuisement des essais. Le client ne reçoit que la longueur, le patron de couleurs par tentative et le statut ; jamais le mot tant que la partie n'est pas finie. La validité d'une proposition (est-ce un Pokémon de la bonne longueur) est vérifiée côté serveur.
 
-### 3. Plus ou Moins (*Poké-Stats & Caractéristiques*)
-* **Concept :** Deviner une caractéristique d'un Pokémon mystère ou comparer deux Pokémon successifs en mode survie.
-* **Variante 1 (Dichotomie Numérique) :** Deviner le poids exact, la taille, ou le numéro de Pokédex via des indications serveur : `"C'est PLUS !"` ou `"C'est MOINS !"`.
-* **Variante 2 (Duel de Comparaison) :** Deux Pokémon sont affichés : *"Qui a la statistique d'Attaque la plus élevée entre Dracaufeu et Mackogneur ?"*. Le joueur clique sur l'un des deux.
-* **Anti-Triche :** Dans le mode duel, les valeurs exactes des statistiques ne sont pas transmises au client au chargement des cartes. Seuls les sprites et les noms sont envoyés. La valeur n'est retournée qu'après le choix.
+### 3. Plus ou Moins (*Duel de caractéristiques*)
+* **Concept :** un **duel** par manche. Deux Pokémon sont affichés (sprite + nom), une question porte sur une caractéristique, le joueur clique sur celui qui a la plus grande valeur.
+* **Format :** **10 manches fixes** par partie, score = nombre de bonnes réponses. Défi quotidien (série déterministe identique pour tous, graine du jour), **une seule session par jour**, fin → retour à l'accueil.
+* **Valeur variable à chaque manche :** la caractéristique change à chaque duel, parmi PV, Taille, Poids, Attaque, Défense, Vitesse et Ancienneté (numéro de Pokédex, le plus ancien = le plus petit numéro). Les deux Pokémon d'un duel ont des valeurs distinctes (pas d'égalité).
+* **Sprites :** affichés en clair (jeu non masqué) via l'endpoint public `GET /api/pokemon/:id/sprite` (le client n'appelle jamais Tyradex directement, cf. Règle 3 ; le backend proxie et met en cache).
+* **Endpoints :** `POST /api/games/plus-minus/start` (duels du jour), `GET /api/games/plus-minus/round/:roundId` (état), `POST /api/games/plus-minus/choice` (soumet A ou B).
+* **Anti-Triche :** les **valeurs exactes ne sont jamais envoyées avant le choix**. Le client ne reçoit que la question et les deux Pokémon (id, nom, URL de sprite). Le serveur (Redis) détient les valeurs et la bonne réponse, valide le choix, puis renvoie les deux valeurs révélées et la manche suivante.
 
 ### 4. L'Intrus (*Odd One Out*)
 * **Concept :** 4 Pokémon sont présentés à l'écran. 3 d'entre eux partagent un point commun secret (ex: tous de Type Eau, tous de 2ème Génération, tous ont 3 stades d'évolution, tous ont une statistique de Vitesse > 100). Le joueur doit identifier l'intrus.

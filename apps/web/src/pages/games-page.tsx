@@ -8,13 +8,14 @@ import { Logo } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
 import { whoIsItDailyStatus, type WhoIsItDailyStatus } from '@/features/game/daily-storage';
 import { motusDailyStatus } from '@/features/game/motus-storage';
+import { plusMinusDailyStatus } from '@/features/game/plus-minus-storage';
 import whoIsItImg from '@/assets/games/who-is-it.png';
 import pokeMotusImg from '@/assets/games/poke-motus.png';
 import plusMinusImg from '@/assets/games/plus-minus.png';
 import intrusImg from '@/assets/games/intrus.png';
 import quiEstCeImg from '@/assets/games/quiestce.png';
 
-type DailyKey = 'who-is-it' | 'motus';
+type DailyKey = 'who-is-it' | 'motus' | 'plus-minus';
 
 interface GameEntry {
   title: string;
@@ -45,8 +46,10 @@ const games: GameEntry[] = [
   {
     title: 'Plus ou Moins',
     description: 'Compare les statistiques',
+    to: '/plus-ou-moins',
     iconImg: plusMinusImg,
-    available: false,
+    available: true,
+    dailyKey: 'plus-minus',
   },
   { title: "L'Intrus", description: 'Repère celui qui ne va pas', iconImg: intrusImg, available: false },
   { title: 'Qui est-ce', description: 'Déduction en duel', iconImg: quiEstCeImg, available: false },
@@ -66,6 +69,7 @@ export function GamesPage() {
   const [statuses] = useState<Record<DailyKey, WhoIsItDailyStatus>>(() => ({
     'who-is-it': whoIsItDailyStatus(),
     motus: motusDailyStatus(),
+    'plus-minus': plusMinusDailyStatus(),
   }));
 
   return (
