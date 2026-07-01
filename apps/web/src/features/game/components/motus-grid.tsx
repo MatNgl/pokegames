@@ -112,10 +112,15 @@ export function MotusGrid({ state, current, shakeKey }: MotusGridProps) {
                 );
               }
 
-              // Premiere case de la ligne active : lettre donnee, fixe (non editable).
-              const isGiven = isCurrent && c === 0;
-              const char = isGiven ? state.firstLetter : isCurrent ? (current[c - 1] ?? '') : '';
-              const isCursor = isCurrent && c === current.length + 1;
+              const hasFirstLetter = Boolean(state.firstLetter);
+              const isGiven = isCurrent && c === 0 && hasFirstLetter;
+              const char = isGiven
+                ? state.firstLetter
+                : isCurrent
+                  ? (current[hasFirstLetter ? c - 1 : c] ?? '')
+                  : '';
+              const cursorIndex = hasFirstLetter ? current.length + 1 : current.length;
+              const isCursor = isCurrent && c === cursorIndex;
               return (
                 <span
                   key={c}

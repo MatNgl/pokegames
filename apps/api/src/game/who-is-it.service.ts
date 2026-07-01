@@ -12,8 +12,12 @@ import {
   WhoIsItHintType,
   PokemonDTO,
   WhoIsItMode,
+  WhoIsItLevel,
 } from '@pokegames/shared-types';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
+import { WHO_IS_IT_ADMIN_CONFIG } from './game-config';
+
+const WHO_IS_IT_LEVELS: WhoIsItLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
 
 interface InternalRoundSession {
   roundId: string;
@@ -27,6 +31,9 @@ interface InternalRoundSession {
   mistakesCount: number;
   hintsUsedCount: number;
   mode: WhoIsItMode;
+  level: WhoIsItLevel;
+  zoomRatio: number;
+  rotationAngle: number;
   roundIndex: number;
   totalRounds: number;
   hints: WhoIsItHint[];
@@ -45,17 +52,37 @@ export class WhoIsItService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  // Zoom et rotation dependent du niveau et du nombre d'erreurs. Source unique : game-config.ts
+  // (WHO_IS_IT_ADMIN_CONFIG). Le zoom se reduit et l'angle se redresse a chaque erreur.
+  private computeVisuals(
+    level: WhoIsItLevel = 'MOYEN',
+    mistakes: number,
+  ): { zoomRatio: number; rotationAngle: number } {
+    const cfg = WHO_IS_IT_ADMIN_CONFIG.levels[level] ?? WHO_IS_IT_ADMIN_CONFIG.levels.MOYEN;
+    const zoom = Math.max(1.0, cfg.initialZoomRatio - mistakes * cfg.zoomStepPerMistake);
+    const angle = Math.max(0, cfg.initialRotationAngle - mistakes * cfg.rotationStepPerMistake);
+    return { zoomRatio: Number(zoom.toFixed(2)), rotationAngle: Math.round(angle) };
+  }
+
   /**
    * Démarre une nouvelle manche avec capital 100 points, pas d'échec au temps et indices payants.
    */
   async startRound(config: WhoIsItConfig = { generations: [] }, userId?: string, roundIndex = 1): Promise<WhoIsItRoundState> {
     const mode = config.mode ?? 'CLASSIC';
-    const totalRounds = config.roundsCount ?? 5;
-    const startCapital = config.startCapital ?? 100;
+    const level = config.level ?? 'MOYEN';
+    if (!WHO_IS_IT_LEVELS.includes(level)) {
+      throw new BadRequestException('Niveau invalide');
+    }
+    const levelConfig = WHO_IS_IT_ADMIN_CONFIG.levels[level];
+    const totalRounds = config.roundsCount ?? WHO_IS_IT_ADMIN_CONFIG.roundsCount;
+    const startCapital = config.startCapital ?? WHO_IS_IT_ADMIN_CONFIG.startCapital;
 
     const whereClause: { generation?: { in: number[] } } = {};
     if (config.generations && config.generations.length > 0) {
       whereClause.generation = { in: config.generations };
+    } else {
+      // Catalogue du niveau (Facile = generations 1 a 3, autres = toutes). Source : game-config.ts.
+      whereClause.generation = { in: levelConfig.allowedGenerations };
     }
 
     const pokemons = await this.prisma.pokemon.findMany({
@@ -74,7 +101,6 @@ export class WhoIsItService {
 
     let targetIndex: number;
     if (mode === 'DAILY') {
-      // Graine déterministe par date et index de round pour le défi du jour
       const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
       let seed = 0;
       for (let i = 0; i < todayStr.length; i++) {
@@ -101,61 +127,46 @@ export class WhoIsItService {
     );
 
     const type1 = target.types.find((t) => t.slot === 1)?.type.nameFr ?? target.types[0]?.type.nameFr ?? 'Inconnu';
-    const type2 = target.types.find((t) => t.slot === 2)?.type.nameFr ?? target.types[1]?.type.nameFr ?? 'Aucun';
-    const hintCost = config.hintCost ?? 10;
+    // height est stocke en metres (ETL : "0,7 m" -> 0.7). Ne pas rediviser.
+    const heightStr = target.height != null ? `${target.height.toFixed(1)} m` : 'Inconnue';
+    const hintCosts = WHO_IS_IT_ADMIN_CONFIG.hintCosts;
 
-    // Échelle d'indices à ordre fixe, débloquée par palier d'erreur, révélée au choix du joueur (payante).
-    // Ordre : couleur floutée, type 1, type 2, génération, puis première lettre (l'indice le plus fort en dernier).
     const hints: WhoIsItHint[] = [
-      {
-        type: 'BLURRED_COLOR',
-        label: 'Couleur floutée',
-        value: 'Couleur dévoilée',
-        cost: hintCost,
-        unlockedAtMistakeCount: 1,
-        isRevealed: false,
-      },
       {
         type: 'TYPE_1',
         label: 'Type 1',
         value: type1,
-        cost: hintCost,
-        unlockedAtMistakeCount: 2,
+        cost: hintCosts.TYPE_1 ?? 0,
+        unlockedAtMistakeCount: 1,
         isRevealed: false,
       },
       {
-        type: 'TYPE_2',
-        label: 'Type 2',
-        value: type2,
-        cost: hintCost,
-        unlockedAtMistakeCount: 3,
+        type: 'HEIGHT',
+        label: 'Taille',
+        value: heightStr,
+        cost: hintCosts.HEIGHT ?? 0,
+        unlockedAtMistakeCount: 2,
         isRevealed: false,
       },
       {
         type: 'GENERATION',
         label: 'Génération',
         value: target.generation,
-        cost: hintCost,
+        cost: hintCosts.GENERATION ?? 0,
+        unlockedAtMistakeCount: 3,
+        isRevealed: false,
+      },
+      {
+        type: 'BLURRED_COLOR',
+        label: 'Aperçu couleur',
+        value: 'Couleur dévoilée',
+        cost: hintCosts.BLURRED_COLOR ?? 0,
         unlockedAtMistakeCount: 4,
         isRevealed: false,
       },
-      {
-        type: 'COLOR_SHARPEN',
-        label: 'Couleur nette',
-        value: 'Couleur affinée',
-        cost: hintCost,
-        unlockedAtMistakeCount: 5,
-        isRevealed: false,
-      },
-      {
-        type: 'FIRST_LETTER',
-        label: 'Première lettre',
-        value: target.nameFr.charAt(0) + '...',
-        cost: hintCost,
-        unlockedAtMistakeCount: 6,
-        isRevealed: false,
-      },
     ];
+
+    const visuals = this.computeVisuals(level, 0);
 
     const session: InternalRoundSession = {
       roundId,
@@ -169,6 +180,9 @@ export class WhoIsItService {
       mistakesCount: 0,
       hintsUsedCount: 0,
       mode,
+      level,
+      zoomRatio: visuals.zoomRatio,
+      rotationAngle: visuals.rotationAngle,
       roundIndex,
       totalRounds,
       hints,
@@ -190,6 +204,9 @@ export class WhoIsItService {
       currentScore: session.currentScore,
       mistakesCount: session.mistakesCount,
       mode: session.mode,
+      level: session.level,
+      zoomRatio: session.zoomRatio,
+      rotationAngle: session.rotationAngle,
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
       hints: session.hints,
@@ -203,6 +220,8 @@ export class WhoIsItService {
       throw new NotFoundException('Manche introuvable ou expirée');
     }
     const session = JSON.parse(raw) as InternalRoundSession;
+    session.level = session.level ?? 'MOYEN';
+    const visuals = this.computeVisuals(session.level, session.mistakesCount);
     return {
       roundId: session.roundId,
       sessionHash: session.sessionHash,
@@ -212,6 +231,9 @@ export class WhoIsItService {
       currentScore: session.currentScore,
       mistakesCount: session.mistakesCount,
       mode: session.mode,
+      level: session.level,
+      zoomRatio: visuals.zoomRatio,
+      rotationAngle: visuals.rotationAngle,
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
       hints: session.hints,
@@ -229,6 +251,7 @@ export class WhoIsItService {
     }
 
     const session = JSON.parse(raw) as InternalRoundSession;
+    session.level = session.level ?? 'MOYEN';
     if (session.status !== 'PLAYING') {
       throw new BadRequestException('Cette manche est déjà terminée');
     }
@@ -251,15 +274,13 @@ export class WhoIsItService {
     session.currentScore = Math.max(0, session.currentScore - hint.cost);
     session.hintsUsedCount++;
 
-    // Les indices de couleur passent par le proxy : floutée (niveau 1) puis défloutée (niveau 2), jamais le sprite net.
     if (hint.type === 'BLURRED_COLOR') {
       await this.spriteProxy.setColorLevel(session.sessionHash, 1);
-    } else if (hint.type === 'COLOR_SHARPEN') {
-      await this.spriteProxy.setColorLevel(session.sessionHash, 2);
     }
 
     await this.redisService.set(`${this.REDIS_PREFIX}${roundId}`, JSON.stringify(session), this.ROUND_TTL_SECONDS);
 
+    const visuals = this.computeVisuals(session.level, session.mistakesCount);
     return {
       roundId: session.roundId,
       sessionHash: session.sessionHash,
@@ -269,6 +290,9 @@ export class WhoIsItService {
       currentScore: session.currentScore,
       mistakesCount: session.mistakesCount,
       mode: session.mode,
+      level: session.level,
+      zoomRatio: visuals.zoomRatio,
+      rotationAngle: visuals.rotationAngle,
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
       hints: session.hints,
@@ -276,9 +300,6 @@ export class WhoIsItService {
     };
   }
 
-  /**
-   * Soumet une tentative (tentatives illimitées jusqu'à trouver).
-   */
   async submitGuess(roundId: string, guess: string, userId?: string): Promise<WhoIsItGuessResponse> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
     if (!raw) {
@@ -286,6 +307,7 @@ export class WhoIsItService {
     }
 
     const session = JSON.parse(raw) as InternalRoundSession;
+    session.level = session.level ?? 'MOYEN';
     if (session.status !== 'PLAYING') {
       throw new BadRequestException('Cette manche est déjà terminée');
     }
@@ -303,6 +325,9 @@ export class WhoIsItService {
     if (!isCorrect) {
       session.mistakesCount++;
       session.currentScore = Math.max(0, session.currentScore - 15);
+      const visuals = this.computeVisuals(session.level, session.mistakesCount);
+      session.zoomRatio = visuals.zoomRatio;
+      session.rotationAngle = visuals.rotationAngle;
       await this.redisService.set(`${this.REDIS_PREFIX}${roundId}`, JSON.stringify(session), this.ROUND_TTL_SECONDS);
 
       return {
@@ -312,6 +337,9 @@ export class WhoIsItService {
         message: 'Ce n’est pas le bon Pokémon !',
         currentScore: session.currentScore,
         mistakesCount: session.mistakesCount,
+        level: session.level,
+        zoomRatio: session.zoomRatio,
+        rotationAngle: session.rotationAngle,
         hints: session.hints,
         revealedPokemon: null,
         unmaskedSpriteUrl: null,
@@ -321,6 +349,8 @@ export class WhoIsItService {
 
     // Victoire !
     session.status = 'SOLVED';
+    session.zoomRatio = 1.0;
+    session.rotationAngle = 0;
     await this.spriteProxy.revealSpriteSession(session.sessionHash);
     await this.redisService.set(`${this.REDIS_PREFIX}${roundId}`, JSON.stringify(session), this.ROUND_TTL_SECONDS);
 
@@ -365,6 +395,9 @@ export class WhoIsItService {
       message: 'Bonne réponse !',
       currentScore: session.currentScore,
       mistakesCount: session.mistakesCount,
+      level: session.level,
+      zoomRatio: 1.0,
+      rotationAngle: 0,
       hints: session.hints,
       revealedPokemon: fullPokemon,
       unmaskedSpriteUrl: `/api/sprites/${session.sessionHash}`,

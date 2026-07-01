@@ -1,16 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
+import { MOTUS_ADMIN_CONFIG } from './game-config';
 import type {
   MotusGuessResponse,
   MotusGuessRow,
   MotusLetterResult,
   MotusLetterState,
   MotusRoundState,
+  MotusLevel,
 } from '@pokegames/shared-types';
+
+const MOTUS_LEVELS: MotusLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
 
 interface MotusTarget {
   pokemonId: number;
@@ -23,6 +27,7 @@ interface MotusSession {
   answer: string; // normalise A-Z
   length: number;
   maxAttempts: number;
+  level?: MotusLevel;
   attempts: MotusGuessRow[];
   status: 'PLAYING' | 'WON' | 'LOST';
   startTime: number;
@@ -33,7 +38,6 @@ interface MotusSession {
 export class MotusService {
   private readonly REDIS_PREFIX = 'game_motus:';
   private readonly ROUND_TTL_SECONDS = 3600;
-  private readonly MAX_ATTEMPTS = 6;
   private readonly MIN_LENGTH = 5;
   private readonly MAX_LENGTH = 9;
 
@@ -76,31 +80,33 @@ export class MotusService {
         targets.push({ pokemonId: row.id, word });
       }
     }
-    // Ordre deterministe pour que la graine du jour designe toujours le meme mot.
     targets.sort((a, b) => a.pokemonId - b.pokemonId);
     this.targetsCache = targets;
     this.validWordsCache = validWords;
     return { targets, validWords };
   }
 
-  private dailyIndex(count: number): number {
+  private dailyIndex(count: number, level: MotusLevel = 'MOYEN'): number {
     const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
     let seed = 0;
     for (let i = 0; i < todayStr.length; i++) {
-      seed = (seed * 31 + todayStr.charCodeAt(i)) % 2147483647;
+      seed = (seed * 31 + todayStr.charCodeAt(i) + level.charCodeAt(0) * 17) % 2147483647;
     }
     return Math.abs(seed) % count;
   }
 
   private toState(session: MotusSession): MotusRoundState {
+    const level = session.level ?? 'MOYEN';
+    // La 1re lettre est fournie selon le niveau (source unique : game-config.ts).
+    const hasFirstLetter = MOTUS_ADMIN_CONFIG.levels[level].provideFirstLetter;
     return {
       roundId: session.roundId,
+      level,
       length: session.length,
       maxAttempts: session.maxAttempts,
       attempts: session.attempts,
       status: session.status,
-      // Premiere lettre donnee comme indice de depart ; le reste du mot reste cache.
-      firstLetter: session.answer.charAt(0),
+      firstLetter: hasFirstLetter ? session.answer.charAt(0) : null,
       answer: session.status === 'PLAYING' ? null : session.answer,
     };
   }
@@ -131,12 +137,24 @@ export class MotusService {
     return Array.from({ length }, (_, i) => ({ letter: guess[i] ?? '', state: states[i] ?? 'ABSENT' }));
   }
 
-  async startDaily(userId?: string): Promise<MotusRoundState> {
+  async startDaily(level: MotusLevel = 'FACILE', userId?: string): Promise<MotusRoundState> {
+    if (!MOTUS_LEVELS.includes(level)) {
+      throw new BadRequestException('Niveau invalide');
+    }
     const { targets } = await this.loadData();
     if (targets.length === 0) {
       throw new NotFoundException('Aucun Pokémon disponible pour le Motus. Lancez le script ETL.');
     }
-    const target = targets[this.dailyIndex(targets.length)];
+
+    // Longueurs et nombre d'essais du niveau (source unique : game-config.ts).
+    const cfg = MOTUS_ADMIN_CONFIG.levels[level];
+    const minLen = cfg.minWordLength;
+    const maxLen = cfg.maxWordLength;
+    const maxAttempts = cfg.maxAttempts;
+
+    const filtered = targets.filter((t) => t.word.length >= minLen && t.word.length <= maxLen);
+    const pool = filtered.length > 0 ? filtered : targets;
+    const target = pool[this.dailyIndex(pool.length, level)];
     if (!target) {
       throw new NotFoundException('Mot du jour introuvable');
     }
@@ -147,7 +165,8 @@ export class MotusService {
       pokemonId: target.pokemonId,
       answer: target.word,
       length: target.word.length,
-      maxAttempts: this.MAX_ATTEMPTS,
+      maxAttempts,
+      level,
       attempts: [],
       status: 'PLAYING',
       startTime: Date.now(),

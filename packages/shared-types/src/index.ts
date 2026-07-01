@@ -61,11 +61,13 @@ export type GameStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
  * JEU 1 : QUEL EST CE POKÉMON ? (WHO'S THAT POKÉMON)
  * ========================================================================== */
 
+export type WhoIsItLevel = 'FACILE' | 'MOYEN' | 'DIFFICILE' | 'EXTREME';
 export type WhoIsItMode = 'CLASSIC' | 'DAILY';
 
 export interface WhoIsItConfig {
   generations: number[];
   mode?: WhoIsItMode;
+  level?: WhoIsItLevel;
   roundsCount?: number; // par défaut 5 en classique
   roundIndex?: number; // manche courante dans la partie (1 à roundsCount)
   startCapital?: number; // par défaut 100
@@ -79,7 +81,8 @@ export type WhoIsItHintType =
   | 'TYPE_2'
   | 'FIRST_LETTER'
   | 'BLURRED_COLOR'
-  | 'COLOR_SHARPEN';
+  | 'COLOR_SHARPEN'
+  | 'HEIGHT';
 
 export interface WhoIsItHint {
   type: WhoIsItHintType;
@@ -99,6 +102,9 @@ export interface WhoIsItRoundState {
   currentScore: number;
   mistakesCount: number;
   mode: WhoIsItMode;
+  level?: WhoIsItLevel;
+  zoomRatio?: number;
+  rotationAngle?: number;
   roundIndex: number;
   totalRounds: number;
   hints: WhoIsItHint[];
@@ -122,6 +128,9 @@ export interface WhoIsItGuessResponse {
   message?: string;
   currentScore: number;
   mistakesCount: number;
+  level?: WhoIsItLevel;
+  zoomRatio?: number;
+  rotationAngle?: number;
   hints: WhoIsItHint[];
   revealedPokemon: PokemonDTO | null;
   unmaskedSpriteUrl: string | null;
@@ -134,6 +143,7 @@ export interface WhoIsItGuessResponse {
  * JEU 2 : POKÉ-MOTUS (WORDLE POKÉMON)
  * ========================================================================== */
 
+export type MotusLevel = 'FACILE' | 'MOYEN' | 'DIFFICILE' | 'EXTREME';
 export type MotusLetterState = 'CORRECT' | 'PRESENT' | 'ABSENT';
 
 export interface MotusLetterResult {
@@ -148,12 +158,13 @@ export interface MotusGuessRow {
 
 export interface MotusRoundState {
   roundId: string;
+  level?: MotusLevel;
   length: number;
   maxAttempts: number;
   attempts: MotusGuessRow[];
   status: 'PLAYING' | 'WON' | 'LOST';
-  // Premiere lettre du mot, donnee des le depart (indice facon Motus). Majuscule A-Z.
-  firstLetter: string;
+  // Premiere lettre du mot si fournie par le niveau (Facile, Moyen), null sinon.
+  firstLetter: string | null;
   // Renseigne uniquement lorsque la partie est terminee (WON ou LOST).
   answer: string | null;
 }

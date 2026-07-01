@@ -4,17 +4,24 @@ import { cn } from '@/lib/utils';
 interface SilhouetteStageProps {
   src: string;
   revealed: boolean;
-  // Incremente a chaque mauvaise reponse pour rejouer la secousse.
   shakeKey?: number;
+  zoomRatio?: number;
+  rotationAngle?: number;
 }
 
-export function SilhouetteStage({ src, revealed, shakeKey = 0 }: SilhouetteStageProps) {
+export function SilhouetteStage({
+  src,
+  revealed,
+  shakeKey = 0,
+  zoomRatio = 1,
+  rotationAngle = 0,
+}: SilhouetteStageProps) {
   const reduceMotion = useReducedMotion();
   return (
     <div
       key={shakeKey > 0 ? `shake-${shakeKey}` : 'stage'}
       className={cn(
-        'relative mx-auto flex aspect-square w-full max-w-xs items-center justify-center rounded-card border-4 border-border-strong bg-tile',
+        'relative mx-auto flex aspect-square w-full max-w-xs items-center justify-center overflow-hidden rounded-card border-4 border-border-strong bg-tile',
         shakeKey > 0 && !revealed && 'shake',
       )}
     >
@@ -22,7 +29,11 @@ export function SilhouetteStage({ src, revealed, shakeKey = 0 }: SilhouetteStage
         src={src}
         alt={revealed ? 'Pokémon révélé' : 'Silhouette à deviner'}
         draggable={false}
-        animate={revealed && !reduceMotion ? { scale: [0.85, 1.08, 1] } : { scale: 1 }}
+        animate={
+          revealed && !reduceMotion
+            ? { scale: [zoomRatio, 1.08, 1], rotate: 0 }
+            : { scale: zoomRatio, rotate: rotationAngle }
+        }
         transition={{ duration: 0.55, ease: 'easeOut' }}
         className={cn(
           'relative h-4/5 w-4/5 select-none object-contain',

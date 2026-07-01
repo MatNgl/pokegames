@@ -75,6 +75,34 @@ describe('MotusService', () => {
       expect(state.firstLetter).toHaveLength(1);
       expect(state.answer).toBeNull();
     });
+
+    it('Facile : 6 essais et première lettre fournie', async () => {
+      const state = await service.startDaily('FACILE');
+      expect(state.maxAttempts).toBe(6);
+      expect(state.firstLetter).toMatch(/^[A-Z]$/);
+    });
+
+    it('Moyen : 5 essais et première lettre fournie', async () => {
+      const state = await service.startDaily('MOYEN');
+      expect(state.maxAttempts).toBe(5);
+      expect(state.firstLetter).toMatch(/^[A-Z]$/);
+    });
+
+    it('Difficile : 6 essais et aucune première lettre', async () => {
+      const state = await service.startDaily('DIFFICILE');
+      expect(state.maxAttempts).toBe(6);
+      expect(state.firstLetter).toBeNull();
+    });
+
+    it('Extrême : 4 essais et aucune première lettre', async () => {
+      const state = await service.startDaily('EXTREME');
+      expect(state.maxAttempts).toBe(4);
+      expect(state.firstLetter).toBeNull();
+    });
+
+    it('rejette un niveau invalide', async () => {
+      await expect(service.startDaily('IMPOSSIBLE' as never)).rejects.toThrow();
+    });
   });
 
   describe('submitGuess', () => {

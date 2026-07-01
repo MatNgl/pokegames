@@ -1,9 +1,61 @@
-import type { JustStatKey, TrueShinyLevel } from '@pokegames/shared-types';
+import type { JustStatKey, TrueShinyLevel, WhoIsItLevel, MotusLevel } from '@pokegames/shared-types';
 
 /**
  * Parametres de configuration des jeux, centralises et types. Ce sont les valeurs qui seront
  * plus tard editables via /admin/games/*. Pour l'instant, source unique cote serveur.
  */
+
+export interface WhoIsItLevelAdminConfig {
+  allowedGenerations: number[];
+  initialZoomRatio: number;
+  zoomStepPerMistake: number;
+  initialRotationAngle: number;
+  rotationStepPerMistake: number;
+}
+
+export interface WhoIsItAdminConfig {
+  roundsCount: number;
+  startCapital: number;
+  hintCosts: Record<string, number>;
+  levels: Record<WhoIsItLevel, WhoIsItLevelAdminConfig>;
+}
+
+export const WHO_IS_IT_ADMIN_CONFIG: WhoIsItAdminConfig = {
+  roundsCount: 5,
+  startCapital: 100,
+  hintCosts: {
+    TYPE_1: 0,
+    HEIGHT: 0,
+    GENERATION: 0,
+    BLURRED_COLOR: 0,
+  },
+  levels: {
+    FACILE: { allowedGenerations: [1, 2, 3], initialZoomRatio: 1.0, zoomStepPerMistake: 0, initialRotationAngle: 0, rotationStepPerMistake: 0 },
+    MOYEN: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 1.3, zoomStepPerMistake: 0.1, initialRotationAngle: 0, rotationStepPerMistake: 0 },
+    DIFFICILE: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 1.5, zoomStepPerMistake: 0.12, initialRotationAngle: 30, rotationStepPerMistake: 8 },
+    EXTREME: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 1.7, zoomStepPerMistake: 0.15, initialRotationAngle: 70, rotationStepPerMistake: 15 },
+  },
+};
+
+export interface MotusLevelAdminConfig {
+  minWordLength: number;
+  maxWordLength: number;
+  maxAttempts: number;
+  provideFirstLetter: boolean;
+}
+
+export interface MotusAdminConfig {
+  levels: Record<MotusLevel, MotusLevelAdminConfig>;
+}
+
+export const MOTUS_ADMIN_CONFIG: MotusAdminConfig = {
+  levels: {
+    FACILE: { minWordLength: 5, maxWordLength: 6, maxAttempts: 6, provideFirstLetter: true },
+    MOYEN: { minWordLength: 6, maxWordLength: 7, maxAttempts: 5, provideFirstLetter: true },
+    DIFFICILE: { minWordLength: 5, maxWordLength: 8, maxAttempts: 6, provideFirstLetter: false },
+    EXTREME: { minWordLength: 5, maxWordLength: 9, maxAttempts: 4, provideFirstLetter: false },
+  },
+};
 
 export interface JustStatConfig {
   roundsCount: number;
@@ -30,10 +82,6 @@ export interface TrueShinyConfig {
   levels: Record<TrueShinyLevel, TrueShinyLevelConfig>;
 }
 
-// La difficulte vient du NOMBRE de vignettes, pas de la subtilite : on garde une alteration de
-// teinte marquee (identique a Facile) a tous les niveaux, sinon les differences deviennent
-// invisibles avec 5 ou 6 propositions. Les leurres restent des teintes franches (rose, rouge,
-// orange...) meme si le shiny officiel est proche d'une de ces teintes.
 export const TRUE_SHINY_CONFIG: TrueShinyConfig = {
   roundsCount: 5,
   levels: {

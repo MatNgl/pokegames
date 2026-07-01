@@ -6,6 +6,7 @@ import type {
   MotusGuessRequest,
   MotusGuessResponse,
   MotusRoundState,
+  MotusLevel,
 } from '@pokegames/shared-types';
 
 interface AuthenticatedUser {
@@ -18,8 +19,11 @@ export class MotusController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Post('start')
-  async start(@Req() req: Request & { user?: AuthenticatedUser }): Promise<MotusRoundState> {
-    return this.motusService.startDaily(req.user?.id);
+  async start(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Body() body?: { level?: MotusLevel },
+  ): Promise<MotusRoundState> {
+    return this.motusService.startDaily(body?.level, req.user?.id);
   }
 
   @Get('round/:roundId')

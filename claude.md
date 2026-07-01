@@ -257,7 +257,8 @@ En pratique, on livre désormais **chaque jeu de bout en bout** (backend puis fr
 * **Données enrichies (ETL) :** colonnes ajoutées sur `Pokemon` pour L'Intrus et Le Bon Shiny (`evolutionStage`, `isFinalEvolution`, `hasMega`, sprites de méga) ; sprite shiny requis pour les jeux chromatiques.
 * **Anti-répétition :** fondation livrée (table `DailyPick`, `HistoryService`), **branchement dans les générateurs à faire**.
 * **Niveaux de difficulté :** en cours d'ajout jeu par jeu. Le Bon Shiny (3 niveaux) et l'écran de choix de niveau sont livrés ; La Juste Stat est en mode unique. Silhouette, Motus, Plus ou Moins, L'Intrus et le réalignement de Trouve le shiny (5 manches, 3 niveaux) restent à finaliser.
-* **Reste à construire :** Qui est-ce (multi 1v1, Socket.io), Easter eggs, endpoints + écran admin `/admin/games/*`, verrouillage serveur de l'unicité quotidienne (par compte et par date).
+* **Reste à construire :** Qui est-ce (multi 1v1, Socket.io), Easter eggs, endpoints + écran admin `/admin/games/*` (édition dynamique de la config, aujourd'hui statique et en lecture seule), verrouillage serveur de l'unicité quotidienne (par compte et par date).
+* **Idée notée (à faire plus tard) : panneau de quêtes du jour.** Une petite icône repliable sur la gauche de l'écran de jeu déroule la liste des jeux du jour, accomplis et restants, avec une coche de validation quand un jeu est terminé à 100 % (tous ses modes et niveaux) et une validation globale quand toute la journée est complétée. Objectif : voir en un coup d'oeil ce qui reste pour ne rater aucun jeu.
 
 ---
 

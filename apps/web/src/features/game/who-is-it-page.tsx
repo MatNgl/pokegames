@@ -267,6 +267,11 @@ export function WhoIsItPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {round.level && (
+                    <Badge className="border-warning bg-warning text-warning-foreground">
+                      {round.level}
+                    </Badge>
+                  )}
                   <Badge className="border-primary bg-primary text-primary-foreground">
                     {round.roundIndex}/{round.totalRounds}
                   </Badge>
@@ -276,7 +281,13 @@ export function WhoIsItPage() {
 
               <div className="flex flex-col items-center gap-5">
                 <div className="flex w-full flex-wrap items-center justify-center gap-4">
-                  <SilhouetteStage src={spriteUrl} revealed={solved} shakeKey={shakeKey} />
+                  <SilhouetteStage
+                    src={spriteUrl}
+                    revealed={solved}
+                    shakeKey={shakeKey}
+                    zoomRatio={round.zoomRatio ?? 1}
+                    rotationAngle={round.rotationAngle ?? 0}
+                  />
                   {!solved && (
                     <HintIcons
                       hints={round.hints}

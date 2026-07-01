@@ -155,13 +155,14 @@ export function MotusPage() {
     (letter: string) => {
       if (!state || state.status !== 'PLAYING' || busy) return;
       setError(null);
-      // La premiere lettre est donnee : le joueur ne saisit que les suivantes.
-      const maxTyped = state.length - 1;
+      const hasFirstLetter = Boolean(state.firstLetter);
+      const maxTyped = hasFirstLetter ? state.length - 1 : state.length;
       if (current.length >= maxTyped) return;
       const next = current + letter;
       setCurrent(next);
       if (next.length === maxTyped) {
-        void submit(state.firstLetter + next);
+        const fullWord = hasFirstLetter ? (state.firstLetter ?? '') + next : next;
+        void submit(fullWord);
       }
     },
     [state, busy, current, submit],
@@ -243,6 +244,11 @@ export function MotusPage() {
                   <p className="mt-1 text-sm font-semibold text-muted">{state.length} lettres</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {state.level && (
+                    <Badge className="border-warning bg-warning text-warning-foreground">
+                      {state.level}
+                    </Badge>
+                  )}
                   <Badge className="border-primary bg-primary text-primary-foreground">
                     {attemptsUsed}/{state.maxAttempts}
                   </Badge>

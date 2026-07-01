@@ -101,7 +101,7 @@ describe('WhoIsItService', () => {
       expect(state.sessionHash).toBeDefined();
       expect(state.status).toBe('PLAYING');
       expect(state.currentScore).toBe(100);
-      expect(state.hints).toHaveLength(6);
+      expect(state.hints).toHaveLength(4);
       expect(state.hints.every((h) => !h.isRevealed)).toBe(true);
 
       expect(mockRegisterSpriteSession).toHaveBeenCalledWith(
@@ -110,6 +110,32 @@ describe('WhoIsItService', () => {
         mockPokemon.spriteRegular,
         3600,
       );
+    });
+  });
+
+  describe('niveaux et indices', () => {
+    it('Facile : zoom 1.0 et aucune rotation', async () => {
+      const state = await service.startRound({ generations: [1], level: 'FACILE' });
+      expect(state.zoomRatio).toBe(1.0);
+      expect(state.rotationAngle).toBe(0);
+    });
+
+    it('Difficile : zoom et rotation initiaux du niveau', async () => {
+      const state = await service.startRound({ generations: [1], level: 'DIFFICILE' });
+      expect(state.zoomRatio).toBe(1.5);
+      expect(state.rotationAngle).toBe(30);
+    });
+
+    it('l’indice Taille affiche la hauteur en mètres (jamais divisée)', async () => {
+      const state = await service.startRound({ generations: [1], level: 'MOYEN' });
+      const heightHint = state.hints.find((h) => h.type === 'HEIGHT');
+      expect(heightHint?.value).toBe('0.4 m');
+    });
+
+    it('rejette un niveau invalide', async () => {
+      await expect(
+        service.startRound({ generations: [1], level: 'IMPOSSIBLE' as never }),
+      ).rejects.toThrow();
     });
   });
 

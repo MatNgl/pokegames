@@ -28,6 +28,8 @@ export class WhoIsItController {
       generations: config?.generations ?? [],
       mode: config?.mode ?? 'CLASSIC',
       roundsCount: config?.roundsCount ?? 5,
+      // exactOptionalPropertyTypes : ne pas assigner explicitement undefined a une propriete optionnelle.
+      ...(config?.level ? { level: config.level } : {}),
     };
     return this.whoIsItService.startRound(fullConfig, req.user?.id, config?.roundIndex ?? 1);
   }

@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Gauge, Palette } from 'lucide-react';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +20,8 @@ import intrusImg from '@/assets/games/intrus.png';
 import quiEstCeImg from '@/assets/games/quiestce.png';
 import findShinyImg from '@/assets/games/find_shiny.png';
 import findNotShinyImg from '@/assets/games/find_not_shiny.png';
+import justPriceImg from '@/assets/games/just_price.png';
+import leBonShinyImg from '@/assets/games/le_bon_shiny.png';
 
 type DailyKey =
   | 'who-is-it'
@@ -198,7 +199,7 @@ export function GamesPage() {
       title: 'La Juste Stat',
       description: 'Devine la valeur exacte',
       to: '/juste-stat',
-      iconNode: <Gauge className="h-7 w-7 shrink-0" />,
+      iconImg: justPriceImg,
       available: true,
       dailyKey: 'just-stat',
     },
@@ -206,7 +207,7 @@ export function GamesPage() {
       title: 'Le Bon Shiny',
       description: 'Repère le shiny authentique',
       to: '/bon-shiny',
-      iconNode: <Palette className="h-7 w-7 shrink-0" />,
+      iconImg: leBonShinyImg,
       available: true,
     },
     { title: 'Qui est-ce', description: 'Déduction en duel', iconImg: quiEstCeImg, available: false },
