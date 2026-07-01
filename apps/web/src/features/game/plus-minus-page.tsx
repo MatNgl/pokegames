@@ -236,13 +236,7 @@ export function PlusMinusPage() {
           ) : (
             <Card className="flex w-full max-w-xl flex-col items-center gap-5 p-6">
               <div className="flex w-full items-start justify-between gap-4">
-                <div>
-                  <h1 className="font-display text-sm leading-relaxed text-foreground">Plus ou Moins</h1>
-                  <p className="mt-1 text-sm font-semibold text-muted">
-                    {state.correctCount} bonne{state.correctCount > 1 ? 's' : ''} réponse
-                    {state.correctCount > 1 ? 's' : ''}
-                  </p>
-                </div>
+                <h1 className="font-display text-sm leading-relaxed text-foreground">Plus ou Moins</h1>
                 <div className="flex items-center gap-2">
                   <Badge className="border-primary bg-primary text-primary-foreground">
                     {state.roundIndex}/{state.totalRounds}
