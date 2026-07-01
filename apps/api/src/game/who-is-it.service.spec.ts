@@ -12,6 +12,7 @@ describe('WhoIsItService', () => {
   let mockRegisterSpriteSession: jest.Mock;
   let mockRevealSpriteSession: jest.Mock;
   let mockEmit: jest.Mock;
+  let mockFindMany: jest.Mock;
 
   const mockPokemon = {
     id: 25,
@@ -48,11 +49,12 @@ describe('WhoIsItService', () => {
     mockRegisterSpriteSession = jest.fn().mockResolvedValue(undefined);
     mockRevealSpriteSession = jest.fn().mockResolvedValue(undefined);
     mockEmit = jest.fn().mockReturnValue(true);
+    mockFindMany = jest.fn().mockResolvedValue([mockPokemon]);
 
     const mockPrismaService = {
       pokemon: {
         count: jest.fn().mockResolvedValue(1),
-        findMany: jest.fn().mockResolvedValue([mockPokemon]),
+        findMany: mockFindMany,
         findUnique: jest.fn().mockResolvedValue({
           ...mockPokemon,
           evolutions: [],
@@ -136,6 +138,25 @@ describe('WhoIsItService', () => {
       await expect(
         service.startRound({ generations: [1], level: 'IMPOSSIBLE' as never }),
       ).rejects.toThrow();
+    });
+
+    it('série quotidienne : Moyen, Difficile et Extrême tirent des Pokémon différents', async () => {
+      const catalog = Array.from({ length: 40 }, (_, i) => ({
+        ...mockPokemon,
+        id: i + 1,
+        pokedexId: i + 1,
+        nameFr: `P${i + 1}`,
+        generation: (i % 9) + 1,
+      }));
+      mockFindMany.mockResolvedValue(catalog);
+
+      await service.startRound({ generations: [], mode: 'DAILY', level: 'MOYEN' });
+      await service.startRound({ generations: [], mode: 'DAILY', level: 'DIFFICILE' });
+      await service.startRound({ generations: [], mode: 'DAILY', level: 'EXTREME' });
+
+      // registerSpriteSession(sessionHash, pokemonId, ...) : le 2e argument est l'id de la cible.
+      const targetIds = mockRegisterSpriteSession.mock.calls.slice(-3).map((call) => call[1]);
+      expect(new Set(targetIds).size).toBe(3);
     });
   });
 

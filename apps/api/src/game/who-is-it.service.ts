@@ -64,6 +64,64 @@ export class WhoIsItService {
     return { zoomRatio: Number(zoom.toFixed(2)), rotationAngle: Math.round(angle) };
   }
 
+  private makeRng(seed: number): () => number {
+    let state = seed >>> 0;
+    return () => {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+  }
+
+  // Graine du jour (date UTC seule) : la permutation est identique pour tous les niveaux, ce qui
+  // rend le decoupage en tranches disjointes coherent quel que soit le niveau demande.
+  private dailyShuffleSeed(): number {
+    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    let seed = 7;
+    for (let i = 0; i < todayStr.length; i++) {
+      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
+    }
+    return seed || 1;
+  }
+
+  /**
+   * Serie deterministe du jour pour un niveau. Melange le catalogue (graine du jour) puis attribue a
+   * chaque niveau, dans l'ordre, des Pokemon non encore utilises et compatibles avec ses generations.
+   * Garantit qu'aucun Pokemon n'est partage entre deux niveaux le meme jour, ni repete dans une serie.
+   */
+  private buildDailySeries<T extends { id: number; generation: number }>(
+    all: T[],
+    level: WhoIsItLevel,
+    roundsCount: number,
+  ): T[] {
+    const rng = this.makeRng(this.dailyShuffleSeed());
+    const perm = [...all];
+    for (let i = perm.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const a = perm[i];
+      const b = perm[j];
+      if (a && b) {
+        perm[i] = b;
+        perm[j] = a;
+      }
+    }
+
+    const used = new Set<number>();
+    const seriesByLevel = new Map<WhoIsItLevel, T[]>();
+    for (const lvl of WHO_IS_IT_LEVELS) {
+      const gens = WHO_IS_IT_ADMIN_CONFIG.levels[lvl].allowedGenerations;
+      const picks: T[] = [];
+      for (const pokemon of perm) {
+        if (picks.length >= roundsCount) break;
+        if (used.has(pokemon.id)) continue;
+        if (!gens.includes(pokemon.generation)) continue;
+        picks.push(pokemon);
+        used.add(pokemon.id);
+      }
+      seriesByLevel.set(lvl, picks);
+    }
+    return seriesByLevel.get(level) ?? [];
+  }
+
   /**
    * Démarre une nouvelle manche avec capital 100 points, pas d'échec au temps et indices payants.
    */
@@ -77,41 +135,36 @@ export class WhoIsItService {
     const totalRounds = config.roundsCount ?? WHO_IS_IT_ADMIN_CONFIG.roundsCount;
     const startCapital = config.startCapital ?? WHO_IS_IT_ADMIN_CONFIG.startCapital;
 
-    const whereClause: { generation?: { in: number[] } } = {};
-    if (config.generations && config.generations.length > 0) {
-      whereClause.generation = { in: config.generations };
-    } else {
-      // Catalogue du niveau (Facile = generations 1 a 3, autres = toutes). Source : game-config.ts.
-      whereClause.generation = { in: levelConfig.allowedGenerations };
-    }
-
+    // Catalogue complet, ordre stable (indispensable au tirage deterministe du jour).
     const pokemons = await this.prisma.pokemon.findMany({
-      where: whereClause,
       include: {
         types: {
           include: { type: true },
           orderBy: { slot: 'asc' },
         },
       },
+      orderBy: { id: 'asc' },
     });
 
     if (pokemons.length === 0) {
-      throw new NotFoundException('Aucun Pokémon trouvé pour les générations spécifiées');
+      throw new NotFoundException('Aucun Pokémon disponible. Lancez le script ETL.');
     }
 
-    let targetIndex: number;
+    type PokemonWithTypes = (typeof pokemons)[number];
+    let target: PokemonWithTypes | undefined;
     if (mode === 'DAILY') {
-      const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-      let seed = 0;
-      for (let i = 0; i < todayStr.length; i++) {
-        seed = (seed * 31 + todayStr.charCodeAt(i) + roundIndex * 17) % pokemons.length;
-      }
-      targetIndex = Math.abs(seed) % pokemons.length;
+      // Serie du jour propre au niveau : DISJOINTE entre tous les niveaux (chaque niveau tire des
+      // Pokemon differents ce jour-la) et sans repetition dans la serie.
+      const series = this.buildDailySeries(pokemons, level, totalRounds);
+      target = series[roundIndex - 1] ?? series[0];
     } else {
-      targetIndex = Math.floor(Math.random() * pokemons.length);
+      const eligibleGenerations =
+        config.generations && config.generations.length > 0
+          ? config.generations
+          : levelConfig.allowedGenerations;
+      const pool = pokemons.filter((p) => eligibleGenerations.includes(p.generation));
+      target = pool[Math.floor(Math.random() * pool.length)];
     }
-
-    const target = pokemons[targetIndex];
     if (!target) {
       throw new NotFoundException('Pokémon cible introuvable');
     }
