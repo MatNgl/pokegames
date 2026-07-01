@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { History, LogOut, Menu, Trophy, X } from 'lucide-react';
+import { History, ListChecks, LogOut, Menu, Trophy, X } from 'lucide-react';
 import { FolderKanbanIcon } from '@/components/ui/icons/folder-kanban-icon';
 import { SettingsIcon } from '@/components/ui/icons/settings-icon';
 import { Logo } from '@/components/brand/logo';
@@ -80,7 +80,7 @@ export function AppHeader() {
         </Link>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="hidden items-center gap-2 sm:gap-3 md:flex">
         <div
           className="flex items-center gap-1.5 rounded-full border-2 border-border bg-surface-2 px-2.5 py-1 text-xs font-bold text-foreground shadow-sm sm:px-3"
           title="Temps restant avant la réinitialisation des défis quotidiens (minuit UTC)"
@@ -163,10 +163,29 @@ export function AppHeader() {
               onClick={() => setMenuOpen(false)}
               className="fixed inset-0 z-30 cursor-default"
             />
-            <div className="absolute right-0 top-12 z-40 flex w-52 flex-col gap-1 rounded-card border-4 border-border bg-surface p-2 shadow-[0_6px_0_rgba(63,93,29,0.25)]">
+            <div className="absolute right-0 top-12 z-40 flex w-56 flex-col gap-1 rounded-card border-4 border-border bg-surface p-2 shadow-[0_6px_0_rgba(63,93,29,0.25)]">
               {user && (
                 <p className="px-2 py-1 text-sm font-bold text-foreground">{user.username}</p>
               )}
+              <div className="mb-1 flex items-center justify-between gap-2 border-b border-border px-2 pb-2">
+                <span className="flex items-center gap-1 font-display text-[9px] text-muted">
+                  Reset <span className="text-primary">{formattedTime}</span>
+                </span>
+                <span className="flex items-center gap-1 font-display text-[9px] text-foreground">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-go opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-go"></span>
+                  </span>
+                  {onlineCount}
+                </span>
+              </div>
+              <Link
+                to="/quetes"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-foreground hover:bg-surface-2"
+              >
+                <ListChecks className="h-4 w-4" /> Quêtes du jour
+              </Link>
               <Link
                 to="/classements"
                 onClick={() => setMenuOpen(false)}

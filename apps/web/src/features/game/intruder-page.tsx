@@ -225,7 +225,7 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
         <img
           src={`${API_ORIGIN}${spriteUrl}`}
           alt={name}
-          className="h-20 w-20 object-contain sm:h-24 sm:w-24"
+          className="h-14 w-14 object-contain sm:h-24 sm:w-24"
           draggable={false}
         />
         <span className="text-center text-sm font-extrabold text-foreground">{name}</span>

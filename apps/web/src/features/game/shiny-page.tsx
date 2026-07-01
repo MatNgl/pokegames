@@ -270,7 +270,7 @@ function ShinyGame({
         <img
           src={`${API_ORIGIN}${imageUrl}`}
           alt=""
-          className="h-20 w-20 object-contain sm:h-24 sm:w-24"
+          className="h-14 w-14 object-contain sm:h-24 sm:w-24"
           draggable={false}
           style={{ imageRendering: 'pixelated' }}
         />

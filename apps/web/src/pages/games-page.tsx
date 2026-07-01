@@ -75,10 +75,14 @@ function GameCard({ game, status }: { game: GameEntry; status?: WhoIsItDailyStat
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-[11px] uppercase leading-relaxed text-foreground sm:text-xs">
+        <h2 className="min-w-0 break-words font-display text-[10px] uppercase leading-relaxed text-foreground sm:text-xs">
           {game.title}
         </h2>
-        {status !== undefined && <StatusBadge status={status} />}
+        {status !== undefined && (
+          <div className="shrink-0">
+            <StatusBadge status={status} />
+          </div>
+        )}
       </div>
       <div
         className={cn(
@@ -93,9 +97,9 @@ function GameCard({ game, status }: { game: GameEntry; status?: WhoIsItDailyStat
         {game.iconNode ?? (
           <img src={game.iconImg} alt="" className="h-7 w-7 shrink-0 object-contain" />
         )}
-        <span className="text-sm font-bold">{game.description}</span>
+        <span className="min-w-0 truncate text-sm font-bold">{game.description}</span>
         {!game.available && (
-          <span className="ml-auto text-[10px] font-bold uppercase">Bientôt</span>
+          <span className="ml-auto shrink-0 text-[10px] font-bold uppercase">Bientôt</span>
         )}
       </div>
     </Card>
@@ -129,10 +133,10 @@ function ShinyToggleCard({ statuses }: { statuses: Record<DailyKey, WhoIsItDaily
         )}
       >
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-display text-[11px] uppercase leading-relaxed text-foreground sm:text-xs">
+          <h2 className="min-w-0 break-words font-display text-[10px] uppercase leading-relaxed text-foreground sm:text-xs">
             {title}
           </h2>
-          <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
             <StatusBadge status={currentStatus} />
             <button
               type="button"
@@ -154,7 +158,7 @@ function ShinyToggleCard({ statuses }: { statuses: Record<DailyKey, WhoIsItDaily
           )}
         >
           <img src={iconImg} alt="" className="h-7 w-7 shrink-0 object-contain" />
-          <span className="text-sm font-bold">{description}</span>
+          <span className="min-w-0 truncate text-sm font-bold">{description}</span>
         </div>
       </Card>
     </Link>
@@ -294,11 +298,6 @@ export function GamesPage() {
             })}
 
             <ShinyToggleCard statuses={statuses} />
-          </div>
-
-          {/* Petits ecrans : les quetes passent sous les jeux (jamais au-dessus). */}
-          <div className="mt-8 w-full xl:hidden">
-            <DailyQuestsPanel />
           </div>
         </main>
       </div>

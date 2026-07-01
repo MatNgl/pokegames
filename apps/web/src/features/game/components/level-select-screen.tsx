@@ -62,7 +62,7 @@ export function LevelSelectScreen<L extends string>({
                   onClick={() => onPick(option.level)}
                   className="flex items-center justify-between gap-3 rounded-card border-4 border-border-strong bg-white p-4 text-left transition-transform duration-100 hover:-translate-y-0.5 hover:border-primary"
                 >
-                  <span>
+                  <span className="min-w-0">
                     <span className="block font-display text-xs uppercase text-foreground">
                       {option.label}
                     </span>
@@ -70,7 +70,9 @@ export function LevelSelectScreen<L extends string>({
                       {option.description}
                     </span>
                   </span>
-                  <StatusChip status={option.status} />
+                  <span className="shrink-0">
+                    <StatusChip status={option.status} />
+                  </span>
                 </button>
               ))}
             </div>
