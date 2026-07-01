@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "prebuild": "rimraf dist tsconfig.tsbuildinfo",
+    "shared:build": "npm --prefix ../../packages/shared-types run build",
+    "prebuild": "npm run shared:build && rimraf dist tsconfig.tsbuildinfo",
     "build": "nest build",
+    "prestart:dev": "npm run shared:build",
+    "prestart:debug": "npm run shared:build",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
