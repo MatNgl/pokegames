@@ -1,8 +1,8 @@
 import { api } from '@/lib/api';
-import type { MotusGuessResponse, MotusRoundState } from '@pokegames/shared-types';
+import type { MotusGuessResponse, MotusLevel, MotusRoundState } from '@pokegames/shared-types';
 
-export async function startMotus(): Promise<MotusRoundState> {
-  const res = await api.post<MotusRoundState>('/games/motus/start', {});
+export async function startMotus(level: MotusLevel): Promise<MotusRoundState> {
+  const res = await api.post<MotusRoundState>('/games/motus/start', { level });
   return res.data;
 }
 

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import type {
   WhoIsItGuessResponse,
   WhoIsItHintType,
+  WhoIsItLevel,
   WhoIsItRoundState,
 } from '@pokegames/shared-types';
 import { AppHeader } from '@/components/layout/app-header';
@@ -30,9 +32,11 @@ import {
   saveDailyDone,
   saveGame,
   todayKey,
+  whoIsItDailyStatus,
 } from './daily-storage';
 import { GuessAutocomplete } from './components/guess-autocomplete';
 import { HintIcons } from './components/hint-icons';
+import { LevelSelectScreen } from './components/level-select-screen';
 import { RoundResult } from './components/round-result';
 import { SilhouetteStage } from './components/silhouette-stage';
 import { WhoIsItSkeleton } from './components/who-is-it-skeleton';
@@ -46,7 +50,37 @@ const WHO_IS_IT_RULES = [
   'Saisie libre avec autocomplétion (flèches puis Entrée).',
 ];
 
+const LEVELS: { level: WhoIsItLevel; label: string; description: string }[] = [
+  { level: 'FACILE', label: 'Facile', description: 'Générations 1 à 3, silhouette plein cadre' },
+  { level: 'MOYEN', label: 'Moyen', description: 'Toutes générations, zoom' },
+  { level: 'DIFFICILE', label: 'Difficile', description: 'Zoom et rotation' },
+  { level: 'EXTREME', label: 'Extrême', description: 'Zoom fort, angle aléatoire' },
+];
+
+const LEVEL_LABEL: Record<WhoIsItLevel, string> = {
+  FACILE: 'Facile',
+  MOYEN: 'Moyen',
+  DIFFICILE: 'Difficile',
+  EXTREME: 'Extrême',
+};
+
 export function WhoIsItPage() {
+  const [level, setLevel] = useState<WhoIsItLevel | null>(null);
+
+  if (!level) {
+    return (
+      <LevelSelectScreen
+        title="Quel est ce Pokémon ?"
+        rules={WHO_IS_IT_RULES}
+        options={LEVELS.map((l) => ({ ...l, status: whoIsItDailyStatus(l.level) }))}
+        onPick={setLevel}
+      />
+    );
+  }
+  return <WhoIsItGame key={level} level={level} onBack={() => setLevel(null)} />;
+}
+
+function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => void }) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const [round, setRound] = useState<WhoIsItRoundState | null>(null);
@@ -61,7 +95,6 @@ export function WhoIsItPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [spriteVersion, setSpriteVersion] = useState(0);
   const [shakeKey, setShakeKey] = useState(0);
-  // Laisse jouer la revelation en place avant d'afficher le bloc d'infos.
   const [revealReady, setRevealReady] = useState(false);
 
   const { data: names = [] } = useQuery({
@@ -70,43 +103,54 @@ export function WhoIsItPage() {
     staleTime: Infinity,
   });
 
-  const finishGame = useCallback((finalAttempts: number) => {
-    setTotalAttempts(finalAttempts);
-    setGameOver(true);
-    setResult(null);
-    clearSavedGame();
-    saveDailyDone({ date: todayKey(), totalAttempts: finalAttempts });
-  }, []);
+  const finishGame = useCallback(
+    (finalAttempts: number) => {
+      setTotalAttempts(finalAttempts);
+      setGameOver(true);
+      setResult(null);
+      clearSavedGame(level);
+      saveDailyDone(level, { date: todayKey(), totalAttempts: finalAttempts });
+    },
+    [level],
+  );
 
-  const startManche = useCallback(async (roundIndex: number, carriedAttempts: number) => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    setRevealReady(false);
-    setShakeKey(0);
-    setFeedback(null);
-    setGuess('');
-    setTried([]);
-    setGameOver(false);
-    try {
-      // Mode quotidien : serie deterministe du jour, identique pour tous.
-      const state = await startRound({ mode: 'DAILY', roundsCount: TOTAL_ROUNDS, roundIndex });
-      setRound(state);
-      setTotalAttempts(carriedAttempts);
-      saveGame({ date: todayKey(), roundId: state.roundId, tried: [], totalAttempts: carriedAttempts });
-      setSpriteVersion((v) => v + 1);
-    } catch (err) {
-      clearSavedGame();
-      setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const startManche = useCallback(
+    async (roundIndex: number, carriedAttempts: number) => {
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      setRevealReady(false);
+      setShakeKey(0);
+      setFeedback(null);
+      setGuess('');
+      setTried([]);
+      setGameOver(false);
+      try {
+        // Mode quotidien : serie deterministe du jour, identique pour tous, propre au niveau.
+        const state = await startRound({ mode: 'DAILY', level, roundsCount: TOTAL_ROUNDS, roundIndex });
+        setRound(state);
+        setTotalAttempts(carriedAttempts);
+        saveGame(level, {
+          date: todayKey(),
+          roundId: state.roundId,
+          tried: [],
+          totalAttempts: carriedAttempts,
+        });
+        setSpriteVersion((v) => v + 1);
+      } catch (err) {
+        clearSavedGame(level);
+        setError(getApiErrorMessage(err, 'Impossible de démarrer le défi du jour'));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [level],
+  );
 
   const restoreOrStart = useCallback(async () => {
     const today = todayKey();
 
-    const done = loadDailyDone();
+    const done = loadDailyDone(level);
     if (done && done.date === today) {
       setTotalAttempts(done.totalAttempts);
       setGameOver(true);
@@ -114,9 +158,9 @@ export function WhoIsItPage() {
       return;
     }
 
-    const saved = loadSavedGame();
+    const saved = loadSavedGame(level);
     if (!saved || saved.date !== today) {
-      clearSavedGame();
+      clearSavedGame(level);
       void startManche(1, 0);
       return;
     }
@@ -145,10 +189,10 @@ export function WhoIsItPage() {
         }
       }
     } catch {
-      clearSavedGame();
+      clearSavedGame(level);
       void startManche(1, 0);
     }
-  }, [startManche, finishGame]);
+  }, [level, startManche, finishGame]);
 
   useEffect(() => {
     void restoreOrStart();
@@ -174,7 +218,6 @@ export function WhoIsItPage() {
         if (reduceMotion) {
           setRevealReady(true);
         } else {
-          // Temps de la revelation (glow + pop) avant le bloc d'infos.
           window.setTimeout(() => setRevealReady(true), 650);
         }
       } else {
@@ -185,8 +228,10 @@ export function WhoIsItPage() {
           currentScore: res.currentScore,
           mistakesCount: res.mistakesCount,
           hints: res.hints,
+          zoomRatio: res.zoomRatio ?? round.zoomRatio,
+          rotationAngle: res.rotationAngle ?? round.rotationAngle,
         });
-        saveGame({ date: todayKey(), roundId: round.roundId, tried: nextTried, totalAttempts });
+        saveGame(level, { date: todayKey(), roundId: round.roundId, tried: nextTried, totalAttempts });
         setFeedback(res.message ?? "Ce n'est pas le bon Pokémon.");
         setShakeKey((k) => k + 1);
         setGuess('');
@@ -205,7 +250,7 @@ export function WhoIsItPage() {
     try {
       const state = await requestHint(round.roundId, type);
       setRound(state);
-      if (type === 'BLURRED_COLOR' || type === 'COLOR_SHARPEN') {
+      if (type === 'BLURRED_COLOR') {
         setSpriteVersion((v) => v + 1);
       }
     } catch (err) {
@@ -247,6 +292,10 @@ export function WhoIsItPage() {
               <Button className="w-full" onClick={() => navigate('/')}>
                 Retour à l'accueil
               </Button>
+              <Button variant="secondary" size="sm" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4" />
+                Changer de niveau
+              </Button>
             </Card>
           ) : !round ? (
             <Card className="max-w-md p-6 text-center">
@@ -258,20 +307,28 @@ export function WhoIsItPage() {
           ) : (
             <Card className="flex w-full max-w-xl flex-col gap-5 p-6">
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h1 className="font-display text-sm leading-relaxed text-foreground">
-                    Quel est ce Pokémon ?
-                  </h1>
-                  <p className="mt-1 text-sm font-semibold text-muted">
-                    {liveAttempts} essai{liveAttempts > 1 ? 's' : ''}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    aria-label="Changer de niveau"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <h1 className="font-display text-sm leading-relaxed text-foreground">
+                      Quel est ce Pokémon ?
+                    </h1>
+                    <p className="mt-1 text-sm font-semibold text-muted">
+                      {liveAttempts} essai{liveAttempts > 1 ? 's' : ''}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {round.level && (
-                    <Badge className="border-warning bg-warning text-warning-foreground">
-                      {round.level}
-                    </Badge>
-                  )}
+                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                    {LEVEL_LABEL[level]}
+                  </Badge>
                   <Badge className="border-primary bg-primary text-primary-foreground">
                     {round.roundIndex}/{round.totalRounds}
                   </Badge>

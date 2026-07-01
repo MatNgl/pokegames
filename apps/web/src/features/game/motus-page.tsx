@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import type { MotusLetterState, MotusRoundState } from '@pokegames/shared-types';
+import { ArrowLeft } from 'lucide-react';
+import type { MotusLetterState, MotusLevel, MotusRoundState } from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
 import { Badge } from '@/components/ui/badge';
@@ -13,19 +14,21 @@ import {
   clearMotus,
   loadMotusDone,
   loadMotusSaved,
+  motusDailyStatus,
   motusTodayKey,
   saveMotus,
   saveMotusDone,
   type MotusDone,
 } from './motus-storage';
 import { HelpPopover, type HelpLegendItem } from '@/components/ui/help-popover';
+import { LevelSelectScreen } from './components/level-select-screen';
 import { MotusGrid } from './components/motus-grid';
 import { MotusKeyboard } from './components/motus-keyboard';
 import { MotusSkeleton } from './components/motus-skeleton';
 
 const MOTUS_RULES = [
-  'Devine le Pokémon du jour en 6 essais.',
-  'La première lettre est donnée.',
+  'Devine le Pokémon du jour, à la Wordle.',
+  'Le nombre d’essais et la longueur dépendent du niveau.',
   'Chaque proposition doit être un vrai Pokémon de la même longueur.',
   'La ligne se valide automatiquement une fois pleine.',
 ];
@@ -38,7 +41,37 @@ const MOTUS_LEGEND: HelpLegendItem[] = [
 
 const STATE_PRIORITY: Record<MotusLetterState, number> = { ABSENT: 0, PRESENT: 1, CORRECT: 2 };
 
+const LEVELS: { level: MotusLevel; label: string; description: string }[] = [
+  { level: 'FACILE', label: 'Facile', description: '5-6 lettres, 1re lettre donnée, 6 essais' },
+  { level: 'MOYEN', label: 'Moyen', description: '6-7 lettres, 1re lettre donnée, 5 essais' },
+  { level: 'DIFFICILE', label: 'Difficile', description: '5-8 lettres, sans 1re lettre, 6 essais' },
+  { level: 'EXTREME', label: 'Extrême', description: '5-9 lettres, sans 1re lettre, 4 essais' },
+];
+
+const LEVEL_LABEL: Record<MotusLevel, string> = {
+  FACILE: 'Facile',
+  MOYEN: 'Moyen',
+  DIFFICILE: 'Difficile',
+  EXTREME: 'Extrême',
+};
+
 export function MotusPage() {
+  const [level, setLevel] = useState<MotusLevel | null>(null);
+
+  if (!level) {
+    return (
+      <LevelSelectScreen
+        title="Poké-Motus"
+        rules={MOTUS_RULES}
+        options={LEVELS.map((l) => ({ ...l, status: motusDailyStatus(l.level) }))}
+        onPick={setLevel}
+      />
+    );
+  }
+  return <MotusGame key={level} level={level} onBack={() => setLevel(null)} />;
+}
+
+function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void }) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const [state, setState] = useState<MotusRoundState | null>(null);
@@ -48,7 +81,6 @@ export function MotusPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
-  // Laisse jouer le flip de revelation avant d'afficher l'ecran de fin sur le dernier essai.
   const [resultReady, setResultReady] = useState(false);
 
   const start = useCallback(async () => {
@@ -58,26 +90,26 @@ export function MotusPage() {
     setCurrent('');
     setResultReady(false);
     try {
-      const round = await startMotus();
+      const round = await startMotus(level);
       setState(round);
-      saveMotus(round.roundId);
+      saveMotus(level, round.roundId);
     } catch (err) {
-      clearMotus();
+      clearMotus(level);
       setError(getApiErrorMessage(err, 'Impossible de démarrer le Motus du jour'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [level]);
 
   const restoreOrStart = useCallback(async () => {
     const today = motusTodayKey();
-    const done = loadMotusDone();
+    const done = loadMotusDone(level);
     if (done && done.date === today) {
       setDoneInfo(done);
       setLoading(false);
       return;
     }
-    const saved = loadMotusSaved();
+    const saved = loadMotusSaved(level);
     if (!saved || saved.date !== today) {
       await start();
       return;
@@ -88,16 +120,15 @@ export function MotusPage() {
       setState(round);
       setCurrent('');
       if (round.status !== 'PLAYING' && round.answer) {
-        // Manche deja terminee a la restauration : pas d'animation, ecran de fin direct.
         setResultReady(true);
-        saveMotusDone(round.status === 'WON', round.answer);
+        saveMotusDone(level, round.status === 'WON', round.answer);
       }
       setLoading(false);
     } catch {
-      clearMotus();
+      clearMotus(level);
       await start();
     }
-  }, [start]);
+  }, [level, start]);
 
   useEffect(() => {
     void restoreOrStart();
@@ -131,11 +162,10 @@ export function MotusPage() {
           setCurrent('');
           setError(null);
           if (res.state.status !== 'PLAYING' && res.state.answer) {
-            saveMotusDone(res.state.status === 'WON', res.state.answer);
+            saveMotusDone(level, res.state.status === 'WON', res.state.answer);
             if (reduceMotion) {
               setResultReady(true);
             } else {
-              // Temps du flip (par lettre) puis de la celebration eventuelle.
               const flipMs = res.state.length * 220 + 300;
               const extraMs = res.state.status === 'WON' ? res.state.length * 80 + 500 : 350;
               window.setTimeout(() => setResultReady(true), flipMs + extraMs);
@@ -148,7 +178,7 @@ export function MotusPage() {
         setBusy(false);
       }
     },
-    [state, busy],
+    [state, busy, reduceMotion, level],
   );
 
   const addLetter = useCallback(
@@ -228,6 +258,10 @@ export function MotusPage() {
               <Button className="w-full" onClick={() => navigate('/')}>
                 Retour à l'accueil
               </Button>
+              <Button variant="secondary" size="sm" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4" />
+                Changer de niveau
+              </Button>
             </Card>
           ) : !state ? (
             <Card className="max-w-md p-6 text-center">
@@ -239,16 +273,24 @@ export function MotusPage() {
           ) : (
             <Card className="flex w-full max-w-xl flex-col items-center gap-5 p-6">
               <div className="flex w-full items-start justify-between gap-4">
-                <div>
-                  <h1 className="font-display text-sm leading-relaxed text-foreground">Poké-Motus</h1>
-                  <p className="mt-1 text-sm font-semibold text-muted">{state.length} lettres</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    aria-label="Changer de niveau"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <h1 className="font-display text-sm leading-relaxed text-foreground">Poké-Motus</h1>
+                    <p className="mt-1 text-sm font-semibold text-muted">{state.length} lettres</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {state.level && (
-                    <Badge className="border-warning bg-warning text-warning-foreground">
-                      {state.level}
-                    </Badge>
-                  )}
+                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                    {LEVEL_LABEL[level]}
+                  </Badge>
                   <Badge className="border-primary bg-primary text-primary-foreground">
                     {attemptsUsed}/{state.maxAttempts}
                   </Badge>

@@ -1,6 +1,13 @@
-// Persistance locale du defi quotidien "Quel est ce Pokemon" (1 session par jour).
-const STORAGE_KEY = 'pokegames:who-is-it';
-const DONE_KEY = 'pokegames:who-is-it:done';
+import type { WhoIsItLevel } from '@pokegames/shared-types';
+
+// Persistance locale du defi quotidien "Quel est ce Pokemon" (1 session par jour et par niveau).
+function storageKey(level: WhoIsItLevel): string {
+  return `pokegames:who-is-it:${level}`;
+}
+
+function doneKey(level: WhoIsItLevel): string {
+  return `pokegames:who-is-it:${level}:done`;
+}
 
 export function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -35,8 +42,8 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-export function loadSavedGame(): SavedGame | null {
-  const saved = readJson<SavedGame>(STORAGE_KEY);
+export function loadSavedGame(level: WhoIsItLevel): SavedGame | null {
+  const saved = readJson<SavedGame>(storageKey(level));
   if (saved && typeof saved.roundId === 'string' && typeof saved.date === 'string') {
     return {
       date: saved.date,
@@ -48,37 +55,37 @@ export function loadSavedGame(): SavedGame | null {
   return null;
 }
 
-export function saveGame(game: SavedGame): void {
-  writeJson(STORAGE_KEY, game);
+export function saveGame(level: WhoIsItLevel, game: SavedGame): void {
+  writeJson(storageKey(level), game);
 }
 
-export function clearSavedGame(): void {
+export function clearSavedGame(level: WhoIsItLevel): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey(level));
   } catch {
     // Rien a faire si le stockage est indisponible.
   }
 }
 
-export function loadDailyDone(): DailyDone | null {
-  const done = readJson<DailyDone>(DONE_KEY);
+export function loadDailyDone(level: WhoIsItLevel): DailyDone | null {
+  const done = readJson<DailyDone>(doneKey(level));
   if (done && typeof done.date === 'string' && typeof done.totalAttempts === 'number') {
     return done;
   }
   return null;
 }
 
-export function saveDailyDone(done: DailyDone): void {
-  writeJson(DONE_KEY, done);
+export function saveDailyDone(level: WhoIsItLevel, done: DailyDone): void {
+  writeJson(doneKey(level), done);
 }
 
 export type WhoIsItDailyStatus = 'idle' | 'in-progress' | 'done';
 
-export function whoIsItDailyStatus(): WhoIsItDailyStatus {
+export function whoIsItDailyStatus(level: WhoIsItLevel): WhoIsItDailyStatus {
   const today = todayKey();
-  const done = loadDailyDone();
+  const done = loadDailyDone(level);
   if (done && done.date === today) return 'done';
-  const saved = loadSavedGame();
+  const saved = loadSavedGame(level);
   if (saved && saved.date === today) return 'in-progress';
   return 'idle';
 }

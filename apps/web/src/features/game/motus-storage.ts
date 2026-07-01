@@ -1,6 +1,13 @@
-// Persistance locale du defi Motus quotidien (1 session par jour). L'etat detaille vit en Redis cote serveur.
-const STORAGE_KEY = 'pokegames:motus';
-const DONE_KEY = 'pokegames:motus:done';
+import type { MotusLevel } from '@pokegames/shared-types';
+
+// Persistance locale du defi Motus quotidien (1 session par jour et par niveau). L'etat detaille vit en Redis.
+function storageKey(level: MotusLevel): string {
+  return `pokegames:motus:${level}`;
+}
+
+function doneKey(level: MotusLevel): string {
+  return `pokegames:motus:${level}:done`;
+}
 
 export function motusTodayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -34,45 +41,45 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-export function loadMotusSaved(): MotusSaved | null {
-  const saved = readJson<MotusSaved>(STORAGE_KEY);
+export function loadMotusSaved(level: MotusLevel): MotusSaved | null {
+  const saved = readJson<MotusSaved>(storageKey(level));
   if (saved && typeof saved.roundId === 'string' && typeof saved.date === 'string') {
     return saved;
   }
   return null;
 }
 
-export function saveMotus(roundId: string): void {
-  writeJson(STORAGE_KEY, { date: motusTodayKey(), roundId });
+export function saveMotus(level: MotusLevel, roundId: string): void {
+  writeJson(storageKey(level), { date: motusTodayKey(), roundId });
 }
 
-export function clearMotus(): void {
+export function clearMotus(level: MotusLevel): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey(level));
   } catch {
     // Rien a faire si le stockage est indisponible.
   }
 }
 
-export function loadMotusDone(): MotusDone | null {
-  const done = readJson<MotusDone>(DONE_KEY);
+export function loadMotusDone(level: MotusLevel): MotusDone | null {
+  const done = readJson<MotusDone>(doneKey(level));
   if (done && typeof done.date === 'string' && typeof done.answer === 'string') {
     return done;
   }
   return null;
 }
 
-export function saveMotusDone(won: boolean, answer: string): void {
-  writeJson(DONE_KEY, { date: motusTodayKey(), won, answer });
+export function saveMotusDone(level: MotusLevel, won: boolean, answer: string): void {
+  writeJson(doneKey(level), { date: motusTodayKey(), won, answer });
 }
 
 export type MotusDailyStatus = 'idle' | 'in-progress' | 'done';
 
-export function motusDailyStatus(): MotusDailyStatus {
+export function motusDailyStatus(level: MotusLevel): MotusDailyStatus {
   const today = motusTodayKey();
-  const done = loadMotusDone();
+  const done = loadMotusDone(level);
   if (done && done.date === today) return 'done';
-  const saved = loadMotusSaved();
+  const saved = loadMotusSaved(level);
   if (saved && saved.date === today) return 'in-progress';
   return 'idle';
 }
