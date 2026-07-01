@@ -53,9 +53,7 @@ export function LevelSelectScreen<L extends string>({
               <h1 className="font-display text-sm leading-relaxed text-foreground">{title}</h1>
               <HelpPopover ariaLabel={`Règles de ${title}`} rules={rules} />
             </div>
-            <p className="text-sm font-semibold text-muted">
-              {subtitle ?? 'Choisis un niveau (un défi par jour et par niveau).'}
-            </p>
+            {subtitle && <p className="text-sm font-semibold text-muted">{subtitle}</p>}
             <div className="flex flex-col gap-3">
               {options.map((option) => (
                 <button

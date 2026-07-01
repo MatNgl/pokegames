@@ -325,11 +325,27 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
                 )}
               </div>
 
-              <div className={cn('grid w-full gap-3', gridColsClass(state.members.length))}>
-                {state.members.map((m, index) =>
-                  renderTile(m.pokemonId, m.name, m.spriteUrl, index),
-                )}
-              </div>
+              {state.members.length === 5 ? (
+                // Moyen : 3 en haut, 2 en bas centrees dans les espaces (rendu homogene).
+                <div className="flex w-full flex-col items-center gap-3">
+                  <div className="flex justify-center gap-3">
+                    {state.members.slice(0, 3).map((m, index) =>
+                      renderTile(m.pokemonId, m.name, m.spriteUrl, index),
+                    )}
+                  </div>
+                  <div className="flex justify-center gap-3">
+                    {state.members.slice(3).map((m, index) =>
+                      renderTile(m.pokemonId, m.name, m.spriteUrl, index + 3),
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className={cn('grid w-full gap-3', gridColsClass(state.members.length))}>
+                  {state.members.map((m, index) =>
+                    renderTile(m.pokemonId, m.name, m.spriteUrl, index),
+                  )}
+                </div>
+              )}
 
               {error && <p className="text-center text-sm font-semibold text-danger">{error}</p>}
 

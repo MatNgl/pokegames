@@ -124,8 +124,13 @@ describe('PlusMinusService', () => {
       expect(session.duels.length).toBeGreaterThan(0);
       for (const duel of session.duels) {
         const diff = Math.abs(duel.a.value - duel.b.value) * scale(duel.criterion);
-        expect(diff).toBeGreaterThanOrEqual(1);
-        expect(diff).toBeLessThanOrEqual(9);
+        if (duel.criterion === 'AGE') {
+          // L'anciennete a son propre seuil (Extreme : au moins 50 d'ecart de Pokedex).
+          expect(diff).toBeGreaterThanOrEqual(50);
+        } else {
+          expect(diff).toBeGreaterThanOrEqual(1);
+          expect(diff).toBeLessThanOrEqual(9);
+        }
       }
     });
 

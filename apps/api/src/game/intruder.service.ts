@@ -83,7 +83,8 @@ const INTRUDER_LEVELS: IntruderLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE'];
 interface HintExtra {
   gen?: number;
   typeName?: string;
-  statLabel?: string;
+  // Pour une stat : indice complet avec le palier (ex. "Indice : au moins 100 en Attaque").
+  statHint?: string;
 }
 
 @Injectable()
@@ -196,6 +197,10 @@ export class IntruderService {
 
   /** Indice pre-reponse selon le niveau. N'indique jamais quel Pokemon est l'intrus. */
   private hintFor(hintMode: IntruderHintMode, rule: IntruderRule, extra: HintExtra): string | null {
+    // Critere de stat : on donne TOUJOURS le palier, quel que soit le niveau (sinon indevinable).
+    if (rule === 'STAT') {
+      return extra.statHint ?? null;
+    }
     if (hintMode === 'EXPLICIT') {
       switch (rule) {
         case 'GENERATION':
@@ -206,16 +211,12 @@ export class IntruderService {
           return "Trouve celui dont le stade d'évolution diffère";
         case 'MEGA':
           return 'Trouve celui qui ne peut pas méga-évoluer';
-        case 'STAT':
-          return extra.statLabel ? `Regarde du côté de la ${extra.statLabel}` : null;
         default:
           return null;
       }
     }
     if (hintMode === 'DOMAIN') {
       switch (rule) {
-        case 'STAT':
-          return extra.statLabel ? `Indice : regarde du côté de la ${extra.statLabel}` : null;
         case 'EVOLUTION':
           return "Indice : regarde les stades d'évolution";
         case 'GENERATION':
@@ -228,8 +229,8 @@ export class IntruderService {
           return null;
       }
     }
-    // STAT_ONLY : indice fourni uniquement si le critere est une stat.
-    return rule === 'STAT' && extra.statLabel ? `Indice : regarde du côté de la ${extra.statLabel}` : null;
+    // STAT_ONLY sur un critere non-stat : aucun indice.
+    return null;
   }
 
   private assemble(
@@ -360,12 +361,16 @@ export class IntruderService {
       const commonLabel = useBelow
         ? `Moins de ${threshold} en ${descriptor.label}`
         : `Au moins ${threshold} en ${descriptor.label}`;
+      // useBelow : les autres sont SOUS le seuil, donc l'intrus est le seul AU-DESSUS (et inversement).
+      const statHint = useBelow
+        ? `Indice : l'intrus est le seul à au moins ${threshold} en ${descriptor.label}`
+        : `Indice : l'intrus est le seul sous ${threshold} en ${descriptor.label}`;
       return this.assemble(
         'STAT',
         matching,
         intruder,
         commonLabel,
-        this.hintFor(hintMode, 'STAT', { statLabel: descriptor.label }),
+        this.hintFor(hintMode, 'STAT', { statHint }),
         (p) => ({ detail: `${descriptor.label} : ${this.statValue(p, descriptor.key)}` }),
         rng,
       );

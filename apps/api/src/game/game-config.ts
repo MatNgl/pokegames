@@ -40,9 +40,9 @@ export const WHO_IS_IT_ADMIN_CONFIG: WhoIsItAdminConfig = {
   },
   levels: {
     FACILE: { allowedGenerations: [1, 2, 3], initialZoomRatio: 1.0, zoomStepPerMistake: 0, initialRotationAngle: 0, rotationStepPerMistake: 0 },
-    MOYEN: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 1.3, zoomStepPerMistake: 0.1, initialRotationAngle: 0, rotationStepPerMistake: 0 },
-    DIFFICILE: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 1.5, zoomStepPerMistake: 0.12, initialRotationAngle: 30, rotationStepPerMistake: 8 },
-    EXTREME: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 1.7, zoomStepPerMistake: 0.15, initialRotationAngle: 70, rotationStepPerMistake: 15 },
+    MOYEN: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 2.6, zoomStepPerMistake: 0.2, initialRotationAngle: 0, rotationStepPerMistake: 0 },
+    DIFFICILE: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 3.0, zoomStepPerMistake: 0.24, initialRotationAngle: 30, rotationStepPerMistake: 8 },
+    EXTREME: { allowedGenerations: [1, 2, 3, 4, 5, 6, 7, 8, 9], initialZoomRatio: 3.4, zoomStepPerMistake: 0.3, initialRotationAngle: 70, rotationStepPerMistake: 15 },
   },
 };
 
@@ -70,6 +70,9 @@ export interface PlusMinusLevelConfig {
   // Bande d'ecart requise entre les deux valeurs du duel, exprimee en "points" (voir dimensionScale).
   minDiff: number;
   maxDiff: number;
+  // Anciennete (numero de Pokedex) : ecart minimal dedie, car l'echelle (1..1025) n'a rien a voir
+  // avec les stats. Un ecart de 25 dans le Pokedex serait trop proche (souvent meme generation).
+  ageMinDiff: number;
 }
 
 export interface PlusMinusConfig {
@@ -82,10 +85,10 @@ export interface PlusMinusConfig {
 export const PLUS_MINUS_CONFIG: PlusMinusConfig = {
   roundsCount: 10,
   levels: {
-    FACILE: { minDiff: 45, maxDiff: 9999 },
-    MOYEN: { minDiff: 25, maxDiff: 45 },
-    DIFFICILE: { minDiff: 10, maxDiff: 25 },
-    EXTREME: { minDiff: 1, maxDiff: 9 },
+    FACILE: { minDiff: 45, maxDiff: 9999, ageMinDiff: 300 },
+    MOYEN: { minDiff: 25, maxDiff: 45, ageMinDiff: 250 },
+    DIFFICILE: { minDiff: 10, maxDiff: 25, ageMinDiff: 150 },
+    EXTREME: { minDiff: 1, maxDiff: 9, ageMinDiff: 50 },
   },
 };
 

@@ -104,7 +104,6 @@ function LevelSelect({ onPick }: { onPick: (level: TrueShinyLevel) => void }) {
               <h1 className="font-display text-sm leading-relaxed text-foreground">Le Bon Shiny</h1>
               <HelpPopover ariaLabel="Règles du Bon Shiny" rules={TRUE_SHINY_RULES} />
             </div>
-            <p className="text-sm font-semibold text-muted">Choisis un niveau (un défi par jour et par niveau).</p>
             <div className="flex flex-col gap-3">
               {LEVELS.map(({ level, label, description }) => (
                 <button

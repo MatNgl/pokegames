@@ -61,6 +61,20 @@
     color: var(--color-foreground);
   }
 
+  /* Tout element interactif montre le curseur main a la souris. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  a[href],
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

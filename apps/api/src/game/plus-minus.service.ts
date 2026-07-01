@@ -214,11 +214,13 @@ export class PlusMinusService {
     rng: () => number,
     used: Set<number>,
   ): Duel | null {
-    const { minDiff, maxDiff } = PLUS_MINUS_CONFIG.levels[level];
+    const { minDiff, maxDiff, ageMinDiff } = PLUS_MINUS_CONFIG.levels[level];
     for (const criterion of this.shuffle(CRITERIA, rng)) {
+      // L'anciennete (numero de Pokedex) a sa propre echelle : ecart minimal dedie, sans plafond.
+      const isAge = criterion === 'AGE';
       const scale = this.dimensionScale(criterion);
-      const minRaw = minDiff / scale;
-      const maxRaw = maxDiff / scale;
+      const minRaw = isAge ? ageMinDiff : minDiff / scale;
+      const maxRaw = isAge ? Number.POSITIVE_INFINITY : maxDiff / scale;
       const eligible = pool.filter((p) => this.value(criterion, p) !== null && !used.has(p.id));
       if (eligible.length < 2) continue;
 

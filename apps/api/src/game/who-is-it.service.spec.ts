@@ -133,7 +133,7 @@ describe('WhoIsItService', () => {
 
     it('Difficile : zoom et rotation initiaux du niveau', async () => {
       const state = await service.startRound({ generations: [1], level: 'DIFFICILE' });
-      expect(state.zoomRatio).toBe(1.5);
+      expect(state.zoomRatio).toBe(3.0);
       expect(state.rotationAngle).toBe(30);
     });
 

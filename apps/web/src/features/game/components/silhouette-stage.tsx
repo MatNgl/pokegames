@@ -29,6 +29,7 @@ export function SilhouetteStage({
         src={src}
         alt={revealed ? 'Pokémon révélé' : 'Silhouette à deviner'}
         draggable={false}
+        initial={false}
         animate={
           revealed && !reduceMotion
             ? { scale: [zoomRatio, 1.08, 1], rotate: 0 }
