@@ -105,6 +105,9 @@ export function AppHeader() {
 
       {/* Barre d'actions en ligne (tablette et desktop) */}
       <div className="hidden items-center gap-1 md:flex">
+        <Link to="/quetes" className={iconButtonClass} title="Quêtes du jour" aria-label="Quêtes du jour">
+          <ListChecks className="h-5 w-5" />
+        </Link>
         <Link to="/classements" className={iconButtonClass} title="Classements" aria-label="Classements">
           <Trophy className="h-5 w-5" />
         </Link>
