@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowUpDown, Check, X } from 'lucide-react';
 import type {
   PlusMinusChoiceResponse,
   PlusMinusCriterion,
@@ -21,6 +21,8 @@ import { HelpPopover } from '@/components/ui/help-popover';
 import { CountUp } from './components/count-up';
 import { DailyDoneCard } from './components/daily-done-card';
 import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
+import { ArenaInstruction } from './components/arena-instruction';
+import { levelColor } from './level-colors';
 import { getPlusMinusRound, startPlusMinus, submitPlusMinusChoice } from './plus-minus-api';
 import {
   clearPlusMinus,
@@ -202,8 +204,14 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
     const isCorrect = reveal !== null && reveal.correctChoice === side;
     const isWrongPick = reveal !== null && chosen === side && reveal.correctChoice !== side;
 
+    const revealed = reveal !== null;
+    const borderStyle: CSSProperties | undefined = isCorrect
+      ? { borderColor: '#5FB24A' }
+      : isWrongPick
+        ? { borderColor: '#EE1515' }
+        : undefined;
     const animate =
-      reveal === null || reduceMotion
+      !revealed || reduceMotion
         ? {}
         : isCorrect
           ? { scale: [1, 1.06, 1] }
@@ -214,37 +222,54 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
     return (
       <motion.button
         type="button"
-        disabled={reveal !== null || busy}
+        disabled={revealed || busy}
         onClick={() => void onChoose(side)}
         animate={animate}
         transition={{ duration: 0.45 }}
+        style={borderStyle}
         className={cn(
-          'flex flex-1 flex-col items-center gap-2 rounded-card border-4 bg-white p-4 transition-colors duration-150',
-          reveal === null && 'cursor-pointer hover:border-primary',
-          isCorrect
-            ? 'border-go bg-go/10'
-            : isWrongPick
-              ? 'border-danger bg-danger/10'
-              : reveal !== null
-                ? 'border-border-strong opacity-70'
-                : 'border-border-strong',
+          'relative flex flex-1 flex-col items-center gap-2 overflow-hidden rounded-card border-4 border-border-strong bg-tile p-4 shadow-[0_4px_0_rgba(43,42,36,0.15)] transition-transform duration-100',
+          !revealed && 'cursor-pointer hover:-translate-y-0.5 hover:border-primary',
+          revealed && !isCorrect && !isWrongPick && 'opacity-60',
         )}
       >
-        <img
-          src={`${API_ORIGIN}${contestant.spriteUrl}`}
-          alt={contestant.name}
-          className="h-24 w-24 object-contain sm:h-28 sm:w-28"
-          draggable={false}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(circle at 50% 38%, rgba(255,203,5,0.2), rgba(255,203,5,0) 60%)' }}
         />
-        <span className="text-center text-sm font-extrabold text-foreground">{contestant.name}</span>
+        <div className="relative h-24 w-24 sm:h-28 sm:w-28">
+          <img
+            src={`${API_ORIGIN}${contestant.spriteUrl}`}
+            alt={contestant.name}
+            className="relative z-10 h-full w-full object-contain"
+            draggable={false}
+          />
+          <span
+            aria-hidden
+            className="absolute bottom-0 left-1/2 h-2.5 w-2/5 -translate-x-1/2 rounded-[50%] bg-black/20 blur-[3px]"
+          />
+        </div>
+        <span className="relative z-10 text-center text-sm font-extrabold text-foreground">
+          {contestant.name}
+        </span>
         {value ? (
           <CountUp
             target={value.value}
             format={(n) => formatValue(state.criterion, n)}
-            className={cn('font-display text-sm', isCorrect ? 'text-success' : 'text-foreground')}
+            className={cn('relative z-10 font-display text-sm', isCorrect ? 'text-success' : 'text-foreground')}
           />
         ) : (
-          <span className="font-display text-xs text-muted">?</span>
+          <span className="relative z-10 font-display text-xs text-muted">?</span>
+        )}
+        {isCorrect && (
+          <span className="absolute right-1.5 top-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border-2 border-go-shadow bg-go text-go-foreground">
+            <Check className="h-4 w-4" />
+          </span>
+        )}
+        {isWrongPick && (
+          <span className="absolute right-1.5 top-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border-2 border-danger bg-danger text-white">
+            <X className="h-4 w-4" />
+          </span>
         )}
       </motion.button>
     );
@@ -297,7 +322,15 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <h1 className="font-display text-sm leading-relaxed text-foreground">Plus ou Moins</h1>
-                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                  <Badge
+                    style={
+                      {
+                        borderColor: levelColor(state.level),
+                        backgroundColor: levelColor(state.level),
+                        color: '#2B2A24',
+                      } as CSSProperties
+                    }
+                  >
                     {LEVEL_LABEL[state.level]}
                   </Badge>
                 </div>
@@ -309,9 +342,9 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
                 </div>
               </div>
 
-              <p className="text-center font-display text-xs leading-relaxed text-foreground sm:text-sm">
+              <ArenaInstruction icon={<ArrowUpDown className="h-3.5 w-3.5 text-foreground" />}>
                 {state.criterionLabel}
-              </p>
+              </ArenaInstruction>
 
               <div className="flex w-full items-stretch justify-center gap-3">
                 {renderTile('A')}

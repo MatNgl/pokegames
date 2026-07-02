@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Check, Search, X } from 'lucide-react';
 import type {
   IntruderChoiceResponse,
   IntruderLevel,
@@ -20,6 +20,9 @@ import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
 import { DailyDoneCard } from './components/daily-done-card';
 import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
+import { ArenaInstruction } from './components/arena-instruction';
+import { TileGrid } from './components/tile-grid';
+import { levelColor } from './level-colors';
 import { getIntruderRound, startIntruder, submitIntruderChoice } from './intruder-api';
 import {
   clearIntruder,
@@ -49,11 +52,6 @@ const LEVEL_LABEL: Record<IntruderLevel, string> = {
   MOYEN: 'Moyen',
   DIFFICILE: 'Difficile',
 };
-
-// 4 cartes -> 2 colonnes (2x2), 5 -> 3 colonnes (3+2), 6 -> 3 colonnes (3x2).
-function gridColsClass(count: number): string {
-  return count === 4 ? 'grid-cols-2' : 'grid-cols-3';
-}
 
 interface EndInfo {
   correctCount: number;
@@ -195,8 +193,14 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
     const isIntruder = info?.isIntruder ?? false;
     const isWrongPick = reveal !== null && chosenId === pokemonId && !isIntruder;
 
+    const revealed = reveal !== null;
+    const borderStyle: CSSProperties | undefined = isIntruder
+      ? { borderColor: '#5FB24A' }
+      : isWrongPick
+        ? { borderColor: '#EE1515' }
+        : undefined;
     const animate =
-      reveal === null || reduceMotion
+      !revealed || reduceMotion
         ? {}
         : isIntruder
           ? { scale: [1, 1.06, 1] }
@@ -208,33 +212,39 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
       <motion.button
         key={pokemonId}
         type="button"
-        disabled={reveal !== null || busy}
+        disabled={revealed || busy}
         onClick={() => void onChoose(pokemonId)}
         animate={animate}
         transition={{ duration: 0.45 }}
+        style={borderStyle}
         className={cn(
-          'flex flex-col items-center gap-1.5 rounded-card border-4 bg-white p-3 transition-colors duration-150',
-          reveal === null && 'cursor-pointer hover:border-primary',
-          isIntruder
-            ? 'border-danger bg-danger/10'
-            : reveal !== null
-              ? 'border-go bg-go/10'
-              : 'border-border-strong',
+          'relative flex w-full flex-col items-center gap-1.5 overflow-hidden rounded-card border-4 border-border-strong bg-tile p-3 shadow-[0_4px_0_rgba(43,42,36,0.15)] transition-transform duration-100',
+          !revealed && 'cursor-pointer hover:-translate-y-0.5 hover:border-primary',
         )}
       >
-        <img
-          src={`${API_ORIGIN}${spriteUrl}`}
-          alt={name}
-          className="h-14 w-14 object-contain sm:h-24 sm:w-24"
-          draggable={false}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(circle at 50% 38%, rgba(255,203,5,0.2), rgba(255,203,5,0) 60%)' }}
         />
-        <span className="text-center text-sm font-extrabold text-foreground">{name}</span>
-        {info ? (
+        <div className="relative h-16 w-16 sm:h-24 sm:w-24">
+          <img
+            src={`${API_ORIGIN}${spriteUrl}`}
+            alt={name}
+            className="relative z-10 h-full w-full object-contain"
+            draggable={false}
+          />
+          <span
+            aria-hidden
+            className="absolute bottom-0 left-1/2 h-2.5 w-2/5 -translate-x-1/2 rounded-[50%] bg-black/20 blur-[3px]"
+          />
+        </div>
+        <span className="relative z-10 text-center text-sm font-extrabold text-foreground">{name}</span>
+        {info && (
           <motion.div
             initial={reduceMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: reduceMotion ? 0 : index * 0.12 }}
-            className="flex flex-col items-center gap-1"
+            className="relative z-10 flex flex-col items-center gap-1"
           >
             <span
               className={cn(
@@ -256,8 +266,16 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
               />
             )}
           </motion.div>
-        ) : (
-          <span className="font-display text-[10px] text-muted">?</span>
+        )}
+        {isIntruder && (
+          <span className="absolute right-1.5 top-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border-2 border-go-shadow bg-go text-go-foreground">
+            <Check className="h-4 w-4" />
+          </span>
+        )}
+        {isWrongPick && (
+          <span className="absolute right-1.5 top-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border-2 border-danger bg-danger text-white">
+            <X className="h-4 w-4" />
+          </span>
         )}
       </motion.button>
     );
@@ -312,7 +330,15 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <h1 className="font-display text-sm leading-relaxed text-foreground">L'Intrus</h1>
-                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                  <Badge
+                    style={
+                      {
+                        borderColor: levelColor(state.level),
+                        backgroundColor: levelColor(state.level),
+                        color: '#2B2A24',
+                      } as CSSProperties
+                    }
+                  >
                     {LEVEL_LABEL[state.level]}
                   </Badge>
                 </div>
@@ -324,36 +350,18 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
                 </div>
               </div>
 
-              <div className="flex flex-col items-center gap-1">
-                <p className="text-center font-display text-xs leading-relaxed text-foreground sm:text-sm">
+              <div className="flex flex-col items-center gap-1.5">
+                <ArenaInstruction icon={<Search className="h-3.5 w-3.5 text-foreground" />}>
                   {state.prompt}
-                </p>
+                </ArenaInstruction>
                 {state.hint && (
                   <p className="text-center text-sm font-semibold text-primary">{state.hint}</p>
                 )}
               </div>
 
-              {state.members.length === 5 ? (
-                // Moyen : 3 en haut, 2 en bas centrees dans les espaces (rendu homogene).
-                <div className="flex w-full flex-col items-center gap-3">
-                  <div className="flex justify-center gap-3">
-                    {state.members.slice(0, 3).map((m, index) =>
-                      renderTile(m.pokemonId, m.name, m.spriteUrl, index),
-                    )}
-                  </div>
-                  <div className="flex justify-center gap-3">
-                    {state.members.slice(3).map((m, index) =>
-                      renderTile(m.pokemonId, m.name, m.spriteUrl, index + 3),
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className={cn('grid w-full gap-3', gridColsClass(state.members.length))}>
-                  {state.members.map((m, index) =>
-                    renderTile(m.pokemonId, m.name, m.spriteUrl, index),
-                  )}
-                </div>
-              )}
+              <TileGrid>
+                {state.members.map((m, index) => renderTile(m.pokemonId, m.name, m.spriteUrl, index))}
+              </TileGrid>
 
               {error && <p className="text-center text-sm font-semibold text-danger">{error}</p>}
 

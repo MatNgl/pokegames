@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Sparkles } from 'lucide-react';
@@ -21,6 +21,10 @@ import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
 import { DailyDoneCard } from './components/daily-done-card';
 import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
+import { ArenaInstruction } from './components/arena-instruction';
+import { PokemonTile, type TileResult } from './components/pokemon-tile';
+import { TileGrid } from './components/tile-grid';
+import { levelColor } from './level-colors';
 import { getShinyRound, startShiny, submitShinyChoice } from './shiny-api';
 import {
   clearShiny,
@@ -70,12 +74,6 @@ const LEVEL_LABEL: Record<ShinyLevel, string> = {
   MOYEN: 'Moyen',
   DIFFICILE: 'Difficile',
 };
-
-// 3 cartes -> 3 colonnes, 4 -> 2 colonnes (2x2), 6 -> 3 colonnes (2x3).
-function gridColsClass(count: number): string {
-  if (count === 4) return 'grid-cols-2';
-  return 'grid-cols-3';
-}
 
 interface EndInfo {
   correctCount: number;
@@ -234,64 +232,29 @@ function ShinyGame({
     const info = revealMap.get(slot);
     const isAnswer = info?.isAnswer ?? false;
     const isWrongPick = reveal !== null && chosenSlot === slot && !isAnswer;
-
-    const animate =
-      reveal === null || reduceMotion
-        ? {}
-        : isAnswer
-          ? { scale: [1, 1.06, 1] }
-          : isWrongPick
-            ? { x: [0, -6, 6, -4, 4, 0] }
-            : {};
+    const result: TileResult = isAnswer
+      ? 'correct'
+      : isWrongPick
+        ? 'wrong'
+        : reveal !== null
+          ? 'dimmed'
+          : 'none';
 
     return (
-      <motion.button
+      <PokemonTile
         key={imageUrl}
-        type="button"
+        src={`${API_ORIGIN}${imageUrl}`}
         disabled={reveal !== null || busy}
         onClick={() => void onChoose(slot)}
-        animate={animate}
-        transition={{ duration: 0.45 }}
-        className={cn(
-          'relative flex flex-col items-center gap-1.5 rounded-card border-4 bg-white p-3 transition-colors duration-150',
-          reveal === null && 'cursor-pointer hover:border-primary',
-          isAnswer
-            ? 'border-go bg-go/10'
-            : isWrongPick
-              ? 'border-danger bg-danger/10'
-              : reveal !== null
-                ? 'border-border-strong opacity-70'
-                : 'border-border-strong',
-        )}
-      >
-        {info?.isShiny && (
-          <Sparkles className="absolute right-1.5 top-1.5 h-4 w-4 text-accent" aria-hidden="true" />
-        )}
-        <img
-          src={`${API_ORIGIN}${imageUrl}`}
-          alt=""
-          className="h-14 w-14 object-contain sm:h-24 sm:w-24"
-          draggable={false}
-          style={{ imageRendering: 'pixelated' }}
-        />
-        {info ? (
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex flex-col items-center gap-0.5"
-          >
-            <span className="text-center text-sm font-extrabold text-foreground">{info.name}</span>
-            <span
-              className={cn('text-xs font-bold', info.isShiny ? 'text-accent-shadow' : 'text-muted')}
-            >
-              {info.isShiny ? 'Shiny' : 'Normal'}
-            </span>
-          </motion.div>
-        ) : (
-          <span className="font-display text-[10px] text-muted">?</span>
-        )}
-      </motion.button>
+        result={result}
+        pixelated
+        mark={info?.isShiny ? <Sparkles className="h-4 w-4 text-accent" aria-hidden="true" /> : undefined}
+        caption={
+          info ? (
+            <span className="text-[11px] font-extrabold leading-tight text-foreground">{info.name}</span>
+          ) : undefined
+        }
+      />
     );
   };
 
@@ -356,7 +319,15 @@ function ShinyGame({
                   <h1 className="font-display text-sm leading-relaxed text-foreground">
                     {MODE_TITLE[mode]}
                   </h1>
-                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                  <Badge
+                    style={
+                      {
+                        borderColor: levelColor(state.level),
+                        backgroundColor: levelColor(state.level),
+                        color: '#2B2A24',
+                      } as CSSProperties
+                    }
+                  >
                     {LEVEL_LABEL[state.level]}
                   </Badge>
                 </div>
@@ -377,13 +348,11 @@ function ShinyGame({
                 </div>
               </div>
 
-              <p className="text-center font-display text-xs leading-relaxed text-foreground sm:text-sm">
+              <ArenaInstruction icon={<Sparkles className="h-3.5 w-3.5 text-foreground" />}>
                 {state.prompt}
-              </p>
+              </ArenaInstruction>
 
-              <div className={cn('grid w-full gap-3', gridColsClass(state.tiles.length))}>
-                {state.tiles.map((tile) => renderTile(tile.slot, tile.imageUrl))}
-              </div>
+              <TileGrid>{state.tiles.map((tile) => renderTile(tile.slot, tile.imageUrl))}</TileGrid>
 
               {error && <p className="text-center text-sm font-semibold text-danger">{error}</p>}
 

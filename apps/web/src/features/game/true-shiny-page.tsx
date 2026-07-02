@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
 import type {
   TrueShinyChoiceResponse,
   TrueShinyLevel,
@@ -19,6 +19,10 @@ import { cn } from '@/lib/utils';
 import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
 import { DailyDoneCard } from './components/daily-done-card';
+import { ArenaInstruction } from './components/arena-instruction';
+import { PokemonTile, type TileResult } from './components/pokemon-tile';
+import { TileGrid } from './components/tile-grid';
+import { levelColor } from './level-colors';
 import { getTrueShinyRound, startTrueShiny, submitTrueShinyChoice } from './true-shiny-api';
 import {
   clearTrueShiny,
@@ -49,16 +53,6 @@ const LEVEL_LABEL: Record<TrueShinyLevel, string> = {
   MOYEN: 'Moyen',
   DIFFICILE: 'Difficile',
 };
-
-// Decoupe les vignettes en rangees de 3 : 3 seules (facile), 3 + 2 centrees (moyen), 3 + 3 (difficile).
-// La rangee de 2 se centre naturellement dans les espaces des 3 du dessus.
-function chunk<T>(items: T[], size: number): T[][] {
-  const rows: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    rows.push(items.slice(i, i + size));
-  }
-  return rows;
-}
 
 function StatusChip({ status }: { status: TrueShinyDailyStatus }) {
   if (status === 'in-progress') {
@@ -248,44 +242,23 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
     const info = revealMap.get(slot);
     const isAnswer = info?.isAnswer ?? false;
     const isWrongPick = reveal !== null && chosenSlot === slot && !isAnswer;
-
-    const animate =
-      reveal === null || reduceMotion
-        ? {}
-        : isAnswer
-          ? { scale: [1, 1.06, 1] }
-          : isWrongPick
-            ? { x: [0, -6, 6, -4, 4, 0] }
-            : {};
+    const result: TileResult = isAnswer
+      ? 'correct'
+      : isWrongPick
+        ? 'wrong'
+        : reveal !== null
+          ? 'dimmed'
+          : 'none';
 
     return (
-      <motion.button
+      <PokemonTile
         key={imageUrl}
-        type="button"
+        src={`${API_ORIGIN}${imageUrl}`}
         disabled={reveal !== null || busy}
         onClick={() => void onChoose(slot)}
-        animate={animate}
-        transition={{ duration: 0.45 }}
-        className={cn(
-          'flex items-center justify-center rounded-card border-4 bg-white p-2 transition-colors duration-150',
-          reveal === null && 'cursor-pointer hover:border-primary',
-          isAnswer
-            ? 'border-go bg-go/10'
-            : isWrongPick
-              ? 'border-danger bg-danger/10'
-              : reveal !== null
-                ? 'border-border-strong opacity-70'
-                : 'border-border-strong',
-        )}
-      >
-        <img
-          src={`${API_ORIGIN}${imageUrl}`}
-          alt=""
-          className="h-14 w-14 object-contain sm:h-24 sm:w-24"
-          draggable={false}
-          style={{ imageRendering: 'pixelated' }}
-        />
-      </motion.button>
+        result={result}
+        pixelated
+      />
     );
   };
 
@@ -338,7 +311,15 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <h1 className="font-display text-sm leading-relaxed text-foreground">Le Bon Shiny</h1>
-                  <Badge className="border-accent-shadow bg-accent text-foreground">
+                  <Badge
+                    style={
+                      {
+                        borderColor: levelColor(state.level),
+                        backgroundColor: levelColor(state.level),
+                        color: '#2B2A24',
+                      } as CSSProperties
+                    }
+                  >
                     {LEVEL_LABEL[state.level]}
                   </Badge>
                 </div>
@@ -350,17 +331,11 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
                 </div>
               </div>
 
-              <p className="text-center font-display text-xs leading-relaxed text-foreground sm:text-sm">
+              <ArenaInstruction icon={<Sparkles className="h-3.5 w-3.5 text-foreground" />}>
                 Trouve le shiny intact
-              </p>
+              </ArenaInstruction>
 
-              <div className="flex w-full flex-col items-center gap-3">
-                {chunk(state.tiles, 3).map((row, rowIndex) => (
-                  <div key={rowIndex} className="flex justify-center gap-3">
-                    {row.map((tile) => renderTile(tile.slot, tile.imageUrl))}
-                  </div>
-                ))}
-              </div>
+              <TileGrid>{state.tiles.map((tile) => renderTile(tile.slot, tile.imageUrl))}</TileGrid>
 
               {error && <p className="text-center text-sm font-semibold text-danger">{error}</p>}
 
