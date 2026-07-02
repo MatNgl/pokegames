@@ -28,3 +28,10 @@ export async function refreshRequest(): Promise<AuthSession> {
 export async function logoutRequest(): Promise<void> {
   await api.post('/auth/logout', {});
 }
+
+export async function changePasswordRequest(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await api.post('/auth/change-password', { currentPassword, newPassword });
+}

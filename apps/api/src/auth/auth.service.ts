@@ -138,6 +138,28 @@ export class AuthService {
     }
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestException('Mot de passe actuel et nouveau requis');
+    }
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Le nouveau mot de passe doit faire au moins 8 caractères');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('Utilisateur introuvable');
+    }
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      throw new UnauthorizedException('Mot de passe actuel incorrect');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  }
+
   private generateAccessToken(user: UserDTO): string {
     return this.jwtService.sign(
       { sub: user.id, username: user.username, role: user.role },

@@ -14,6 +14,7 @@ describe('AuthService', () => {
   let mockPrismaFindFirst: jest.Mock;
   let mockPrismaCreate: jest.Mock;
   let mockPrismaFindUnique: jest.Mock;
+  let mockPrismaUpdate: jest.Mock;
   let mockJwtSign: jest.Mock;
   let mockRedisSet: jest.Mock;
   let mockRedisGet: jest.Mock;
@@ -23,6 +24,7 @@ describe('AuthService', () => {
     mockPrismaFindFirst = jest.fn();
     mockPrismaCreate = jest.fn();
     mockPrismaFindUnique = jest.fn();
+    mockPrismaUpdate = jest.fn().mockResolvedValue({});
     mockJwtSign = jest.fn().mockReturnValue('access-token-123');
     mockRedisSet = jest.fn().mockResolvedValue(undefined);
     mockRedisGet = jest.fn();
@@ -33,6 +35,7 @@ describe('AuthService', () => {
         findFirst: mockPrismaFindFirst,
         create: mockPrismaCreate,
         findUnique: mockPrismaFindUnique,
+        update: mockPrismaUpdate,
       },
     };
 
@@ -138,6 +141,32 @@ describe('AuthService', () => {
       expect(mockRedisDel).toHaveBeenCalledWith('refresh_token:old-refresh-token');
       expect(res.accessToken).toBe('access-token-123');
       expect(res.refreshToken).not.toBe('old-refresh-token');
+    });
+  });
+
+  describe('changePassword', () => {
+    it('doit hacher et enregistrer le nouveau mot de passe si l’actuel est correct', async () => {
+      mockPrismaFindUnique.mockResolvedValue({ id: 'user-1', passwordHash: 'old-hash' });
+      mockedBcrypt.compare.mockImplementation(async () => true);
+      mockedBcrypt.hash.mockImplementation(async () => 'new-hash');
+
+      await service.changePassword('user-1', 'CurrentPwd1', 'NewPassword1');
+
+      expect(mockedBcrypt.hash).toHaveBeenCalledWith('NewPassword1', 10);
+      expect(mockPrismaUpdate).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { passwordHash: 'new-hash' },
+      });
+    });
+
+    it('doit refuser si le mot de passe actuel est incorrect', async () => {
+      mockPrismaFindUnique.mockResolvedValue({ id: 'user-1', passwordHash: 'old-hash' });
+      mockedBcrypt.compare.mockImplementation(async () => false);
+
+      await expect(service.changePassword('user-1', 'wrong', 'NewPassword1')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockPrismaUpdate).not.toHaveBeenCalled();
     });
   });
 });

@@ -2,7 +2,11 @@ import { Controller, Post, Body, Res, Req, HttpCode, HttpStatus, Get, UseGuards 
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { RegisterRequest, LoginRequest } from '@pokegames/shared-types';
+import { RegisterRequest, LoginRequest, ChangePasswordRequest } from '@pokegames/shared-types';
+
+interface AuthUser {
+  id: string;
+}
 
 @Controller('auth')
 export class AuthController {
@@ -58,5 +62,16 @@ export class AuthController {
   @Get('me')
   async getProfile(@Req() req: Request & { user?: unknown }) {
     return req.user;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Req() req: Request & { user?: AuthUser },
+    @Body() body: ChangePasswordRequest,
+  ) {
+    await this.authService.changePassword(req.user!.id, body.currentPassword, body.newPassword);
+    return { success: true };
   }
 }

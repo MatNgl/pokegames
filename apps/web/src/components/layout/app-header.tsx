@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { History, ListChecks, LogOut, Menu, Shield, Trophy, X } from 'lucide-react';
 import { FolderKanbanIcon } from '@/components/ui/icons/folder-kanban-icon';
 import { SettingsIcon } from '@/components/ui/icons/settings-icon';
+import { SettingsModal } from '@/features/settings/settings-modal';
 import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-context';
@@ -38,6 +39,7 @@ export function AppHeader() {
   const [timeLeft, setTimeLeft] = useState(getNextResetDiff);
   const [onlineCount, setOnlineCount] = useState<number>(1);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -119,7 +121,13 @@ export function AppHeader() {
         <button type="button" className={iconButtonClass} title="Pokédex (bientôt)" aria-label="Pokédex">
           <FolderKanbanIcon size={20} />
         </button>
-        <button type="button" className={iconButtonClass} title="Paramètres (bientôt)" aria-label="Paramètres">
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          className={iconButtonClass}
+          title="Paramètres"
+          aria-label="Paramètres"
+        >
           <SettingsIcon size={20} />
         </button>
         {user?.role === 'ADMIN' && (
@@ -213,6 +221,16 @@ export function AppHeader() {
               <span className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-muted/60">
                 <FolderKanbanIcon size={16} /> Pokédex (bientôt)
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setSettingsOpen(true);
+                }}
+                className="flex items-center gap-2 rounded-control px-2 py-2 text-left text-sm font-semibold text-foreground hover:bg-surface-2"
+              >
+                <SettingsIcon size={16} /> Paramètres
+              </button>
               {user?.role === 'ADMIN' && (
                 <Link
                   to="/admin"
@@ -247,6 +265,7 @@ export function AppHeader() {
           </>
         )}
       </div>
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }
