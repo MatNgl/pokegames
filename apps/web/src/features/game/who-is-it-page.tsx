@@ -42,8 +42,6 @@ import { SilhouetteStage } from './components/silhouette-stage';
 import { WhoIsItSkeleton } from './components/who-is-it-skeleton';
 import { DailyDoneCard } from './components/daily-done-card';
 
-const TOTAL_ROUNDS = 5;
-
 const WHO_IS_IT_RULES = [
   'Devine le Pokémon caché derrière la silhouette.',
   'Chaque mauvaise réponse débloque un nouvel indice.',
@@ -129,7 +127,8 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
       setGameOver(false);
       try {
         // Mode quotidien : serie deterministe du jour, identique pour tous, propre au niveau.
-        const state = await startRound({ mode: 'DAILY', level, roundsCount: TOTAL_ROUNDS, roundIndex });
+        // Le nombre de manches vient de la config serveur (admin), le client ne l'impose pas.
+        const state = await startRound({ mode: 'DAILY', level, roundIndex });
         setRound(state);
         setTotalAttempts(carriedAttempts);
         saveGame(level, {
@@ -298,7 +297,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
                 Défi du jour terminé
               </span>
               <p className="text-sm font-semibold text-muted">
-                Tu as deviné les {TOTAL_ROUNDS} Pokémon. Reviens demain pour un nouveau défi.
+                Tu as deviné tous les Pokémon du jour. Reviens demain pour un nouveau défi.
               </p>
               <p className="font-display text-2xl text-primary">{totalAttempts}</p>
               <p className="text-sm font-bold text-foreground">
