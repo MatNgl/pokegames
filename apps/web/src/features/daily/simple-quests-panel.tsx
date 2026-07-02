@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 import { getDailyStatus } from './daily-api';
-import { gameLabel } from './daily-catalog';
 import { DAILY_GAME_GROUPS, TOTAL_DAILY_CHALLENGES, challengeKey } from './daily-challenges';
 
 // Panneau de quetes compact et lisible : par jeu, une progression fait/total.
@@ -28,7 +27,7 @@ export function SimpleQuestsPanel() {
     const done = g.challenges.filter(
       (c) => serverDone.has(challengeKey(c.gameType, c.scope)) || c.localStatus() === 'done',
     ).length;
-    return { gameType: g.gameType, done, total: g.challenges.length };
+    return { key: g.key, label: g.label, done, total: g.challenges.length };
   });
   const totalDone = groups.reduce((s, g) => s + g.done, 0);
   const allDone = totalDone === TOTAL_DAILY_CHALLENGES;
@@ -51,11 +50,11 @@ export function SimpleQuestsPanel() {
         {groups.map((g) => {
           const complete = g.done === g.total;
           return (
-            <div key={g.gameType} className="flex flex-col gap-1">
+            <div key={g.key} className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2 text-xs font-semibold">
                 <span className={cn('truncate', complete ? 'text-go-shadow' : 'text-foreground')}>
                   {complete && <Check className="mr-1 inline h-3 w-3" />}
-                  {gameLabel(g.gameType)}
+                  {g.label}
                 </span>
                 <span className="shrink-0 text-muted">
                   {g.done}/{g.total}

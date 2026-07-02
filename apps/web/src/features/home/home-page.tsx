@@ -48,7 +48,7 @@ function GameTile({ game, complete }: { game: HomeGame; complete: boolean }) {
 // Page d'accueil : jeu vedette du jour + quetes simplifiees a gauche + sections Solo / Multijoueur.
 export function HomePage() {
   const completed = useCompletedGames();
-  const isDone = (g: HomeGame): boolean => Boolean(g.gameType && completed.has(g.gameType));
+  const isDone = (g: HomeGame): boolean => Boolean(g.completionKey && completed.has(g.completionKey));
   const solo = HOME_GAMES.filter((g) => g.title !== 'Qui est-ce');
   const multi = HOME_GAMES.filter((g) => g.title === 'Qui est-ce');
   const fIndex = featuredIndex(solo.length);

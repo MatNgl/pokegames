@@ -17,6 +17,8 @@ export interface DailyChallenge {
 }
 
 export interface DailyGameGroup {
+  key: string; // identifiant unique du groupe (= gameType, sauf shiny scinde par mode)
+  label: string; // libelle affiche dans les quetes
   gameType: string;
   route: string;
   challenges: DailyChallenge[];
@@ -34,6 +36,8 @@ const LEVEL_LABEL: Record<string, string> = {
 // Catalogue complet des defis quotidiens (jeu x niveau/mode). Source unique pour les quetes.
 export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
   {
+    key: 'WHO_IS_IT',
+    label: 'Quel est ce Pokémon',
     gameType: 'WHO_IS_IT',
     route: '/jouer',
     challenges: LEVELS4.map((l) => ({
@@ -45,6 +49,8 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     })),
   },
   {
+    key: 'MOTUS',
+    label: 'Poké-Motus',
     gameType: 'MOTUS',
     route: '/motus',
     challenges: LEVELS4.map((l) => ({
@@ -56,6 +62,8 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     })),
   },
   {
+    key: 'PLUS_MINUS',
+    label: 'Plus ou Moins',
     gameType: 'PLUS_MINUS',
     route: '/plus-ou-moins',
     challenges: LEVELS4.map((l) => ({
@@ -67,6 +75,8 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     })),
   },
   {
+    key: 'INTRUDER',
+    label: "L'Intrus",
     gameType: 'INTRUDER',
     route: '/intrus',
     challenges: LEVELS3.map((l) => ({
@@ -77,27 +87,37 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
       localStatus: () => intruderDailyStatus(l),
     })),
   },
+  // Trouve le shiny et Trouve le non-shiny : deux jeux distincts (vignettes et modes differents),
+  // donc deux groupes de quetes separes, meme si le type serveur reste SHINY (scope par mode).
   {
+    key: 'SHINY_FIND_SHINY',
+    label: 'Trouve le shiny',
     gameType: 'SHINY',
     route: '/shiny',
-    challenges: [
-      ...LEVELS3.map((l) => ({
-        gameType: 'SHINY',
-        scope: `FIND_SHINY:${l}`,
-        label: `Shiny · ${LEVEL_LABEL[l] ?? l}`,
-        route: '/shiny',
-        localStatus: () => shinyDailyStatus('FIND_SHINY', l),
-      })),
-      ...LEVELS3.map((l) => ({
-        gameType: 'SHINY',
-        scope: `FIND_NON_SHINY:${l}`,
-        label: `Non-Shiny · ${LEVEL_LABEL[l] ?? l}`,
-        route: '/non-shiny',
-        localStatus: () => shinyDailyStatus('FIND_NON_SHINY', l),
-      })),
-    ],
+    challenges: LEVELS3.map((l) => ({
+      gameType: 'SHINY',
+      scope: `FIND_SHINY:${l}`,
+      label: LEVEL_LABEL[l] ?? l,
+      route: '/shiny',
+      localStatus: () => shinyDailyStatus('FIND_SHINY', l),
+    })),
   },
   {
+    key: 'SHINY_FIND_NON_SHINY',
+    label: 'Trouve le non-shiny',
+    gameType: 'SHINY',
+    route: '/non-shiny',
+    challenges: LEVELS3.map((l) => ({
+      gameType: 'SHINY',
+      scope: `FIND_NON_SHINY:${l}`,
+      label: LEVEL_LABEL[l] ?? l,
+      route: '/non-shiny',
+      localStatus: () => shinyDailyStatus('FIND_NON_SHINY', l),
+    })),
+  },
+  {
+    key: 'TRUE_SHINY',
+    label: 'Le Bon Shiny',
     gameType: 'TRUE_SHINY',
     route: '/bon-shiny',
     challenges: LEVELS3.map((l) => ({
@@ -109,6 +129,8 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     })),
   },
   {
+    key: 'JUST_STAT',
+    label: 'La Juste Stat',
     gameType: 'JUST_STAT',
     route: '/juste-stat',
     challenges: [

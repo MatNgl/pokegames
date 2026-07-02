@@ -4,7 +4,7 @@ import { useAuth } from '@/features/auth/auth-context';
 import { getDailyStatus } from './daily-api';
 import { DAILY_GAME_GROUPS, challengeKey } from './daily-challenges';
 
-/** Renvoie l'ensemble des jeux termines a 100 % aujourd'hui (tous niveaux/modes faits). */
+/** Renvoie l'ensemble des groupes de jeu termines a 100 % aujourd'hui (cle = DailyGameGroup.key). */
 export function useCompletedGames(): Set<string> {
   const { user } = useAuth();
   const { data } = useQuery({
@@ -23,7 +23,7 @@ export function useCompletedGames(): Set<string> {
       const allDone = group.challenges.every(
         (c) => serverDone.has(challengeKey(c.gameType, c.scope)) || c.localStatus() === 'done',
       );
-      if (allDone) completed.add(group.gameType);
+      if (allDone) completed.add(group.key);
     }
     return completed;
   }, [data]);

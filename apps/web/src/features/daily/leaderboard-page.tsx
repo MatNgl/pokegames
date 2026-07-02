@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { getLeaderboard } from './daily-api';
-import { gameLabel, resultMetric } from './daily-catalog';
+import { resultMetric } from './daily-catalog';
 import { DAILY_GAME_GROUPS } from './daily-challenges';
 
 const TAB_BASE =
@@ -16,23 +16,23 @@ const TAB_BASE =
 
 export function LeaderboardPage() {
   const navigate = useNavigate();
-  const [gameType, setGameType] = useState<string>(DAILY_GAME_GROUPS[0]?.gameType ?? 'WHO_IS_IT');
+  const [groupKey, setGroupKey] = useState<string>(DAILY_GAME_GROUPS[0]?.key ?? 'WHO_IS_IT');
   const [scope, setScope] = useState<string>(DAILY_GAME_GROUPS[0]?.challenges[0]?.scope ?? '');
 
   const group = useMemo(
-    () => DAILY_GAME_GROUPS.find((g) => g.gameType === gameType) ?? DAILY_GAME_GROUPS[0],
-    [gameType],
+    () => DAILY_GAME_GROUPS.find((g) => g.key === groupKey) ?? DAILY_GAME_GROUPS[0],
+    [groupKey],
   );
 
-  const pickGame = (nextGame: string) => {
-    const nextGroup = DAILY_GAME_GROUPS.find((g) => g.gameType === nextGame);
-    setGameType(nextGame);
+  const pickGame = (nextKey: string) => {
+    const nextGroup = DAILY_GAME_GROUPS.find((g) => g.key === nextKey);
+    setGroupKey(nextKey);
     setScope(nextGroup?.challenges[0]?.scope ?? '');
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ['leaderboard', gameType, scope],
-    queryFn: () => getLeaderboard(gameType, scope),
+    queryKey: ['leaderboard', groupKey, scope],
+    queryFn: () => getLeaderboard(group?.gameType ?? '', scope),
     staleTime: 20_000,
   });
 
@@ -56,17 +56,17 @@ export function LeaderboardPage() {
             <div className="flex flex-wrap gap-1.5">
               {DAILY_GAME_GROUPS.map((g) => (
                 <button
-                  key={g.gameType}
+                  key={g.key}
                   type="button"
-                  onClick={() => pickGame(g.gameType)}
+                  onClick={() => pickGame(g.key)}
                   className={cn(
                     TAB_BASE,
-                    g.gameType === gameType
+                    g.key === groupKey
                       ? 'border-primary-shadow bg-primary text-primary-foreground'
                       : 'border-border-strong bg-surface-2/60 text-muted hover:border-primary hover:text-foreground',
                   )}
                 >
-                  {gameLabel(g.gameType)}
+                  {g.label}
                 </button>
               ))}
             </div>

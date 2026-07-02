@@ -7,7 +7,6 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/auth-context';
 import { getDailyStatus } from './daily-api';
-import { gameLabel } from './daily-catalog';
 import {
   DAILY_GAME_GROUPS,
   TOTAL_DAILY_CHALLENGES,
@@ -77,9 +76,9 @@ export function DailyQuestsPanel() {
       {open && (
         <div className="mt-4 flex flex-col gap-3">
           {DAILY_GAME_GROUPS.map((group) => (
-            <div key={group.gameType} className="flex flex-col gap-1.5">
+            <div key={group.key} className="flex flex-col gap-1.5">
               <p className="font-display text-[9px] uppercase tracking-widest text-muted">
-                {gameLabel(group.gameType)}
+                {group.label}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {group.challenges.map((c) => {

@@ -13,18 +13,19 @@ export interface HomeGame {
   description: string;
   to: string;
   iconImg: string;
-  gameType?: string; // cle du catalogue de defis (absent pour le multi, sans defi quotidien)
+  // Cle du groupe de quetes (DailyGameGroup.key) pour le badge "terminé". Absent pour le multi.
+  completionKey?: string;
 }
 
 // Liste partagee des jeux de l'accueil.
 export const HOME_GAMES: HomeGame[] = [
-  { title: 'Silhouette', description: 'Devine le Pokémon caché', to: '/jouer', iconImg: whoIsItImg, gameType: 'WHO_IS_IT' },
-  { title: 'Poké-Motus', description: 'Trouve le nom du Pokémon', to: '/motus', iconImg: pokeMotusImg, gameType: 'MOTUS' },
-  { title: 'Plus ou Moins', description: 'Compare les statistiques', to: '/plus-ou-moins', iconImg: plusMinusImg, gameType: 'PLUS_MINUS' },
-  { title: "L'Intrus", description: 'Repère celui qui ne va pas', to: '/intrus', iconImg: intrusImg, gameType: 'INTRUDER' },
-  { title: 'La Juste Stat', description: 'Devine la valeur exacte', to: '/juste-stat', iconImg: justPriceImg, gameType: 'JUST_STAT' },
-  { title: 'Le Bon Shiny', description: 'Repère le shiny authentique', to: '/bon-shiny', iconImg: leBonShinyImg, gameType: 'TRUE_SHINY' },
-  { title: 'Trouve le shiny', description: 'Repère le Pokémon shiny', to: '/shiny', iconImg: findShinyImg, gameType: 'SHINY' },
-  { title: 'Trouve le non-shiny', description: "Repère celui qui n'est pas shiny", to: '/non-shiny', iconImg: findNotShinyImg, gameType: 'SHINY' },
+  { title: 'Silhouette', description: 'Devine le Pokémon caché', to: '/jouer', iconImg: whoIsItImg, completionKey: 'WHO_IS_IT' },
+  { title: 'Poké-Motus', description: 'Trouve le nom du Pokémon', to: '/motus', iconImg: pokeMotusImg, completionKey: 'MOTUS' },
+  { title: 'Plus ou Moins', description: 'Compare les statistiques', to: '/plus-ou-moins', iconImg: plusMinusImg, completionKey: 'PLUS_MINUS' },
+  { title: "L'Intrus", description: 'Repère celui qui ne va pas', to: '/intrus', iconImg: intrusImg, completionKey: 'INTRUDER' },
+  { title: 'La Juste Stat', description: 'Devine la valeur exacte', to: '/juste-stat', iconImg: justPriceImg, completionKey: 'JUST_STAT' },
+  { title: 'Le Bon Shiny', description: 'Repère le shiny authentique', to: '/bon-shiny', iconImg: leBonShinyImg, completionKey: 'TRUE_SHINY' },
+  { title: 'Trouve le shiny', description: 'Repère le Pokémon shiny', to: '/shiny', iconImg: findShinyImg, completionKey: 'SHINY_FIND_SHINY' },
+  { title: 'Trouve le non-shiny', description: "Repère celui qui n'est pas shiny", to: '/non-shiny', iconImg: findNotShinyImg, completionKey: 'SHINY_FIND_NON_SHINY' },
   { title: 'Qui est-ce', description: 'Duel 1 contre 1 en temps réel', to: '/qui-est-ce', iconImg: quiEstCeImg },
 ];
