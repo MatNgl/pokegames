@@ -6,7 +6,7 @@ module.exports = {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
   moduleNameMapper: {
-    '^@pokegames/shared-types$': '<rootDir>/../../packages/shared-types/src/index.ts',
+    '^@pokegames/shared-types$': '<rootDir>/../../../packages/shared-types/src/index.ts',
   },
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',

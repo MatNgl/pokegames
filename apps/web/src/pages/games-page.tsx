@@ -257,7 +257,13 @@ export function GamesPage() {
       available: true,
       dailyKey: 'true-shiny',
     },
-    { title: 'Qui est-ce', description: 'Déduction en duel', iconImg: quiEstCeImg, available: false },
+    {
+      title: 'Qui est-ce',
+      description: 'Duel 1 contre 1 en temps réel',
+      to: '/qui-est-ce',
+      iconImg: quiEstCeImg,
+      available: true,
+    },
   ];
 
   return (

@@ -92,6 +92,56 @@ export interface AdminGameConfigEntry {
   updatedAt: string;
 }
 
+/* ==========================================================================
+ * Qui est-ce ? (multijoueur 1v1, temps reel Socket.io)
+ * ========================================================================== */
+
+export interface GuessWhoCard {
+  pokemonId: number;
+  name: string;
+}
+
+export type GuessWhoPhase = 'ASKING' | 'ANSWERING' | 'ELIMINATING';
+
+export interface GuessWhoStateDTO {
+  gameId: string;
+  grid: GuessWhoCard[]; // grille commune de 25 Pokemon
+  yourSecretPokemonId: number; // le Pokemon secret du joueur (jamais celui de l'adversaire)
+  opponentName: string;
+  phase: GuessWhoPhase;
+  yourTurn: boolean; // true si c'est a vous de poser la question / d'eliminer
+  currentQuestion: string | null;
+  turnDeadline: number | null; // epoch ms : fin du minuteur d'elimination
+}
+
+export interface GuessWhoOverDTO {
+  youWon: boolean;
+  winnerName: string;
+  yourSecretPokemonId: number;
+  opponentSecretPokemonId: number;
+  reason: 'GUESS' | 'FORFEIT';
+}
+
+// Canaux Socket.io (client -> serveur et serveur -> client).
+export const GUESS_WHO_EVENTS = {
+  // client -> serveur
+  joinQueue: 'gw:joinQueue',
+  createRoom: 'gw:createRoom',
+  joinRoom: 'gw:joinRoom',
+  cancel: 'gw:cancel',
+  ask: 'gw:ask',
+  answer: 'gw:answer',
+  finalGuess: 'gw:finalGuess',
+  // serveur -> client
+  waiting: 'gw:waiting', // { code? } en attente d'un adversaire
+  roomCreated: 'gw:roomCreated', // { code }
+  state: 'gw:state', // GuessWhoStateDTO
+  question: 'gw:question', // { text }
+  answered: 'gw:answered', // { value: boolean }
+  over: 'gw:over', // GuessWhoOverDTO
+  errorMsg: 'gw:error', // { message }
+} as const;
+
 export interface PokemonStats {
   hp: number;
   atk: number;

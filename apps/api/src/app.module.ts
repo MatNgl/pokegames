@@ -6,6 +6,7 @@ import { EtlModule } from './etl/etl.module';
 import { EventsModule } from './events/events.module';
 import { GameModule } from './game/game.module';
 import { GameConfigModule } from './game-config/game-config.module';
+import { GuessWhoModule } from './guess-who/guess-who.module';
 import { HistoryModule } from './history/history.module';
 import { DailyResultModule } from './daily-result/daily-result.module';
 import { PokemonModule } from './pokemon/pokemon.module';
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
     EventsModule,
     GameConfigModule,
     GameModule,
+    GuessWhoModule,
     HistoryModule,
     DailyResultModule,
     PokemonModule,
