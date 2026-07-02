@@ -65,7 +65,7 @@ export function HomePage() {
         <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8">
           <div className="text-center">
             <h1 className="font-display text-2xl text-accent" style={{ textShadow: '2px 2px 0 #28338c' }}>
-              PokéGames
+              Poké-Idle
             </h1>
             <p
               className="mt-3 font-display text-[10px] leading-relaxed text-white sm:text-xs"

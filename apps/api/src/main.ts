@@ -32,7 +32,7 @@ async function bootstrap(): Promise<void> {
 
   const port = process.env['PORT'] ?? 3001;
   await app.listen(port);
-  logger.log(`PokéGames Backend en écoute sur le port ${port}`);
+  logger.log(`Poké-Idle Backend en écoute sur le port ${port}`);
 }
 
 void bootstrap();

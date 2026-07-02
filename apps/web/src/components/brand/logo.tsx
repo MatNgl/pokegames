@@ -10,7 +10,7 @@ export function Logo({ className }: { className?: string }) {
           '2px 2px 0 #28338c, -2px 2px 0 #28338c, 2px -2px 0 #28338c, -2px -2px 0 #28338c, 0 3px 0 #28338c',
       }}
     >
-      PokéGames
+      Poké-Idle
     </span>
   );
 }
