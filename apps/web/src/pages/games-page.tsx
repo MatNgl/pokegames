@@ -218,7 +218,7 @@ export function GamesPage() {
       dailyKey: 'who-is-it',
     },
     {
-      title: 'Motus',
+      title: 'Poké-Motus',
       description: 'Trouve le nom du Pokémon',
       to: '/motus',
       iconImg: pokeMotusImg,
