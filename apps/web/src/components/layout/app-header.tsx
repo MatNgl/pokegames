@@ -9,7 +9,7 @@ import { useAuth } from '@/features/auth/auth-context';
 import { api } from '@/lib/api';
 
 const iconButtonClass =
-  'flex h-10 w-10 items-center justify-center rounded-control text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-foreground cursor-pointer';
+  'flex h-10 w-10 items-center justify-center rounded-control text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
 
 function getNextResetDiff(): { hours: number; minutes: number; seconds: number } {
   const now = new Date();
