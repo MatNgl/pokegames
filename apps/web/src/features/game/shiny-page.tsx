@@ -244,6 +244,7 @@ function ShinyGame({
       <PokemonTile
         key={imageUrl}
         src={`${API_ORIGIN}${imageUrl}`}
+        ariaLabel={`Choisir la case ${slot + 1}`}
         disabled={reveal !== null || busy}
         onClick={() => void onChoose(slot)}
         result={result}
@@ -307,7 +308,7 @@ function ShinyGame({
                     type="button"
                     onClick={onBack}
                     aria-label="Changer de niveau"
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
@@ -332,7 +333,7 @@ function ShinyGame({
                     onClick={() => navigate(other.route)}
                     aria-label={`Passer au mode ${MODE_TITLE[other.mode]}`}
                     title={MODE_TITLE[other.mode]}
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
                   >
                     <RefreshCw className="h-5 w-5" />
                   </button>
@@ -354,6 +355,8 @@ function ShinyGame({
               {reveal && (
                 <div className="flex flex-col items-center gap-3">
                   <motion.p
+                    role="status"
+                    aria-live="polite"
                     initial={reduceMotion ? false : { scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.3, ease: 'easeOut' }}

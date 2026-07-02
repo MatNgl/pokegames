@@ -31,7 +31,10 @@ function featuredIndex(count: number): number {
 
 function GameTile({ game, complete }: { game: HomeGame; complete: boolean }) {
   return (
-    <Link to={game.to}>
+    <Link
+      to={game.to}
+      className="block rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+    >
       <Card className="relative flex h-full flex-col items-center gap-2 p-3 text-center transition-transform duration-100 hover:-translate-y-0.5 hover:border-primary">
         {complete && <DoneBadge />}
         <div className="flex h-16 w-16 items-center justify-center rounded-card border-2 border-border-strong bg-go/10">
@@ -124,7 +127,11 @@ export function HomePage() {
                   </h3>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {multi.map((game) => (
-                      <Link key={game.title} to={game.to}>
+                      <Link
+                        key={game.title}
+                        to={game.to}
+                        className="block rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                      >
                         <Card className="flex h-full items-center gap-3 border-primary p-3 transition-transform duration-100 hover:-translate-y-0.5">
                           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-card border-2 border-border-strong bg-primary/10">
                             <img src={game.iconImg} alt="" className="h-10 w-10 object-contain" draggable={false} />

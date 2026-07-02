@@ -10,7 +10,7 @@ interface NumericPadProps {
 }
 
 const KEY =
-  'flex h-12 items-center justify-center rounded-control border-2 text-lg font-extrabold transition-colors duration-100 disabled:opacity-50 cursor-pointer';
+  'flex h-12 items-center justify-center rounded-control border-2 text-lg font-extrabold transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 cursor-pointer';
 
 // Pave numerique tactile : entree de nombres fiable sur mobile (jeux ou l'on saisit une valeur).
 export function NumericPad({ onDigit, onBackspace, onSubmit, disabled, canSubmit }: NumericPadProps) {

@@ -290,7 +290,7 @@ function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void })
                     type="button"
                     onClick={onBack}
                     aria-label="Changer de niveau"
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>

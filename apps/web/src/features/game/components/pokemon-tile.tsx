@@ -9,6 +9,7 @@ export type TileResult = 'none' | 'correct' | 'wrong' | 'dimmed';
 interface PokemonTileProps {
   src: string; // URL de l'image (deja absolue)
   alt?: string;
+  ariaLabel?: string; // nom accessible du bouton (les cases n'ont pas toujours de texte visible)
   onClick?: () => void;
   disabled?: boolean;
   result?: TileResult;
@@ -24,6 +25,7 @@ interface PokemonTileProps {
 export function PokemonTile({
   src,
   alt = '',
+  ariaLabel,
   onClick,
   disabled = false,
   result = 'none',
@@ -55,12 +57,13 @@ export function PokemonTile({
     <motion.button
       type="button"
       disabled={disabled}
+      aria-label={ariaLabel}
       onClick={onClick}
       animate={animate}
       transition={{ duration: 0.45 }}
       style={borderStyle}
       className={cn(
-        'relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-card border-4 border-border-strong bg-tile p-3 shadow-[0_4px_0_rgba(43,42,36,0.15)] transition-transform duration-100',
+        'relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-card border-4 border-border-strong bg-tile p-3 shadow-[0_4px_0_rgba(43,42,36,0.15)] transition-transform duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
         !revealed && !disabled && 'cursor-pointer hover:-translate-y-0.5 hover:border-primary',
         result === 'dimmed' && 'opacity-60',
         className,

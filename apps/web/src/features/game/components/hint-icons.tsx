@@ -62,7 +62,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
               <span className="min-w-0 flex-1 truncate text-right text-xs font-bold text-foreground">
                 {hintValueText(hint)}
               </span>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border-2 border-go-shadow bg-go text-go-foreground shadow-[0_2px_0_var(--color-go-shadow)]">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control border-2 border-go-shadow bg-go text-go-foreground shadow-[0_2px_0_var(--color-go-shadow)]">
                 <HintGlyph type={hint.type} />
               </span>
             </div>
@@ -79,7 +79,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
               <span className="text-[10px] font-bold text-muted/70">
                 {hint.unlockedAtMistakeCount} err.
               </span>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border-2 border-border-strong bg-surface-2 text-muted/60">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control border-2 border-border-strong bg-surface-2 text-muted/60">
                 <Lock className="h-4 w-4" />
               </span>
             </div>
@@ -96,7 +96,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
               initial={justUnlocked && !reduceMotion ? { scale: 0.5, opacity: 0 } : false}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-control border-2 border-go bg-surface text-go-shadow shadow-[0_2px_0_var(--color-go)] transition-colors duration-200 hover:bg-go hover:text-white disabled:opacity-50"
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-control border-2 border-go bg-surface text-go-shadow shadow-[0_2px_0_var(--color-go)] transition-colors duration-200 hover:bg-go hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50"
             >
               <HintGlyph type={hint.type} />
             </motion.button>

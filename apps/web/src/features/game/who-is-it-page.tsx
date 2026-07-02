@@ -35,7 +35,7 @@ import {
   todayKey,
   whoIsItDailyStatus,
 } from './daily-storage';
-import { levelColor } from './level-colors';
+import { levelColor, levelBadgeText } from './level-colors';
 import { GuessAutocomplete } from './components/guess-autocomplete';
 import { HintIcons } from './components/hint-icons';
 import { LevelSelectScreen } from './components/level-select-screen';
@@ -352,7 +352,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
                     type="button"
                     onClick={onBack}
                     aria-label="Changer de niveau"
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
@@ -377,7 +377,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
                         {
                           borderColor: levelColor(level),
                           backgroundColor: levelColor(level),
-                          color: '#2B2A24',
+                          color: levelBadgeText(level),
                         } as CSSProperties
                       }
                     >

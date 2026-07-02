@@ -29,7 +29,7 @@ interface MotusKeyboardProps {
 }
 
 const KEY_BASE =
-  'flex h-11 items-center justify-center rounded-md border-2 px-1 text-sm font-bold uppercase transition-colors duration-150 disabled:opacity-50 sm:px-2';
+  'flex h-11 items-center justify-center rounded-md border-2 px-1 text-sm font-bold uppercase transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 sm:px-2';
 
 export function MotusKeyboard({ letterStates, disabled, onKey, onBackspace }: MotusKeyboardProps) {
   return (

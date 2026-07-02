@@ -22,7 +22,7 @@ import { CountUp } from './components/count-up';
 import { DailyDoneCard } from './components/daily-done-card';
 import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
 import { ArenaInstruction } from './components/arena-instruction';
-import { levelColor } from './level-colors';
+import { levelColor, levelBadgeText } from './level-colors';
 import { getPlusMinusRound, startPlusMinus, submitPlusMinusChoice } from './plus-minus-api';
 import {
   clearPlusMinus,
@@ -223,12 +223,13 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
       <motion.button
         type="button"
         disabled={revealed || busy}
+        aria-label={`Choisir ${contestant.name}`}
         onClick={() => void onChoose(side)}
         animate={animate}
         transition={{ duration: 0.45 }}
         style={borderStyle}
         className={cn(
-          'relative flex flex-1 flex-col items-center gap-2 overflow-hidden rounded-card border-4 border-border-strong bg-tile p-4 shadow-[0_4px_0_rgba(43,42,36,0.15)] transition-transform duration-100',
+          'relative flex flex-1 flex-col items-center gap-2 overflow-hidden rounded-card border-4 border-border-strong bg-tile p-4 shadow-[0_4px_0_rgba(43,42,36,0.15)] transition-transform duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
           !revealed && 'cursor-pointer hover:-translate-y-0.5 hover:border-primary',
           revealed && !isCorrect && !isWrongPick && 'opacity-60',
         )}
@@ -317,7 +318,7 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
                     type="button"
                     onClick={onBack}
                     aria-label="Changer de niveau"
-                    className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:text-primary"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
@@ -327,7 +328,7 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
                       {
                         borderColor: levelColor(state.level),
                         backgroundColor: levelColor(state.level),
-                        color: '#2B2A24',
+                        color: levelBadgeText(state.level),
                       } as CSSProperties
                     }
                   >
@@ -357,6 +358,8 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
               {reveal && (
                 <div className="flex flex-col items-center gap-3">
                   <motion.p
+                    role="status"
+                    aria-live="polite"
                     initial={reduceMotion ? false : { scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.3, ease: 'easeOut' }}

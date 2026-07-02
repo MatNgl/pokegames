@@ -11,6 +11,12 @@ export function levelColor(level: string): string {
   return LEVEL_COLOR[level] ?? '#3B4CCA';
 }
 
+// Couleur de texte lisible (AA) sur un badge rempli de la couleur du niveau. Le rouge Extrême est
+// trop sombre pour du texte sombre : on passe en blanc. Les autres restent en texte sombre.
+export function levelBadgeText(level: string): string {
+  return level === 'EXTREME' ? '#FFFFFF' : '#2B2A24';
+}
+
 // Teinte tres claire (le meme ton, en transparence) pour un fond de carte discret.
 export function levelTint(level: string, alpha = 0.08): string {
   const hex = levelColor(level).replace('#', '');

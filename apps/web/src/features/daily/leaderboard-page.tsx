@@ -12,7 +12,7 @@ import { resultMetric } from './daily-catalog';
 import { DAILY_GAME_GROUPS } from './daily-challenges';
 
 const TAB_BASE =
-  'rounded-control border-2 px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer';
+  'rounded-control border-2 px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
 
 export function LeaderboardPage() {
   const navigate = useNavigate();
@@ -58,6 +58,7 @@ export function LeaderboardPage() {
                 <button
                   key={g.key}
                   type="button"
+                  aria-pressed={g.key === groupKey}
                   onClick={() => pickGame(g.key)}
                   className={cn(
                     TAB_BASE,
@@ -77,6 +78,7 @@ export function LeaderboardPage() {
                   <button
                     key={c.scope}
                     type="button"
+                    aria-pressed={c.scope === scope}
                     onClick={() => setScope(c.scope)}
                     className={cn(
                       TAB_BASE,
