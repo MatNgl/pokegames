@@ -35,7 +35,7 @@ import {
   todayKey,
   whoIsItDailyStatus,
 } from './daily-storage';
-import { levelColor, levelBadgeText } from './level-colors';
+import { levelColor, LEVEL_BADGE_TEXT, LEVEL_BADGE_TEXT_SHADOW } from './level-colors';
 import { GuessAutocomplete } from './components/guess-autocomplete';
 import { HintIcons } from './components/hint-icons';
 import { LevelSelectScreen } from './components/level-select-screen';
@@ -377,7 +377,8 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
                         {
                           borderColor: levelColor(level),
                           backgroundColor: levelColor(level),
-                          color: levelBadgeText(level),
+                          color: LEVEL_BADGE_TEXT,
+                          textShadow: LEVEL_BADGE_TEXT_SHADOW,
                         } as CSSProperties
                       }
                     >

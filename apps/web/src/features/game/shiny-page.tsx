@@ -24,7 +24,7 @@ import { LevelSelectScreen, type LevelOption } from './components/level-select-s
 import { ArenaInstruction } from './components/arena-instruction';
 import { PokemonTile, type TileResult } from './components/pokemon-tile';
 import { TileGrid } from './components/tile-grid';
-import { levelColor } from './level-colors';
+import { levelColor, LEVEL_BADGE_TEXT, LEVEL_BADGE_TEXT_SHADOW } from './level-colors';
 import { getShinyRound, startShiny, submitShinyChoice } from './shiny-api';
 import {
   clearShiny,
@@ -320,7 +320,8 @@ function ShinyGame({
                       {
                         borderColor: levelColor(state.level),
                         backgroundColor: levelColor(state.level),
-                        color: '#2B2A24',
+                        color: LEVEL_BADGE_TEXT,
+                        textShadow: LEVEL_BADGE_TEXT_SHADOW,
                       } as CSSProperties
                     }
                   >

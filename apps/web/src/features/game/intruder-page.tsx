@@ -22,7 +22,7 @@ import { DailyDoneCard } from './components/daily-done-card';
 import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
 import { ArenaInstruction } from './components/arena-instruction';
 import { TileGrid } from './components/tile-grid';
-import { levelColor } from './level-colors';
+import { levelColor, LEVEL_BADGE_TEXT, LEVEL_BADGE_TEXT_SHADOW } from './level-colors';
 import { getIntruderRound, startIntruder, submitIntruderChoice } from './intruder-api';
 import {
   clearIntruder,
@@ -336,7 +336,8 @@ function IntruderGame({ level, onBack }: { level: IntruderLevel; onBack: () => v
                       {
                         borderColor: levelColor(state.level),
                         backgroundColor: levelColor(state.level),
-                        color: '#2B2A24',
+                        color: LEVEL_BADGE_TEXT,
+                        textShadow: LEVEL_BADGE_TEXT_SHADOW,
                       } as CSSProperties
                     }
                   >

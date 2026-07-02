@@ -22,7 +22,7 @@ import { CountUp } from './components/count-up';
 import { DailyDoneCard } from './components/daily-done-card';
 import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
 import { ArenaInstruction } from './components/arena-instruction';
-import { levelColor, levelBadgeText } from './level-colors';
+import { levelColor, LEVEL_BADGE_TEXT, LEVEL_BADGE_TEXT_SHADOW } from './level-colors';
 import { getPlusMinusRound, startPlusMinus, submitPlusMinusChoice } from './plus-minus-api';
 import {
   clearPlusMinus,
@@ -328,7 +328,8 @@ function PlusMinusGame({ level, onBack }: { level: PlusMinusLevel; onBack: () =>
                       {
                         borderColor: levelColor(state.level),
                         backgroundColor: levelColor(state.level),
-                        color: levelBadgeText(state.level),
+                        color: LEVEL_BADGE_TEXT,
+                        textShadow: LEVEL_BADGE_TEXT_SHADOW,
                       } as CSSProperties
                     }
                   >
