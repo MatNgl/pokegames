@@ -331,7 +331,7 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
                 </div>
               </div>
 
-              <ArenaInstruction icon={<Sparkles className="h-3.5 w-3.5 text-foreground" />}>
+              <ArenaInstruction>
                 Trouve le shiny intact
               </ArenaInstruction>
 

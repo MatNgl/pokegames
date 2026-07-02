@@ -70,12 +70,6 @@ export function SimpleQuestsPanel() {
           );
         })}
       </div>
-
-      {!user && (
-        <p className="text-[11px] font-semibold text-muted">
-          Connecte-toi pour suivre tes quêtes sur tous tes appareils.
-        </p>
-      )}
     </Card>
   );
 }
