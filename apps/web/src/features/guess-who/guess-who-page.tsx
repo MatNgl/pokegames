@@ -170,11 +170,14 @@ export function GuessWhoPage() {
   if (!user) {
     return (
       <Shell>
-        <Card className="mt-10 flex max-w-md flex-col items-center gap-4 p-8 text-center">
+        <Card className="mt-10 flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
           <h1 className="font-display text-sm text-foreground">Qui est-ce ?</h1>
           <p className="text-sm font-semibold text-muted">Connecte-toi pour jouer en 1 contre 1.</p>
-          <Button onClick={() => navigate('/connexion', { state: { from: '/qui-est-ce' } })}>
+          <Button className="w-full" onClick={() => navigate('/connexion', { state: { from: '/qui-est-ce' } })}>
             Se connecter
+          </Button>
+          <Button className="w-full" onClick={() => navigate('/')}>
+            Retour à l'accueil
           </Button>
         </Card>
       </Shell>
@@ -206,7 +209,7 @@ export function GuessWhoPage() {
           <Button className="w-full" onClick={leave}>
             Rejouer
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
+          <Button className="w-full" onClick={() => navigate('/')}>
             Retour à l'accueil
           </Button>
         </Card>
@@ -285,6 +288,9 @@ export function GuessWhoPage() {
                 </Button>
               </div>
               {!connected && <p className="text-center text-xs text-muted">Connexion au serveur...</p>}
+              <Button className="w-full" onClick={() => navigate('/')}>
+                Retour à l'accueil
+              </Button>
             </div>
           )}
         </Card>

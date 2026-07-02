@@ -95,6 +95,9 @@ export function LoginPage() {
               Créer un compte
             </Link>
           </p>
+          <Button className="mt-4 w-full" onClick={() => navigate('/')}>
+            Retour à l'accueil
+          </Button>
         </Card>
       </div>
     </AppBackground>

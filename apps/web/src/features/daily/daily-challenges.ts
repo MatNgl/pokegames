@@ -6,6 +6,15 @@ import { shinyDailyStatus } from '@/features/game/shiny-storage';
 import { trueShinyDailyStatus } from '@/features/game/true-shiny-storage';
 import { justStatDailyStatus } from '@/features/game/just-stat-storage';
 
+import whoIsItImg from '@/assets/games/who-is-it.png';
+import pokeMotusImg from '@/assets/games/poke-motus.png';
+import plusMinusImg from '@/assets/games/plus-minus.png';
+import intrusImg from '@/assets/games/intrus.png';
+import findShinyImg from '@/assets/games/find_shiny.png';
+import findNotShinyImg from '@/assets/games/find_not_shiny.png';
+import justPriceImg from '@/assets/games/just_price.png';
+import leBonShinyImg from '@/assets/games/le_bon_shiny.png';
+
 export type LocalStatus = 'idle' | 'in-progress' | 'done';
 
 export interface DailyChallenge {
@@ -21,6 +30,7 @@ export interface DailyGameGroup {
   label: string; // libelle affiche dans les quetes
   gameType: string;
   route: string;
+  iconImg: string;
   challenges: DailyChallenge[];
 }
 
@@ -40,6 +50,7 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     label: 'Quel est ce Pokémon',
     gameType: 'WHO_IS_IT',
     route: '/jouer',
+    iconImg: whoIsItImg,
     challenges: LEVELS4.map((l) => ({
       gameType: 'WHO_IS_IT',
       scope: l,
@@ -53,6 +64,7 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     label: 'Poké-Motus',
     gameType: 'MOTUS',
     route: '/motus',
+    iconImg: pokeMotusImg,
     challenges: LEVELS4.map((l) => ({
       gameType: 'MOTUS',
       scope: l,
@@ -66,6 +78,7 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     label: 'Plus ou Moins',
     gameType: 'PLUS_MINUS',
     route: '/plus-ou-moins',
+    iconImg: plusMinusImg,
     challenges: LEVELS4.map((l) => ({
       gameType: 'PLUS_MINUS',
       scope: l,
@@ -79,6 +92,7 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     label: "L'Intrus",
     gameType: 'INTRUDER',
     route: '/intrus',
+    iconImg: intrusImg,
     challenges: LEVELS3.map((l) => ({
       gameType: 'INTRUDER',
       scope: l,
@@ -94,6 +108,7 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     label: 'Trouve le shiny',
     gameType: 'SHINY',
     route: '/shiny',
+    iconImg: findShinyImg,
     challenges: LEVELS3.map((l) => ({
       gameType: 'SHINY',
       scope: `FIND_SHINY:${l}`,
@@ -107,6 +122,7 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     label: 'Trouve le non-shiny',
     gameType: 'SHINY',
     route: '/non-shiny',
+    iconImg: findNotShinyImg,
     challenges: LEVELS3.map((l) => ({
       gameType: 'SHINY',
       scope: `FIND_NON_SHINY:${l}`,
@@ -120,6 +136,7 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     label: 'Le Bon Shiny',
     gameType: 'TRUE_SHINY',
     route: '/bon-shiny',
+    iconImg: leBonShinyImg,
     challenges: LEVELS3.map((l) => ({
       gameType: 'TRUE_SHINY',
       scope: l,
@@ -133,6 +150,7 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
     label: 'La Juste Stat',
     gameType: 'JUST_STAT',
     route: '/juste-stat',
+    iconImg: justPriceImg,
     challenges: [
       {
         gameType: 'JUST_STAT',

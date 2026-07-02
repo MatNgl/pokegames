@@ -12,7 +12,7 @@ export function QuestsPage() {
         <AppHeader />
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 px-4 py-8">
           <DailyQuestsPanel />
-          <Button variant="secondary" className="w-full" onClick={() => navigate('/')}>
+          <Button className="w-full" onClick={() => navigate('/')}>
             Retour à l'accueil
           </Button>
         </main>

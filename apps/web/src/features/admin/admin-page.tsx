@@ -57,7 +57,9 @@ export function AdminPage() {
           <p className="text-sm font-semibold text-muted">
             Cette section est réservée aux administrateurs.
           </p>
-          <Button onClick={() => navigate('/')}>Retour à l'accueil</Button>
+          <Button className="w-full" onClick={() => navigate('/')}>
+            Retour à l'accueil
+          </Button>
         </Card>
       </Shell>
     );
@@ -108,6 +110,9 @@ export function AdminPage() {
       </div>
 
       {tab === 'dashboard' ? <DashboardTab /> : tab === 'users' ? <UsersTab /> : <ConfigTab />}
+      <Button className="w-full" onClick={() => navigate('/')}>
+        Retour à l'accueil
+      </Button>
     </Shell>
   );
 }

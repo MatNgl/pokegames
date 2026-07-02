@@ -12,7 +12,7 @@ import { resultMetric } from './daily-catalog';
 import { DAILY_GAME_GROUPS } from './daily-challenges';
 
 const TAB_BASE =
-  'rounded-control border-2 px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
+  'flex items-center gap-1.5 rounded-control border-2 px-3 py-1.5 text-xs font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
 
 export function LeaderboardPage() {
   const navigate = useNavigate();
@@ -58,14 +58,27 @@ export function LeaderboardPage() {
                   className={cn(
                     TAB_BASE,
                     g.key === groupKey
-                      ? 'border-primary-shadow bg-primary text-primary-foreground'
-                      : 'border-border-strong bg-surface-2/60 text-muted hover:border-primary hover:text-foreground',
+                      ? 'border-primary-shadow bg-primary text-primary-foreground shadow-sm scale-[1.02]'
+                      : 'border-border-strong bg-surface-2/60 text-muted hover:border-primary hover:text-foreground hover:bg-surface',
                   )}
                 >
-                  {g.label}
+                  <img src={g.iconImg} alt="" className="h-5 w-5 shrink-0 object-contain" />
+                  <span>{g.label}</span>
                 </button>
               ))}
             </div>
+
+            {group && (
+              <div className="flex items-center gap-3 rounded-control border-2 border-border-strong bg-surface-2/40 p-2.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded border-2 border-border-strong bg-surface p-1 shadow-sm">
+                  <img src={group.iconImg} alt="" className="h-full w-full object-contain" />
+                </div>
+                <div>
+                  <h2 className="font-display text-xs text-foreground">{group.label}</h2>
+                  <p className="text-xs font-semibold text-muted">Classement quotidien par niveau</p>
+                </div>
+              </div>
+            )}
 
             {group && group.challenges.length > 1 && (
               <div className="flex flex-wrap gap-1.5">
@@ -121,7 +134,7 @@ export function LeaderboardPage() {
               </ol>
             )}
 
-            <Button variant="secondary" className="w-full" onClick={() => navigate('/')}>
+            <Button className="w-full" onClick={() => navigate('/')}>
               Retour à l'accueil
             </Button>
           </Card>

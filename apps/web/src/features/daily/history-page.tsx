@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/features/auth/auth-context';
 import { getDailyHistory } from './daily-api';
-import { gameLabel, resultMetric, scopeLabel } from './daily-catalog';
+import { gameIconImg, gameLabel, resultMetric, scopeLabel } from './daily-catalog';
 
 function formatDay(day: string): string {
   const date = new Date(`${day}T00:00:00Z`);
@@ -82,7 +82,7 @@ export function HistoryPage() {
           <Button className="w-full" onClick={() => navigate('/connexion', { state: { from: '/historique' } })}>
             Se connecter
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
+          <Button className="w-full" onClick={() => navigate('/')}>
             Retour à l'accueil
           </Button>
         </Card>
@@ -118,40 +118,48 @@ export function HistoryPage() {
                 <p className="font-display text-[10px] uppercase tracking-widest text-muted">
                   {formatDay(day)}
                 </p>
-                {rows.map((r) => (
-                  <div
-                    key={`${r.gameType}:${r.scope}`}
-                    className="flex items-center justify-between gap-3 rounded-control border-2 border-border-strong bg-surface-2/60 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-extrabold text-foreground">
-                        {gameLabel(r.gameType)}
-                        {scopeLabel(r.scope) && (
-                          <span className="font-semibold text-muted">
-                            {' · '}
-                            {scopeLabel(r.scope)}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs font-semibold text-muted">{resultMetric(r)}</p>
-                    </div>
-                    <Badge
-                      className={
-                        r.won
-                          ? 'border-go-shadow bg-go text-go-foreground'
-                          : 'border-border-strong bg-surface text-muted'
-                      }
+                {rows.map((r) => {
+                  const icon = gameIconImg(r.gameType, r.scope);
+                  return (
+                    <div
+                      key={`${r.gameType}:${r.scope}`}
+                      className="flex items-center justify-between gap-3 rounded-control border-2 border-border-strong bg-surface-2/60 p-2.5 transition-colors hover:border-primary/50 hover:bg-surface"
                     >
-                      {r.won ? 'Réussi' : 'Terminé'}
-                    </Badge>
-                  </div>
-                ))}
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-border-strong bg-surface p-1 shadow-sm">
+                          <img src={icon} alt="" className="h-full w-full object-contain" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-extrabold text-foreground">
+                            {gameLabel(r.gameType, r.scope)}
+                            {scopeLabel(r.scope) && (
+                              <span className="font-semibold text-muted">
+                                {' · '}
+                                {scopeLabel(r.scope)}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs font-semibold text-muted">{resultMetric(r)}</p>
+                        </div>
+                      </div>
+                      <Badge
+                        className={
+                          r.won
+                            ? 'border-go-shadow bg-go text-go-foreground shrink-0'
+                            : 'border-border-strong bg-surface text-muted shrink-0'
+                        }
+                      >
+                        {r.won ? 'Réussi' : 'Terminé'}
+                      </Badge>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
         )}
 
-        <Button variant="secondary" className="w-full" onClick={() => navigate('/')}>
+        <Button className="w-full" onClick={() => navigate('/')}>
           Retour à l'accueil
         </Button>
       </Card>

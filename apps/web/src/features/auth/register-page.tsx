@@ -129,6 +129,9 @@ export function RegisterPage() {
               Se connecter
             </Link>
           </p>
+          <Button className="mt-4 w-full" onClick={() => navigate('/')}>
+            Retour à l'accueil
+          </Button>
         </Card>
       </div>
     </AppBackground>

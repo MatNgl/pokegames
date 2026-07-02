@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -68,9 +69,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm sm:p-6"
       onClick={onClose}
     >
       <div
@@ -78,7 +79,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         aria-modal="true"
         aria-labelledby="settings-title"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-full w-full max-w-md flex-col gap-4 overflow-auto rounded-card border-4 border-border-strong bg-surface p-6 shadow-lg"
+        className="flex max-h-[85vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-card border-4 border-border-strong bg-surface p-6 shadow-xl"
       >
         <div className="flex items-center justify-between gap-4">
           <h2 id="settings-title" className="font-display text-sm leading-relaxed text-foreground">
@@ -200,6 +201,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           )}
         </section>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
