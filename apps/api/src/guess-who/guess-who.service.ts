@@ -9,7 +9,12 @@ import {
 } from '@pokegames/shared-types';
 
 const GRID_SIZE = 25;
-const ELIMINATE_MS = 20_000;
+// Minuteur par phase (ms) : poser la question, y repondre, puis analyser/eliminer.
+const PHASE_MS: Record<GuessWhoPhase, number> = {
+  ASKING: 30_000,
+  ANSWERING: 30_000,
+  ELIMINATING: 20_000,
+};
 
 export interface Emit {
   socketId: string;
@@ -98,6 +103,18 @@ export class GuessWhoService {
     ];
   }
 
+  // Entre dans une phase : fixe l'echeance, invalide les minuteurs perimes et en programme un nouveau.
+  private beginPhase(game: Game, phase: GuessWhoPhase): void {
+    game.phase = phase;
+    game.turnToken += 1;
+    game.turnDeadline = Date.now() + PHASE_MS[phase];
+    this.onScheduleExpire?.(game.id, game.turnToken, PHASE_MS[phase]);
+  }
+
+  private switchTurn(game: Game): void {
+    game.activeIndex = game.activeIndex === 0 ? 1 : 0;
+  }
+
   private async startGame(a: Waiting, b: Waiting): Promise<Emit[]> {
     const pool = await this.loadPool();
     if (pool.length < GRID_SIZE) {
@@ -123,6 +140,7 @@ export class GuessWhoService {
     this.games.set(game.id, game);
     this.bySocket.set(a.socketId, game.id);
     this.bySocket.set(b.socketId, game.id);
+    this.beginPhase(game, 'ASKING');
     return this.bothStates(game);
   }
 
@@ -178,7 +196,7 @@ export class GuessWhoService {
     const clean = text.trim().slice(0, 200);
     if (!clean) return [];
     game.currentQuestion = clean;
-    game.phase = 'ANSWERING';
+    this.beginPhase(game, 'ANSWERING');
     const opp = game.players[index === 0 ? 1 : 0];
     return [
       { socketId: opp.socketId, event: GUESS_WHO_EVENTS.question, payload: { text: clean } },
@@ -192,28 +210,40 @@ export class GuessWhoService {
     const { game, index } = found;
     // C'est l'adversaire (non actif) qui repond.
     if (game.status !== 'PLAYING' || game.phase !== 'ANSWERING' || game.activeIndex === index) return [];
-    game.phase = 'ELIMINATING';
-    game.turnDeadline = Date.now() + ELIMINATE_MS;
-    game.turnToken += 1;
     const asker = game.players[game.activeIndex];
-    this.onScheduleExpire?.(game.id, game.turnToken, ELIMINATE_MS);
+    this.beginPhase(game, 'ELIMINATING');
     return [
       { socketId: asker.socketId, event: GUESS_WHO_EVENTS.answered, payload: { value } },
       ...this.bothStates(game),
     ];
   }
 
-  /** Fin du minuteur d'elimination : on passe la main a l'adversaire. */
-  expireTurn(gameId: string, token: number): Emit[] {
+  /** Fin du minuteur d'une phase : fait avancer la machine a etats selon la phase courante. */
+  expire(gameId: string, token: number): Emit[] {
     const game = this.games.get(gameId);
-    if (!game || game.status !== 'PLAYING' || game.turnToken !== token || game.phase !== 'ELIMINATING') {
+    if (!game || game.status !== 'PLAYING' || game.turnToken !== token) {
       return [];
     }
-    game.activeIndex = game.activeIndex === 0 ? 1 : 0;
-    game.phase = 'ASKING';
+    if (game.phase === 'ASKING') {
+      // Le joueur actif n'a pas pose sa question a temps : la main passe a l'adversaire.
+      this.switchTurn(game);
+      game.currentQuestion = null;
+      this.beginPhase(game, 'ASKING');
+      return this.bothStates(game);
+    }
+    if (game.phase === 'ANSWERING') {
+      // L'adversaire n'a pas repondu : aucune reponse, on passe a l'elimination.
+      const asker = game.players[game.activeIndex];
+      this.beginPhase(game, 'ELIMINATING');
+      return [
+        { socketId: asker.socketId, event: GUESS_WHO_EVENTS.answered, payload: { value: null } },
+        ...this.bothStates(game),
+      ];
+    }
+    // ELIMINATING : fin du tour, on passe la main.
+    this.switchTurn(game);
     game.currentQuestion = null;
-    game.turnDeadline = null;
-    game.turnToken += 1;
+    this.beginPhase(game, 'ASKING');
     return this.bothStates(game);
   }
 
@@ -246,8 +276,8 @@ export class GuessWhoService {
     const found = this.findGame(socketId);
     if (!found) return [];
     const { game, index } = found;
-    // Reponse finale autorisee seulement pendant son tour (hors phase de reponse de l'adversaire).
-    if (game.status !== 'PLAYING' || game.activeIndex !== index || game.phase === 'ANSWERING') return [];
+    // Reponse finale autorisee seulement a son tour et avant d'avoir pose sa question (phase ASKING).
+    if (game.status !== 'PLAYING' || game.activeIndex !== index || game.phase !== 'ASKING') return [];
     const opponent = game.players[index === 0 ? 1 : 0];
     const correct = opponent.secret === pokemonId;
     const winnerIndex: 0 | 1 = correct ? index : (index === 0 ? 1 : 0);

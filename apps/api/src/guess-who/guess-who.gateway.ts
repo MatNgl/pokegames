@@ -31,7 +31,7 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     // Le service demande la programmation du minuteur d'elimination ; le gateway l'execute.
     this.service.onScheduleExpire = (gameId, token, delayMs) => {
-      setTimeout(() => this.dispatch(this.service.expireTurn(gameId, token)), delayMs);
+      setTimeout(() => this.dispatch(this.service.expire(gameId, token)), delayMs);
     };
   }
 

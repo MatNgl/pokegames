@@ -63,7 +63,8 @@ describe('GuessWhoService', () => {
     expect(afterAnswer.phase).toBe('ELIMINATING');
     expect(afterAnswer.turnDeadline).toBeGreaterThan(0);
 
-    const expired = service.expireTurn(gameId, 1);
+    // Tokens : ASKING(1) -> ANSWERING(2) -> ELIMINATING(3). Fin du minuteur d'elimination :
+    const expired = service.expire(gameId, 3);
     expect(expired).toHaveLength(2);
     const s1State = expired.find((e) => e.socketId === 's1')?.payload as GuessWhoStateDTO;
     expect(s1State.yourTurn).toBe(false); // le tour est passé à l'adversaire

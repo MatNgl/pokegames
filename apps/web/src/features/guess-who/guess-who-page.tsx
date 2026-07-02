@@ -52,6 +52,9 @@ export function GuessWhoPage() {
   const [guessMode, setGuessMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(Date.now());
+  const [showIntro, setShowIntro] = useState(false);
+  const [introCount, setIntroCount] = useState(4);
+  const inGameRef = useRef(false);
 
   useEffect(() => {
     if (!user) return;
@@ -73,12 +76,24 @@ export function GuessWhoPage() {
       setRoomCode(null);
       setOver(null);
       setState(s);
+      if (!inGameRef.current) {
+        inGameRef.current = true;
+        setChat([]);
+        setEliminated(new Set());
+        setShowIntro(true);
+        setIntroCount(4);
+      }
     });
     socket.on(GUESS_WHO_EVENTS.question, (p: { text: string }) => {
       setChat((c) => [...c, { mine: false, text: p.text }]);
     });
-    socket.on(GUESS_WHO_EVENTS.answered, (p: { value: boolean }) => {
-      setChat((c) => [...c, { mine: false, text: p.value ? 'Oui' : 'Non', answer: p.value }]);
+    socket.on(GUESS_WHO_EVENTS.answered, (p: { value: boolean | null }) => {
+      if (p.value === null) {
+        setChat((c) => [...c, { mine: false, text: 'Temps écoulé, pas de réponse' }]);
+        return;
+      }
+      const value: boolean = p.value;
+      setChat((c) => [...c, { mine: false, text: value ? 'Oui' : 'Non', answer: value }]);
     });
     socket.on(GUESS_WHO_EVENTS.over, (o: GuessWhoOverDTO) => setOver(o));
     socket.on(GUESS_WHO_EVENTS.errorMsg, (p: { message: string }) => setError(p.message));
@@ -93,6 +108,17 @@ export function GuessWhoPage() {
     const t = setInterval(() => setNowTick(Date.now()), 500);
     return () => clearInterval(t);
   }, []);
+
+  // Ecran "Adversaire trouve" : petit decompte avant le debut de la partie.
+  useEffect(() => {
+    if (!showIntro) return;
+    if (introCount <= 0) {
+      setShowIntro(false);
+      return;
+    }
+    const t = setTimeout(() => setIntroCount((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showIntro, introCount]);
 
   const emit = useCallback((event: string, payload?: unknown) => {
     socketRef.current?.emit(event, payload);
@@ -112,7 +138,8 @@ export function GuessWhoPage() {
   };
 
   const toggleCard = (pokemonId: number) => {
-    if (guessMode) {
+    // Reponse finale : seulement a son tour, avant d'avoir pose la question.
+    if (guessMode && state?.yourTurn && state.phase === 'ASKING') {
       emit(GUESS_WHO_EVENTS.finalGuess, { pokemonId });
       setGuessMode(false);
       return;
@@ -127,12 +154,15 @@ export function GuessWhoPage() {
 
   const leave = () => {
     emit(GUESS_WHO_EVENTS.cancel);
+    inGameRef.current = false;
+    setShowIntro(false);
     setWaiting(false);
     setRoomCode(null);
     setState(null);
     setOver(null);
     setChat([]);
     setEliminated(new Set());
+    setGuessMode(false);
   };
 
   if (initializing) return <Shell>{null}</Shell>;
@@ -260,14 +290,40 @@ export function GuessWhoPage() {
     );
   }
 
+  // Ecran "Adversaire trouve" avec decompte + revelation du Pokemon secret.
+  if (showIntro) {
+    const secret = state.grid.find((c) => c.pokemonId === state.yourSecretPokemonId);
+    return (
+      <Shell>
+        <Card className="mt-10 flex w-full max-w-md flex-col items-center gap-3 p-8 text-center">
+          <span className="font-display text-sm uppercase tracking-widest text-success">
+            Adversaire trouvé
+          </span>
+          <p className="text-sm font-semibold text-muted">vs {state.opponentName}</p>
+          <p className="mt-2 text-sm font-bold text-foreground">Ton Pokémon secret :</p>
+          <img
+            src={`${API_ORIGIN}/api/pokemon/${state.yourSecretPokemonId}/sprite`}
+            alt={secret?.name ?? ''}
+            className="h-28 w-28 object-contain"
+            draggable={false}
+          />
+          <p className="font-display text-lg text-primary">{secret?.name}</p>
+          <p className="text-sm font-semibold text-muted">
+            La partie commence dans {introCount}s...
+          </p>
+        </Card>
+      </Shell>
+    );
+  }
+
   // Partie en cours.
+  const mySecret = state.grid.find((c) => c.pokemonId === state.yourSecretPokemonId);
   const myAnswering = !state.yourTurn && state.phase === 'ANSWERING';
   const myAsking = state.yourTurn && state.phase === 'ASKING';
   const myEliminating = state.yourTurn && state.phase === 'ELIMINATING';
-  const secondsLeft =
-    state.turnDeadline && state.phase === 'ELIMINATING'
-      ? Math.max(0, Math.ceil((state.turnDeadline - nowTick) / 1000))
-      : null;
+  const secondsLeft = state.turnDeadline
+    ? Math.max(0, Math.ceil((state.turnDeadline - nowTick) / 1000))
+    : null;
 
   return (
     <Shell>
@@ -315,8 +371,21 @@ export function GuessWhoPage() {
           )}
         </div>
 
-        {/* Panneau lateral : etat + chat + actions */}
+        {/* Panneau lateral : secret + etat + chat + actions */}
         <div className="flex w-full flex-col gap-3 lg:w-72">
+          <Card className="flex items-center gap-3 p-3">
+            <img
+              src={`${API_ORIGIN}/api/pokemon/${state.yourSecretPokemonId}/sprite`}
+              alt={mySecret?.name ?? ''}
+              className="h-12 w-12 shrink-0 object-contain"
+              draggable={false}
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase text-muted">Ton Pokémon</p>
+              <p className="truncate font-display text-xs text-primary">{mySecret?.name}</p>
+            </div>
+          </Card>
+
           <Card className="flex flex-col gap-2 p-3">
             <p className="text-center text-sm font-bold text-foreground">
               {myAsking && 'À toi : pose une question'}
@@ -376,7 +445,7 @@ export function GuessWhoPage() {
             </div>
           )}
 
-          {state.yourTurn && state.phase !== 'ANSWERING' && (
+          {myAsking && (
             <Button
               variant={guessMode ? 'secondary' : 'go'}
               onClick={() => setGuessMode((v) => !v)}
