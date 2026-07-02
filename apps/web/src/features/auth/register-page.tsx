@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import { registerSchema, type RegisterValues } from './schemas';
 export function RegisterPage() {
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? '/jouer';
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -27,7 +29,7 @@ export function RegisterPage() {
     setServerError(null);
     try {
       await registerUser(values.email, values.username, values.password);
-      navigate('/jouer');
+      navigate(from, { replace: true });
     } catch (error) {
       setServerError(getApiErrorMessage(error, 'Inscription impossible'));
     }
@@ -88,7 +90,7 @@ export function RegisterPage() {
 
           <p className="mt-6 text-center text-sm text-muted">
             Déjà un compte ?{' '}
-            <Link to="/connexion" className="text-primary hover:underline">
+            <Link to="/connexion" state={{ from }} className="text-primary hover:underline">
               Se connecter
             </Link>
           </p>

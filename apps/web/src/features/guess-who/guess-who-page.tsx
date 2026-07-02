@@ -173,7 +173,9 @@ export function GuessWhoPage() {
         <Card className="mt-10 flex max-w-md flex-col items-center gap-4 p-8 text-center">
           <h1 className="font-display text-sm text-foreground">Qui est-ce ?</h1>
           <p className="text-sm font-semibold text-muted">Connecte-toi pour jouer en 1 contre 1.</p>
-          <Button onClick={() => navigate('/connexion')}>Se connecter</Button>
+          <Button onClick={() => navigate('/connexion', { state: { from: '/qui-est-ce' } })}>
+            Se connecter
+          </Button>
         </Card>
       </Shell>
     );

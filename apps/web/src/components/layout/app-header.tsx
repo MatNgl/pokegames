@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { History, ListChecks, LogOut, Menu, Shield, Trophy, X } from 'lucide-react';
 import { FolderKanbanIcon } from '@/components/ui/icons/folder-kanban-icon';
 import { SettingsIcon } from '@/components/ui/icons/settings-icon';
@@ -33,6 +33,8 @@ function getClientId(): string {
 
 export function AppHeader() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const loginState = { from: location.pathname + location.search };
   const [timeLeft, setTimeLeft] = useState(getNextResetDiff);
   const [onlineCount, setOnlineCount] = useState<number>(1);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -139,7 +141,7 @@ export function AppHeader() {
             </button>
           </div>
         ) : (
-          <Link to="/connexion" className="pl-1 sm:pl-2">
+          <Link to="/connexion" state={loginState} className="pl-1 sm:pl-2">
             <Button
               size="sm"
               variant="go"
@@ -234,6 +236,7 @@ export function AppHeader() {
               ) : (
                 <Link
                   to="/connexion"
+                  state={loginState}
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-bold text-go hover:bg-surface-2"
                 >

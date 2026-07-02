@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import { loginSchema, type LoginValues } from './schemas';
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? '/jouer';
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -27,7 +29,7 @@ export function LoginPage() {
     setServerError(null);
     try {
       await login(values.emailOrUsername, values.password);
-      navigate('/jouer');
+      navigate(from, { replace: true });
     } catch (error) {
       setServerError(getApiErrorMessage(error, 'Connexion impossible'));
     }
@@ -73,7 +75,7 @@ export function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-muted">
             Pas encore de compte ?{' '}
-            <Link to="/inscription" className="text-primary hover:underline">
+            <Link to="/inscription" state={{ from }} className="text-primary hover:underline">
               Créer un compte
             </Link>
           </p>
