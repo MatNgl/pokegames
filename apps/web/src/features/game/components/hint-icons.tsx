@@ -1,13 +1,14 @@
 import { useEffect, useRef, type ComponentType } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { WhoIsItHint, WhoIsItHintType } from '@pokegames/shared-types';
-import { Hash, Lock, Tag, Tags, Type } from 'lucide-react';
+import { Hash, Lock, Ruler, Tag, Tags, Type } from 'lucide-react';
 import colorRevealIcon from '@/assets/games/couleur_reveal.png';
 
 const LUCIDE_ICONS: Partial<Record<WhoIsItHintType, ComponentType<{ className?: string }>>> = {
   TYPE_1: Tag,
   TYPE_2: Tags,
   GENERATION: Hash,
+  HEIGHT: Ruler,
   FIRST_LETTER: Type,
 };
 
@@ -17,6 +18,13 @@ function HintGlyph({ type }: { type: WhoIsItHintType }) {
   }
   const Icon = LUCIDE_ICONS[type];
   return Icon ? <Icon className="h-4 w-4" /> : null;
+}
+
+// Valeur affichee une fois l'indice revele (le libelle est porte par l'icone / le tooltip).
+function hintValueText(hint: WhoIsItHint): string {
+  if (hint.type === 'GENERATION') return `Génération ${hint.value}`;
+  if (hint.type === 'BLURRED_COLOR' || hint.type === 'COLOR_SHARPEN') return 'Couleur';
+  return String(hint.value);
 }
 
 interface HintIconsProps {
@@ -52,7 +60,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
           return (
             <div key={hint.type} className="flex items-center justify-end gap-2" title={hint.label}>
               <span className="min-w-0 flex-1 truncate text-right text-xs font-bold text-foreground">
-                {String(hint.value)}
+                {hintValueText(hint)}
               </span>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border-2 border-go-shadow bg-go text-go-foreground shadow-[0_2px_0_var(--color-go-shadow)]">
                 <HintGlyph type={hint.type} />

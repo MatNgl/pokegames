@@ -14,6 +14,8 @@ import { QuestsPage } from '@/features/daily/quests-page';
 import { AdminPage } from '@/features/admin/admin-page';
 import { GuessWhoPage } from '@/features/guess-who/guess-who-page';
 import { HomePage } from '@/features/home/home-page';
+import { TileArenaMockupA } from '@/features/game/mockups/tile-arena-a';
+import { TileArenaMockupB } from '@/features/game/mockups/tile-arena-b';
 
 export default function App() {
   return (
@@ -35,6 +37,8 @@ export default function App() {
         <Route path="/quetes" element={<QuestsPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/qui-est-ce" element={<GuessWhoPage />} />
+        <Route path="/maquette-cases-a" element={<TileArenaMockupA />} />
+        <Route path="/maquette-cases-b" element={<TileArenaMockupB />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
