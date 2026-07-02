@@ -85,30 +85,26 @@ export function LevelSelectScreen<L extends string>({
                     key={option.level}
                     type="button"
                     onClick={() => onPick(option.level)}
-                    style={{ '--lvl': color, backgroundColor: hexToRgba(color, 0.08) } as CSSProperties}
-                    className="group relative flex items-stretch gap-0 overflow-hidden rounded-card border-4 border-border-strong text-left transition-transform duration-100 hover:-translate-y-0.5 hover:border-[color:var(--lvl)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--lvl)] focus-visible:ring-offset-2"
+                    style={{ '--lvl': color, borderColor: color, backgroundColor: hexToRgba(color, 0.08) } as CSSProperties}
+                    className="group flex items-center justify-between gap-3 rounded-card border-4 p-4 text-left transition-transform duration-100 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--lvl)] focus-visible:ring-offset-2"
                   >
-                    {/* Rail colore : repere de niveau immediat. */}
-                    <span aria-hidden className="w-2.5 shrink-0" style={{ backgroundColor: color }} />
-                    <span className="flex flex-1 items-center justify-between gap-3 p-4">
-                      <span className="min-w-0">
-                        <span className="mb-0.5 flex items-center gap-1.5">
-                          <span
-                            aria-hidden
-                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: color }}
-                          />
-                          <span className="font-display text-xs uppercase text-foreground">
-                            {option.label}
-                          </span>
-                        </span>
-                        <span className="block text-sm font-semibold text-muted">
-                          {option.description}
+                    <span className="min-w-0">
+                      <span className="mb-0.5 flex items-center gap-1.5">
+                        <span
+                          aria-hidden
+                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="font-display text-xs uppercase text-foreground">
+                          {option.label}
                         </span>
                       </span>
-                      <span className="shrink-0">
-                        <StatusChip status={option.status} />
+                      <span className="block text-sm font-semibold text-muted">
+                        {option.description}
                       </span>
+                    </span>
+                    <span className="shrink-0">
+                      <StatusChip status={option.status} />
                     </span>
                   </button>
                 );
