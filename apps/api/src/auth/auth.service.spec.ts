@@ -64,7 +64,6 @@ describe('AuthService', () => {
         email: 'test@example.com',
         username: 'sacha',
         role: 'USER',
-        eloScore: 1000,
         createdAt: new Date(),
       });
 
@@ -96,7 +95,6 @@ describe('AuthService', () => {
         username: 'sacha',
         passwordHash: 'hashed-pwd',
         role: 'USER',
-        eloScore: 1000,
         createdAt: new Date(),
       });
       mockedBcrypt.compare.mockImplementation(async () => true);
@@ -133,7 +131,6 @@ describe('AuthService', () => {
         email: 'test@example.com',
         username: 'sacha',
         role: 'USER',
-        eloScore: 1000,
       });
 
       const res = await service.refreshTokens('old-refresh-token');

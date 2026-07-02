@@ -96,7 +96,6 @@ export class AdminUsersService {
         email: true,
         role: true,
         createdAt: true,
-        eloScore: true,
       },
     });
     if (!user) {
@@ -123,7 +122,6 @@ export class AdminUsersService {
       email: user.email,
       role: user.role,
       createdAt: user.createdAt.toISOString(),
-      eloScore: user.eloScore,
       gamesPlayed: agg._count._all,
       totalTimeSeconds: agg._sum.durationSeconds ?? 0,
       dailyResultsCount,

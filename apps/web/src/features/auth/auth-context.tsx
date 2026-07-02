@@ -21,25 +21,34 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// Restauration de session dedoublonnee : partagee entre les deux montages de React StrictMode
+// (le refresh token est a usage unique cote serveur, deux appels concurrents en invalideraient un).
+let bootstrapPromise: Promise<UserDTO | null> | null = null;
+function bootstrapSession(): Promise<UserDTO | null> {
+  bootstrapPromise ??= refreshRequest()
+    .then((session) => {
+      setAccessToken(session.accessToken);
+      return session.user;
+    })
+    .catch(() => {
+      setAccessToken(null);
+      return null;
+    });
+  return bootstrapPromise;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDTO | null>(null);
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
     let active = true;
-    // Restauration de session via le cookie refresh httpOnly au premier chargement.
-    void (async () => {
-      try {
-        const session = await refreshRequest();
-        if (!active) return;
-        setAccessToken(session.accessToken);
-        setUser(session.user);
-      } catch {
-        if (active) setUser(null);
-      } finally {
-        if (active) setInitializing(false);
-      }
-    })();
+    // Restauration de session via le cookie refresh httpOnly au premier chargement (une seule requete).
+    void bootstrapSession().then((restored) => {
+      if (!active) return;
+      setUser(restored);
+      setInitializing(false);
+    });
     return () => {
       active = false;
     };

@@ -24,7 +24,6 @@ export class UsersService {
       email: user.email,
       username: user.username,
       role: user.role,
-      eloScore: user.eloScore,
       createdAt: user.createdAt,
     };
   }
@@ -42,22 +41,6 @@ export class UsersService {
       score: item.score,
       playedAt: item.playedAt,
       isMulti: item.isMulti,
-    }));
-  }
-
-  async getLeaderboard(limit = 10): Promise<UserDTO[]> {
-    const topUsers = await this.prisma.user.findMany({
-      orderBy: { eloScore: 'desc' },
-      take: Math.min(limit, 50),
-    });
-
-    return topUsers.map((user) => ({
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      role: user.role,
-      eloScore: user.eloScore,
-      createdAt: user.createdAt,
     }));
   }
 

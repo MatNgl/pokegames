@@ -44,13 +44,12 @@ describe('UsersService', () => {
       email: 'test@example.com',
       username: 'red',
       role: 'USER',
-      eloScore: 1200,
       createdAt: new Date(),
     });
 
     const res = await service.getProfile('u-1');
     expect(res.username).toBe('red');
-    expect(res.eloScore).toBe(1200);
+    expect(res.role).toBe('USER');
   });
 
   it('doit lever NotFoundException si l’utilisateur est introuvable', async () => {

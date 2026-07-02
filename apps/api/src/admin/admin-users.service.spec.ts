@@ -46,7 +46,7 @@ describe('AdminUsersService', () => {
   it('detail renvoie les infos, agrégats et parties récentes', async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'u1', username: 'Alice', email: 'a@x.fr', role: 'USER',
-      createdAt: new Date('2026-07-01T00:00:00Z'), eloScore: 1000,
+      createdAt: new Date('2026-07-01T00:00:00Z'),
     });
     prisma.gameAuditLog.aggregate.mockResolvedValue({ _count: { _all: 3 }, _sum: { durationSeconds: 120 } });
     prisma.gameAuditLog.findMany.mockResolvedValue([

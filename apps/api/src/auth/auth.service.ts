@@ -47,7 +47,6 @@ export class AuthService {
       email: user.email,
       username: user.username,
       role: user.role,
-      eloScore: user.eloScore,
       createdAt: user.createdAt,
     };
   }
@@ -77,7 +76,6 @@ export class AuthService {
       email: user.email,
       username: user.username,
       role: user.role,
-      eloScore: user.eloScore,
       createdAt: user.createdAt,
     };
 
@@ -119,7 +117,6 @@ export class AuthService {
       email: user.email,
       username: user.username,
       role: user.role,
-      eloScore: user.eloScore,
       createdAt: user.createdAt,
     };
 

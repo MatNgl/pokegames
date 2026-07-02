@@ -73,7 +73,6 @@ model User {
   passwordHash String
   role         String        @default("USER")
   avatarUrl    String?
-  eloScore     Int           @default(1000)
   createdAt    DateTime      @default(now())
   gameHistory  GameHistory[]
   dailyResults DailyResult[]

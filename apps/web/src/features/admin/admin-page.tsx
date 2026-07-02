@@ -280,10 +280,6 @@ function UsersTab() {
               <p className="text-xs text-muted">Défis (jour)</p>
               <p className="font-bold text-foreground">{detail.dailyResultsCount}</p>
             </div>
-            <div>
-              <p className="text-xs text-muted">Elo</p>
-              <p className="font-bold text-foreground">{detail.eloScore}</p>
-            </div>
           </div>
           <p className="text-xs font-semibold text-muted">
             {detail.email} · inscrit le {formatDate(detail.createdAt)}

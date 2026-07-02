@@ -14,11 +14,6 @@ interface AuthenticatedUser {
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get('leaderboard')
-  async getLeaderboard(@Query('limit') limit?: string) {
-    return this.usersService.getLeaderboard(Number(limit) || 10);
-  }
-
   @UseGuards(JwtAuthGuard)
   @Get('me/history')
   async getMyHistory(@Req() req: Request & { user?: AuthenticatedUser }, @Query('limit') limit?: string) {

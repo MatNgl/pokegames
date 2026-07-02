@@ -81,7 +81,6 @@ export interface AdminUserSummary {
 }
 
 export interface AdminUserDetail extends AdminUserSummary {
-  eloScore: number;
   dailyResultsCount: number;
   recentGames: AdminAuditLogEntry[];
 }
@@ -584,7 +583,6 @@ export interface UserDTO {
   email: string;
   username: string;
   role: string;
-  eloScore: number;
   createdAt?: string | Date;
 }
 
