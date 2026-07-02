@@ -1,11 +1,25 @@
 import { Link } from 'react-router-dom';
-import { Sparkles, Swords } from 'lucide-react';
+import { CheckCircle2, Sparkles, Swords } from 'lucide-react';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SimpleQuestsPanel } from '@/features/daily/simple-quests-panel';
+import { useCompletedGames } from '@/features/daily/use-daily-completion';
 import { HOME_GAMES, type HomeGame } from './games-list';
+
+// Badge vert de validation, coin haut-droite d'une case, quand le jeu du jour est fini a 100 %.
+function DoneBadge() {
+  return (
+    <span
+      className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-go-shadow bg-go text-go-foreground"
+      title="Terminé aujourd'hui"
+      aria-label="Terminé aujourd'hui"
+    >
+      <CheckCircle2 className="h-4 w-4" />
+    </span>
+  );
+}
 
 // Vedette du jour : deterministe (change chaque jour), identique pour tous.
 function featuredIndex(count: number): number {
@@ -15,10 +29,11 @@ function featuredIndex(count: number): number {
   return seed % count;
 }
 
-function GameTile({ game }: { game: HomeGame }) {
+function GameTile({ game, complete }: { game: HomeGame; complete: boolean }) {
   return (
     <Link to={game.to}>
-      <Card className="flex h-full flex-col items-center gap-2 p-3 text-center transition-transform duration-100 hover:-translate-y-0.5 hover:border-primary">
+      <Card className="relative flex h-full flex-col items-center gap-2 p-3 text-center transition-transform duration-100 hover:-translate-y-0.5 hover:border-primary">
+        {complete && <DoneBadge />}
         <div className="flex h-16 w-16 items-center justify-center rounded-card border-2 border-border-strong bg-go/10">
           <img src={game.iconImg} alt="" className="h-12 w-12 object-contain" draggable={false} />
         </div>
@@ -30,8 +45,10 @@ function GameTile({ game }: { game: HomeGame }) {
   );
 }
 
-// Variante C (libre, page de reference) : vedette du jour + quetes a gauche + Solo / Multijoueur.
-export function FreeHome() {
+// Page d'accueil : jeu vedette du jour + quetes simplifiees a gauche + sections Solo / Multijoueur.
+export function HomePage() {
+  const completed = useCompletedGames();
+  const isDone = (g: HomeGame): boolean => Boolean(g.gameType && completed.has(g.gameType));
   const solo = HOME_GAMES.filter((g) => g.title !== 'Qui est-ce');
   const multi = HOME_GAMES.filter((g) => g.title === 'Qui est-ce');
   const fIndex = featuredIndex(solo.length);
@@ -65,9 +82,10 @@ export function FreeHome() {
               {/* Jeu vedette du jour */}
               {featured && (
                 <Card className="relative flex flex-col items-center gap-4 overflow-hidden p-6 sm:flex-row sm:gap-6 sm:p-8">
-                  <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 font-display text-[9px] uppercase text-foreground">
+                  <span className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 font-display text-[9px] uppercase text-foreground">
                     <Sparkles className="h-3 w-3" /> Vedette du jour
                   </span>
+                  {isDone(featured) && <DoneBadge />}
                   <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-card border-4 border-border-strong bg-primary/10">
                     <img src={featured.iconImg} alt="" className="h-24 w-24 object-contain" draggable={false} />
                   </div>
@@ -90,7 +108,7 @@ export function FreeHome() {
                 </h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {rest.map((game) => (
-                    <GameTile key={game.title} game={game} />
+                    <GameTile key={game.title} game={game} complete={isDone(game)} />
                   ))}
                 </div>
               </div>

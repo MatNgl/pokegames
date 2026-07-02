@@ -1,5 +1,4 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { GamesPage } from '@/pages/games-page';
 import { LoginPage } from '@/features/auth/login-page';
 import { RegisterPage } from '@/features/auth/register-page';
 import { WhoIsItPage } from '@/features/game/who-is-it-page';
@@ -14,15 +13,13 @@ import { LeaderboardPage } from '@/features/daily/leaderboard-page';
 import { QuestsPage } from '@/features/daily/quests-page';
 import { AdminPage } from '@/features/admin/admin-page';
 import { GuessWhoPage } from '@/features/guess-who/guess-who-page';
-import { CarouselHome } from '@/features/home-variants/carousel-home';
-import { LevelHome } from '@/features/home-variants/level-home';
-import { FreeHome } from '@/features/home-variants/free-home';
+import { HomePage } from '@/features/home/home-page';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<GamesPage />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/connexion" element={<LoginPage />} />
         <Route path="/inscription" element={<RegisterPage />} />
         <Route path="/jouer" element={<WhoIsItPage />} />
@@ -38,9 +35,6 @@ export default function App() {
         <Route path="/quetes" element={<QuestsPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/qui-est-ce" element={<GuessWhoPage />} />
-        <Route path="/accueil-carrousel" element={<CarouselHome />} />
-        <Route path="/accueil-niveau" element={<LevelHome />} />
-        <Route path="/accueil-libre" element={<FreeHome />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
