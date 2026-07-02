@@ -47,9 +47,17 @@ export function LoginPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="emailOrUsername">Email ou nom d'utilisateur</Label>
-              <Input id="emailOrUsername" autoComplete="username" {...register('emailOrUsername')} />
+              <Input
+                id="emailOrUsername"
+                autoComplete="username"
+                aria-invalid={Boolean(errors.emailOrUsername)}
+                aria-describedby={errors.emailOrUsername ? 'emailOrUsername-error' : undefined}
+                {...register('emailOrUsername')}
+              />
               {errors.emailOrUsername && (
-                <p className="text-xs text-danger">{errors.emailOrUsername.message}</p>
+                <p id="emailOrUsername-error" role="alert" className="text-xs text-danger">
+                  {errors.emailOrUsername.message}
+                </p>
               )}
             </div>
 
@@ -59,13 +67,21 @@ export function LoginPage() {
                 id="password"
                 type="password"
                 autoComplete="current-password"
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? 'password-error' : undefined}
                 {...register('password')}
               />
-              {errors.password && <p className="text-xs text-danger">{errors.password.message}</p>}
+              {errors.password && (
+                <p id="password-error" role="alert" className="text-xs text-danger">
+                  {errors.password.message}
+                </p>
+              )}
             </div>
 
             {serverError && (
-              <p className="rounded-control bg-danger/10 px-3 py-2 text-sm text-danger">{serverError}</p>
+              <p role="alert" className="rounded-control bg-danger/10 px-3 py-2 text-sm text-danger">
+                {serverError}
+              </p>
             )}
 
             <Button type="submit" disabled={isSubmitting} className="mt-1">

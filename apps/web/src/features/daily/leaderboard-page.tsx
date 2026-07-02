@@ -44,14 +44,9 @@ export function LeaderboardPage() {
         <AppHeader />
         <main className="flex flex-1 items-start justify-center px-4 py-8">
           <Card className="flex w-full max-w-xl flex-col gap-4 p-6">
-            <div className="flex items-start justify-between gap-4">
-              <h1 className="font-display text-sm leading-relaxed text-foreground">
-                Classement du jour
-              </h1>
-              <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
-                Accueil
-              </Button>
-            </div>
+            <h1 className="font-display text-sm leading-relaxed text-foreground">
+              Classement du jour
+            </h1>
 
             <div className="flex flex-wrap gap-1.5">
               {DAILY_GAME_GROUPS.map((g) => (
@@ -125,6 +120,10 @@ export function LeaderboardPage() {
                 ))}
               </ol>
             )}
+
+            <Button variant="secondary" className="w-full" onClick={() => navigate('/')}>
+              Retour à l'accueil
+            </Button>
           </Card>
         </main>
       </div>

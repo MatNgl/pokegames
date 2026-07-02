@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import { HelpPopover } from '@/components/ui/help-popover';
 import { DailyDoneCard } from './components/daily-done-card';
+import { LevelSelectScreen, type LevelOption } from './components/level-select-screen';
 import { ArenaInstruction } from './components/arena-instruction';
 import { PokemonTile, type TileResult } from './components/pokemon-tile';
 import { TileGrid } from './components/tile-grid';
@@ -32,7 +33,6 @@ import {
   saveTrueShinyDone,
   trueShinyDailyStatus,
   trueShinyTodayKey,
-  type TrueShinyDailyStatus,
 } from './true-shiny-storage';
 
 const TRUE_SHINY_RULES = [
@@ -54,16 +54,6 @@ const LEVEL_LABEL: Record<TrueShinyLevel, string> = {
   DIFFICILE: 'Difficile',
 };
 
-function StatusChip({ status }: { status: TrueShinyDailyStatus }) {
-  if (status === 'in-progress') {
-    return <Badge className="border-[#b8860b] bg-accent text-foreground">En cours</Badge>;
-  }
-  if (status === 'done') {
-    return <Badge className="border-go-shadow bg-go text-go-foreground">Terminé</Badge>;
-  }
-  return null;
-}
-
 interface EndInfo {
   correctCount: number;
   totalRounds: number;
@@ -79,49 +69,17 @@ export function TrueShinyPage() {
 }
 
 function LevelSelect({ onPick }: { onPick: (level: TrueShinyLevel) => void }) {
-  const navigate = useNavigate();
-  const statuses = useMemo(
-    () => ({
-      FACILE: trueShinyDailyStatus('FACILE'),
-      MOYEN: trueShinyDailyStatus('MOYEN'),
-      DIFFICILE: trueShinyDailyStatus('DIFFICILE'),
-    }),
+  const options = useMemo<LevelOption<TrueShinyLevel>[]>(
+    () => LEVELS.map((l) => ({ ...l, status: trueShinyDailyStatus(l.level) })),
     [],
   );
-
   return (
-    <AppBackground>
-      <div className="flex min-h-screen flex-col">
-        <AppHeader />
-        <main className="flex flex-1 items-center justify-center px-4 py-8">
-          <Card className="flex w-full max-w-md flex-col gap-4 p-6">
-            <div className="flex items-start justify-between gap-4">
-              <h1 className="font-display text-sm leading-relaxed text-foreground">Le Bon Shiny</h1>
-              <HelpPopover ariaLabel="Règles du Bon Shiny" rules={TRUE_SHINY_RULES} />
-            </div>
-            <div className="flex flex-col gap-3">
-              {LEVELS.map(({ level, label, description }) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => onPick(level)}
-                  className="flex items-center justify-between gap-3 rounded-card border-4 border-border-strong bg-white p-4 text-left transition-transform duration-100 hover:-translate-y-0.5 hover:border-primary"
-                >
-                  <span>
-                    <span className="block font-display text-xs uppercase text-foreground">{label}</span>
-                    <span className="block text-sm font-semibold text-muted">{description}</span>
-                  </span>
-                  <StatusChip status={statuses[level]} />
-                </button>
-              ))}
-            </div>
-            <Button className="w-full" onClick={() => navigate('/')}>
-              Retour à l'accueil
-            </Button>
-          </Card>
-        </main>
-      </div>
-    </AppBackground>
+    <LevelSelectScreen
+      title="Le Bon Shiny"
+      rules={TRUE_SHINY_RULES}
+      options={options}
+      onPick={onPick}
+    />
   );
 }
 

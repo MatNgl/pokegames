@@ -47,14 +47,35 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Adresse email</Label>
-              <Input id="email" type="email" autoComplete="email" {...register('email')} />
-              {errors.email && <p className="text-xs text-danger">{errors.email.message}</p>}
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'email-error' : undefined}
+                {...register('email')}
+              />
+              {errors.email && (
+                <p id="email-error" role="alert" className="text-xs text-danger">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="username">Nom d'utilisateur</Label>
-              <Input id="username" autoComplete="username" {...register('username')} />
-              {errors.username && <p className="text-xs text-danger">{errors.username.message}</p>}
+              <Input
+                id="username"
+                autoComplete="username"
+                aria-invalid={Boolean(errors.username)}
+                aria-describedby={errors.username ? 'username-error' : undefined}
+                {...register('username')}
+              />
+              {errors.username && (
+                <p id="username-error" role="alert" className="text-xs text-danger">
+                  {errors.username.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -63,9 +84,15 @@ export function RegisterPage() {
                 id="password"
                 type="password"
                 autoComplete="new-password"
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? 'password-error' : undefined}
                 {...register('password')}
               />
-              {errors.password && <p className="text-xs text-danger">{errors.password.message}</p>}
+              {errors.password && (
+                <p id="password-error" role="alert" className="text-xs text-danger">
+                  {errors.password.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -74,13 +101,21 @@ export function RegisterPage() {
                 id="confirm"
                 type="password"
                 autoComplete="new-password"
+                aria-invalid={Boolean(errors.confirm)}
+                aria-describedby={errors.confirm ? 'confirm-error' : undefined}
                 {...register('confirm')}
               />
-              {errors.confirm && <p className="text-xs text-danger">{errors.confirm.message}</p>}
+              {errors.confirm && (
+                <p id="confirm-error" role="alert" className="text-xs text-danger">
+                  {errors.confirm.message}
+                </p>
+              )}
             </div>
 
             {serverError && (
-              <p className="rounded-control bg-danger/10 px-3 py-2 text-sm text-danger">{serverError}</p>
+              <p role="alert" className="rounded-control bg-danger/10 px-3 py-2 text-sm text-danger">
+                {serverError}
+              </p>
             )}
 
             <Button type="submit" disabled={isSubmitting} className="mt-1">
