@@ -6,30 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { HelpPopover } from '@/components/ui/help-popover';
+import { levelColor, levelTint } from '../level-colors';
 
 export type LevelDailyStatus = 'idle' | 'in-progress' | 'done';
-
-// Couleur dediee par niveau (rampe de difficulte issue de la marque : vert -> jaune -> orange -> rouge).
-// Meme code pour tous les jeux a niveaux, les cles etant partagees (FACILE/MOYEN/DIFFICILE/EXTREME).
-const LEVEL_COLOR: Record<string, string> = {
-  FACILE: '#5FB24A',
-  MOYEN: '#EAB308',
-  DIFFICILE: '#E8730C',
-  EXTREME: '#EE1515',
-};
-
-function levelColor(level: string): string {
-  return LEVEL_COLOR[level] ?? '#3B4CCA';
-}
-
-// Teinte tres claire pour le fond de la carte (le meme ton que le rail, en transparence).
-function hexToRgba(hex: string, alpha: number): string {
-  const n = hex.replace('#', '');
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 export interface LevelOption<L extends string> {
   level: L;
@@ -85,7 +64,7 @@ export function LevelSelectScreen<L extends string>({
                     key={option.level}
                     type="button"
                     onClick={() => onPick(option.level)}
-                    style={{ '--lvl': color, borderColor: color, backgroundColor: hexToRgba(color, 0.08) } as CSSProperties}
+                    style={{ '--lvl': color, borderColor: color, backgroundColor: levelTint(option.level) } as CSSProperties}
                     className="group flex items-center justify-between gap-3 rounded-card border-4 p-4 text-left transition-transform duration-100 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--lvl)] focus-visible:ring-offset-2"
                   >
                     <span className="min-w-0">

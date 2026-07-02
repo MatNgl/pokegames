@@ -38,6 +38,9 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
 
   return (
     <div className="flex w-32 shrink-0 flex-col gap-2">
+      <span className="text-right font-display text-[9px] uppercase tracking-widest text-muted">
+        Indices
+      </span>
       {hints.map((hint) => {
         const unlocked = mistakes >= hint.unlockedAtMistakeCount;
         const plural = hint.unlockedAtMistakeCount > 1 ? 's' : '';
@@ -51,7 +54,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
               <span className="min-w-0 flex-1 truncate text-right text-xs font-bold text-foreground">
                 {String(hint.value)}
               </span>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border-2 border-go-shadow bg-go text-go-foreground">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border-2 border-go-shadow bg-go text-go-foreground shadow-[0_2px_0_var(--color-go-shadow)]">
                 <HintGlyph type={hint.type} />
               </span>
             </div>
@@ -62,10 +65,13 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
           return (
             <div
               key={hint.type}
-              className="flex justify-end"
+              className="flex items-center justify-end gap-2"
               title={`${hint.label} : débloqué à ${hint.unlockedAtMistakeCount} erreur${plural}`}
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-control border-2 border-border-strong bg-surface-2 text-muted/60">
+              <span className="text-[10px] font-bold text-muted/70">
+                {hint.unlockedAtMistakeCount} err.
+              </span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border-2 border-border-strong bg-surface-2 text-muted/60">
                 <Lock className="h-4 w-4" />
               </span>
             </div>
@@ -82,7 +88,7 @@ export function HintIcons({ hints, mistakes, busy, onReveal }: HintIconsProps) {
               initial={justUnlocked && !reduceMotion ? { scale: 0.5, opacity: 0 } : false}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-control border-2 border-go bg-surface text-go-shadow transition-colors duration-200 hover:bg-go hover:text-white disabled:opacity-50"
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-control border-2 border-go bg-surface text-go-shadow shadow-[0_2px_0_var(--color-go)] transition-colors duration-200 hover:bg-go hover:text-white disabled:opacity-50"
             >
               <HintGlyph type={hint.type} />
             </motion.button>

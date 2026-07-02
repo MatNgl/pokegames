@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card';
 import { HelpPopover } from '@/components/ui/help-popover';
 import { Spinner } from '@/components/ui/spinner';
 import { API_ORIGIN } from '@/lib/env';
+import { cn } from '@/lib/utils';
 import { getApiErrorMessage, isDailyCompletedError } from '@/lib/errors';
 import {
   getPokemonNames,
@@ -34,6 +35,7 @@ import {
   todayKey,
   whoIsItDailyStatus,
 } from './daily-storage';
+import { levelColor } from './level-colors';
 import { GuessAutocomplete } from './components/guess-autocomplete';
 import { HintIcons } from './components/hint-icons';
 import { LevelSelectScreen } from './components/level-select-screen';
@@ -62,6 +64,30 @@ const LEVEL_LABEL: Record<WhoIsItLevel, string> = {
   DIFFICILE: 'Difficile',
   EXTREME: 'Extrême',
 };
+
+// Progression des manches en pastilles (faite / en cours / a venir).
+function RoundPills({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex items-center gap-1" aria-label={`Manche ${current} sur ${total}`}>
+      {Array.from({ length: total }, (_, i) => {
+        const n = i + 1;
+        const done = n < current;
+        const isCurrent = n === current;
+        return (
+          <span
+            key={n}
+            className={cn(
+              'h-2.5 w-2.5 rounded-full border-2 transition-colors',
+              done && 'border-go-shadow bg-go',
+              isCurrent && 'border-primary-shadow bg-primary',
+              !done && !isCurrent && 'border-border-strong bg-surface-2',
+            )}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
 export function WhoIsItPage() {
   const [level, setLevel] = useState<WhoIsItLevel | null>(null);
@@ -334,19 +360,32 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
                     <h1 className="font-display text-sm leading-relaxed text-foreground">
                       Quel est ce Pokémon ?
                     </h1>
-                    <p className="mt-1 text-sm font-semibold text-muted">
-                      {liveAttempts} essai{liveAttempts > 1 ? 's' : ''}
-                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="font-display text-lg leading-none text-primary">
+                        {liveAttempts}
+                      </span>
+                      <span className="text-xs font-bold text-muted">
+                        essai{liveAttempts > 1 ? 's' : ''}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge className="border-accent-shadow bg-accent text-foreground">
-                    {LEVEL_LABEL[level]}
-                  </Badge>
-                  <Badge className="border-primary bg-primary text-primary-foreground">
-                    {round.roundIndex}/{round.totalRounds}
-                  </Badge>
-                  <HelpPopover ariaLabel="Règles du jeu" rules={WHO_IS_IT_RULES} />
+                <div className="flex flex-col items-end gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      style={
+                        {
+                          borderColor: levelColor(level),
+                          backgroundColor: levelColor(level),
+                          color: '#2B2A24',
+                        } as CSSProperties
+                      }
+                    >
+                      {LEVEL_LABEL[level]}
+                    </Badge>
+                    <HelpPopover ariaLabel="Règles du jeu" rules={WHO_IS_IT_RULES} />
+                  </div>
+                  <RoundPills current={round.roundIndex} total={round.totalRounds} />
                 </div>
               </div>
 
