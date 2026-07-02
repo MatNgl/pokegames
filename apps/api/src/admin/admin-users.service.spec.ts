@@ -5,14 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 describe('AdminUsersService', () => {
   let service: AdminUsersService;
   let prisma: {
-    user: { findMany: jest.Mock; findUnique: jest.Mock };
+    user: { findMany: jest.Mock; findUnique: jest.Mock; count: jest.Mock };
     gameAuditLog: { groupBy: jest.Mock; aggregate: jest.Mock; findMany: jest.Mock };
     dailyResult: { count: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
-      user: { findMany: jest.fn(), findUnique: jest.fn() },
+      user: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn().mockResolvedValue(2) },
       gameAuditLog: { groupBy: jest.fn(), aggregate: jest.fn(), findMany: jest.fn() },
       dailyResult: { count: jest.fn() },
     };
@@ -36,10 +36,11 @@ describe('AdminUsersService', () => {
     ]);
 
     const list = await service.list();
-    expect(list).toHaveLength(2);
-    expect(list[0]?.gamesPlayed).toBe(5);
-    expect(list[0]?.totalTimeSeconds).toBe(300);
-    expect(list[1]?.gamesPlayed).toBe(0);
+    expect(list.total).toBe(2);
+    expect(list.items).toHaveLength(2);
+    expect(list.items[0]?.gamesPlayed).toBe(5);
+    expect(list.items[0]?.totalTimeSeconds).toBe(300);
+    expect(list.items[1]?.gamesPlayed).toBe(0);
   });
 
   it('detail renvoie les infos, agrégats et parties récentes', async () => {

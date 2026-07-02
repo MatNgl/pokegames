@@ -2,9 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   AdminAuditLogEntry,
+  AdminPage,
   AdminUserDetail,
   AdminUserSummary,
 } from '@pokegames/shared-types';
+
+const USERS_PAGE_SIZE = 20;
 
 @Injectable()
 export class AdminUsersService {
@@ -27,26 +30,35 @@ export class AdminUsersService {
     return map;
   }
 
-  async list(): Promise<AdminUserSummary[]> {
-    const [users, stats] = await Promise.all([
+  async list(page = 1): Promise<AdminPage<AdminUserSummary>> {
+    const pageNum = Math.max(1, page);
+    const [users, total, stats] = await Promise.all([
       this.prisma.user.findMany({
         select: { id: true, username: true, email: true, role: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
+        skip: (pageNum - 1) * USERS_PAGE_SIZE,
+        take: USERS_PAGE_SIZE,
       }),
+      this.prisma.user.count(),
       this.playStatsByUser(),
     ]);
-    return users.map((u) => {
-      const s = stats.get(u.id);
-      return {
-        id: u.id,
-        username: u.username,
-        email: u.email,
-        role: u.role,
-        createdAt: u.createdAt.toISOString(),
-        gamesPlayed: s?.games ?? 0,
-        totalTimeSeconds: s?.time ?? 0,
-      };
-    });
+    return {
+      items: users.map((u) => {
+        const s = stats.get(u.id);
+        return {
+          id: u.id,
+          username: u.username,
+          email: u.email,
+          role: u.role,
+          createdAt: u.createdAt.toISOString(),
+          gamesPlayed: s?.games ?? 0,
+          totalTimeSeconds: s?.time ?? 0,
+        };
+      }),
+      total,
+      page: pageNum,
+      pageSize: USERS_PAGE_SIZE,
+    };
   }
 
   private toAuditEntry(row: {

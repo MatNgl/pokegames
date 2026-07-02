@@ -121,11 +121,40 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+function Pager({
+  page,
+  total,
+  pageSize,
+  onPage,
+}: {
+  page: number;
+  total: number;
+  pageSize: number;
+  onPage: (p: number) => void;
+}) {
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
+  if (lastPage <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-3 pt-1">
+      <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        Précédent
+      </Button>
+      <span className="text-xs font-semibold text-muted">
+        Page {page} / {lastPage}
+      </span>
+      <Button size="sm" variant="secondary" disabled={page >= lastPage} onClick={() => onPage(page + 1)}>
+        Suivant
+      </Button>
+    </div>
+  );
+}
+
 function DashboardTab() {
+  const [page, setPage] = useState(1);
   const { data: stats } = useQuery({ queryKey: ['admin-stats'], queryFn: getAdminStats });
   const { data: logs, isLoading } = useQuery({
-    queryKey: ['admin-logs'],
-    queryFn: () => getAdminAuditLogs(),
+    queryKey: ['admin-logs', page],
+    queryFn: () => getAdminAuditLogs(page),
   });
 
   return (
@@ -141,11 +170,11 @@ function DashboardTab() {
         <h2 className="font-display text-xs uppercase text-foreground">Historique des parties</h2>
         {isLoading ? (
           <Spinner className="mx-auto my-6 h-6 w-6 text-primary" />
-        ) : (logs?.length ?? 0) === 0 ? (
+        ) : (logs?.items.length ?? 0) === 0 ? (
           <p className="py-6 text-center text-sm font-semibold text-muted">Aucune partie enregistrée.</p>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {logs?.map((log) => (
+            {logs?.items.map((log) => (
               <div
                 key={log.id}
                 className="flex items-center justify-between gap-2 rounded-control border-2 border-border-strong bg-surface-2/50 px-3 py-2"
@@ -174,6 +203,9 @@ function DashboardTab() {
             ))}
           </div>
         )}
+        {logs && (
+          <Pager page={logs.page} total={logs.total} pageSize={logs.pageSize} onPage={setPage} />
+        )}
       </Card>
     </div>
   );
@@ -181,7 +213,11 @@ function DashboardTab() {
 
 function UsersTab() {
   const [selected, setSelected] = useState<string | null>(null);
-  const { data: users, isLoading } = useQuery({ queryKey: ['admin-users'], queryFn: getAdminUsers });
+  const [page, setPage] = useState(1);
+  const { data: users, isLoading } = useQuery({
+    queryKey: ['admin-users', page],
+    queryFn: () => getAdminUsers(page),
+  });
   const { data: detail } = useQuery({
     queryKey: ['admin-user', selected],
     queryFn: () => getAdminUser(selected as string),
@@ -196,7 +232,7 @@ function UsersTab() {
           <Spinner className="mx-auto my-6 h-6 w-6 text-primary" />
         ) : (
           <div className="flex flex-col gap-1.5">
-            {users?.map((u) => (
+            {users?.items.map((u) => (
               <button
                 key={u.id}
                 type="button"
@@ -222,6 +258,9 @@ function UsersTab() {
               </button>
             ))}
           </div>
+        )}
+        {users && (
+          <Pager page={users.page} total={users.total} pageSize={users.pageSize} onPage={setPage} />
         )}
       </Card>
 

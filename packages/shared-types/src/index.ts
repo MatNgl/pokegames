@@ -92,6 +92,13 @@ export interface AdminGameConfigEntry {
   updatedAt: string;
 }
 
+export interface AdminPage<T> {
+  items: T[];
+  total: number;
+  page: number; // 1-indexe
+  pageSize: number;
+}
+
 /* ==========================================================================
  * Qui est-ce ? (multijoueur 1v1, temps reel Socket.io)
  * ========================================================================== */

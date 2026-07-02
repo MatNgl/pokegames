@@ -2,6 +2,7 @@ import { api } from '@/lib/api';
 import type {
   AdminAuditLogEntry,
   AdminGameConfigEntry,
+  AdminPage,
   AdminStats,
   AdminUserDetail,
   AdminUserSummary,
@@ -21,15 +22,13 @@ export async function getAdminStats(): Promise<AdminStats> {
   return res.data;
 }
 
-export async function getAdminAuditLogs(gameType?: string): Promise<AdminAuditLogEntry[]> {
-  const res = await api.get<AdminAuditLogEntry[]>('/admin/audit/logs', {
-    params: gameType ? { gameType, limit: 100 } : { limit: 100 },
-  });
+export async function getAdminAuditLogs(page = 1): Promise<AdminPage<AdminAuditLogEntry>> {
+  const res = await api.get<AdminPage<AdminAuditLogEntry>>('/admin/audit/logs', { params: { page } });
   return res.data;
 }
 
-export async function getAdminUsers(): Promise<AdminUserSummary[]> {
-  const res = await api.get<AdminUserSummary[]>('/admin/users');
+export async function getAdminUsers(page = 1): Promise<AdminPage<AdminUserSummary>> {
+  const res = await api.get<AdminPage<AdminUserSummary>>('/admin/users', { params: { page } });
   return res.data;
 }
 
