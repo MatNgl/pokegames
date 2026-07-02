@@ -4,6 +4,7 @@ import plusMinusImg from '@/assets/games/plus-minus.png';
 import intrusImg from '@/assets/games/intrus.png';
 import quiEstCeImg from '@/assets/games/quiestce.png';
 import findShinyImg from '@/assets/games/find_shiny.png';
+import findNotShinyImg from '@/assets/games/find_not_shiny.png';
 import justPriceImg from '@/assets/games/just_price.png';
 import leBonShinyImg from '@/assets/games/le_bon_shiny.png';
 
@@ -24,5 +25,6 @@ export const HOME_GAMES: HomeGame[] = [
   { title: 'La Juste Stat', description: 'Devine la valeur exacte', to: '/juste-stat', iconImg: justPriceImg, gameType: 'JUST_STAT' },
   { title: 'Le Bon Shiny', description: 'Repère le shiny authentique', to: '/bon-shiny', iconImg: leBonShinyImg, gameType: 'TRUE_SHINY' },
   { title: 'Trouve le shiny', description: 'Repère le Pokémon shiny', to: '/shiny', iconImg: findShinyImg, gameType: 'SHINY' },
+  { title: 'Trouve le non-shiny', description: "Repère celui qui n'est pas shiny", to: '/non-shiny', iconImg: findNotShinyImg, gameType: 'SHINY' },
   { title: 'Qui est-ce', description: 'Duel 1 contre 1 en temps réel', to: '/qui-est-ce', iconImg: quiEstCeImg },
 ];

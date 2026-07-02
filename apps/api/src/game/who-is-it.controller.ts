@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { WhoIsItService } from './who-is-it.service';
+import { GameConfigService } from '../game-config/game-config.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import {
   WhoIsItConfig,
@@ -16,7 +17,10 @@ interface AuthenticatedUser {
 
 @Controller('games/who-is-it')
 export class WhoIsItController {
-  constructor(private readonly whoIsItService: WhoIsItService) {}
+  constructor(
+    private readonly whoIsItService: WhoIsItService,
+    private readonly gameConfig: GameConfigService,
+  ) {}
 
   @UseGuards(OptionalJwtAuthGuard)
   @Post('start')
@@ -27,7 +31,7 @@ export class WhoIsItController {
     const fullConfig: WhoIsItConfig = {
       generations: config?.generations ?? [],
       mode: config?.mode ?? 'CLASSIC',
-      roundsCount: config?.roundsCount ?? 5,
+      roundsCount: config?.roundsCount ?? this.gameConfig.whoIsIt().roundsCount,
       // exactOptionalPropertyTypes : ne pas assigner explicitement undefined a une propriete optionnelle.
       ...(config?.level ? { level: config.level } : {}),
     };

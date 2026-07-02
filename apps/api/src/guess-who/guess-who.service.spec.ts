@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GUESS_WHO_EVENTS, type GuessWhoStateDTO } from '@pokegames/shared-types';
 import { GuessWhoService } from './guess-who.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { GameConfigService } from '../game-config/game-config.service';
+import { gameConfigMock } from '../game-config/game-config.mock';
 
 const cards = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, nameFr: `P${i + 1}` }));
 
@@ -13,6 +15,7 @@ describe('GuessWhoService', () => {
       providers: [
         GuessWhoService,
         { provide: PrismaService, useValue: { pokemon: { findMany: jest.fn().mockResolvedValue(cards) } } },
+        { provide: GameConfigService, useValue: gameConfigMock() },
       ],
     }).compile();
     service = module.get<GuessWhoService>(GuessWhoService);

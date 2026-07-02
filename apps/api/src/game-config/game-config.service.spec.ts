@@ -7,15 +7,17 @@ describe('GameConfigService', () => {
   let findMany: jest.Mock;
   let create: jest.Mock;
   let upsert: jest.Mock;
+  let update: jest.Mock;
 
   beforeEach(async () => {
     findMany = jest.fn().mockResolvedValue([]);
     create = jest.fn().mockResolvedValue({});
     upsert = jest.fn().mockResolvedValue({});
+    update = jest.fn().mockResolvedValue({});
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GameConfigService,
-        { provide: PrismaService, useValue: { gameConfig: { findMany, create, upsert } } },
+        { provide: PrismaService, useValue: { gameConfig: { findMany, create, upsert, update } } },
       ],
     }).compile();
     service = module.get<GameConfigService>(GameConfigService);
@@ -27,8 +29,8 @@ describe('GameConfigService', () => {
 
   it('seed les clés manquantes au démarrage et expose les défauts', async () => {
     await service.onModuleInit();
-    // 8 clés seedees (aucune en base au depart).
-    expect(create).toHaveBeenCalledTimes(8);
+    // 9 clés seedees (aucune en base au depart).
+    expect(create).toHaveBeenCalledTimes(9);
     expect(service.plusMinus().roundsCount).toBe(10);
     expect(service.antiRepeatWindow('PLUS_MINUS')).toBe(5);
     expect(service.antiRepeatDetailWindow()).toBe(1);
@@ -40,6 +42,20 @@ describe('GameConfigService', () => {
     ]);
     await service.onModuleInit();
     expect(service.plusMinus().roundsCount).toBe(3);
+  });
+
+  it('complète une valeur en base avec les nouveaux paramètres par défaut sans écraser l’existant', async () => {
+    // Ligne stockee avant l'ajout de enabledStats : la valeur existante (roundsCount) est preservee,
+    // le champ manquant est complete depuis le defaut et persiste.
+    findMany.mockResolvedValue([
+      { key: 'PLUS_MINUS', value: { roundsCount: 7, levels: {} }, updatedAt: new Date() },
+    ]);
+    await service.onModuleInit();
+    expect(service.plusMinus().roundsCount).toBe(7);
+    expect(service.plusMinus().enabledStats).toContain('HP');
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { key: 'PLUS_MINUS' } }),
+    );
   });
 
   it('update persiste et rafraîchit le cache', async () => {

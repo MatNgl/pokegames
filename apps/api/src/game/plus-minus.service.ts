@@ -57,7 +57,8 @@ interface PlusMinusSession {
   userId?: string;
 }
 
-const CRITERIA: PlusMinusCriterion[] = ['HP', 'HEIGHT', 'WEIGHT', 'ATK', 'DEF', 'SPEED', 'AGE'];
+// Ensemble complet des criteres. La config restreint lesquels sont actifs (enabledStats).
+const ALL_CRITERIA: PlusMinusCriterion[] = ['HP', 'HEIGHT', 'WEIGHT', 'ATK', 'DEF', 'SPEED', 'AGE'];
 
 // Ordre fixe de construction du plan du jour. La dedup entre niveaux depend de cet ordre :
 // chaque niveau tire en excluant les Pokemon deja pris par les niveaux precedents.
@@ -223,7 +224,9 @@ export class PlusMinusService {
     used: Set<number>,
   ): Duel | null {
     const { minDiff, maxDiff, ageMinDiff } = this.gameConfig.plusMinus().levels[level];
-    for (const criterion of this.shuffle(CRITERIA, rng)) {
+    const enabled = this.gameConfig.plusMinus().enabledStats;
+    const criteria = enabled.length > 0 ? ALL_CRITERIA.filter((c) => enabled.includes(c)) : ALL_CRITERIA;
+    for (const criterion of this.shuffle(criteria, rng)) {
       // L'anciennete (numero de Pokedex) a sa propre echelle : ecart minimal dedie, sans plafond.
       const isAge = criterion === 'AGE';
       const scale = this.dimensionScale(criterion);

@@ -83,8 +83,6 @@ const STAT_DESCRIPTORS: StatDescriptor[] = [
   { key: 'speed', label: 'Vitesse' },
 ];
 
-const STAT_THRESHOLDS = [50, 60, 70, 80, 90, 100, 110, 120];
-
 const INTRUDER_LEVELS: IntruderLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE'];
 
 interface HintExtra {
@@ -351,9 +349,10 @@ export class IntruderService {
     hintMode: IntruderHintMode,
     rng: () => number,
   ): RoundDef | null {
+    const statThresholds = this.gameConfig.intruder().statThresholds;
     for (let attempt = 0; attempt < 40; attempt++) {
       const descriptor = STAT_DESCRIPTORS[Math.floor(rng() * STAT_DESCRIPTORS.length)];
-      const threshold = STAT_THRESHOLDS[Math.floor(rng() * STAT_THRESHOLDS.length)];
+      const threshold = statThresholds[Math.floor(rng() * statThresholds.length)];
       if (!descriptor || threshold === undefined) continue;
       const below = pool.filter((p) => this.statValue(p, descriptor.key) < threshold);
       const atOrAbove = pool.filter((p) => this.statValue(p, descriptor.key) >= threshold);

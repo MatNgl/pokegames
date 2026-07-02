@@ -1,20 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
+import { GameConfigService } from '../game-config/game-config.service';
 import {
   GUESS_WHO_EVENTS,
   type GuessWhoCard,
   type GuessWhoPhase,
   type GuessWhoStateDTO,
 } from '@pokegames/shared-types';
-
-const GRID_SIZE = 25;
-// Minuteur par phase (ms) : poser la question, y repondre, puis analyser/eliminer.
-const PHASE_MS: Record<GuessWhoPhase, number> = {
-  ASKING: 30_000,
-  ANSWERING: 30_000,
-  ELIMINATING: 20_000,
-};
 
 export interface Emit {
   socketId: string;
@@ -55,10 +48,18 @@ export class GuessWhoService {
   private readonly rooms = new Map<string, Waiting>(); // code -> hote en attente
   private poolCache: GuessWhoCard[] | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gameConfig: GameConfigService,
+  ) {}
 
   /** Programme la fin de tour (minuteur d'elimination) : le gateway rappelle expireTurn. */
   onScheduleExpire?: (gameId: string, token: number, delayMs: number) => void;
+
+  // Minuteur d'une phase (ms), lu depuis la config dynamique.
+  private phaseMs(phase: GuessWhoPhase): number {
+    return this.gameConfig.guessWho().phaseSeconds[phase] * 1000;
+  }
 
   private async loadPool(): Promise<GuessWhoCard[]> {
     if (this.poolCache) return this.poolCache;
@@ -107,8 +108,9 @@ export class GuessWhoService {
   private beginPhase(game: Game, phase: GuessWhoPhase): void {
     game.phase = phase;
     game.turnToken += 1;
-    game.turnDeadline = Date.now() + PHASE_MS[phase];
-    this.onScheduleExpire?.(game.id, game.turnToken, PHASE_MS[phase]);
+    const delay = this.phaseMs(phase);
+    game.turnDeadline = Date.now() + delay;
+    this.onScheduleExpire?.(game.id, game.turnToken, delay);
   }
 
   private switchTurn(game: Game): void {
@@ -117,12 +119,13 @@ export class GuessWhoService {
 
   private async startGame(a: Waiting, b: Waiting): Promise<Emit[]> {
     const pool = await this.loadPool();
-    if (pool.length < GRID_SIZE) {
+    const gridSize = this.gameConfig.guessWho().gridSize;
+    if (pool.length < gridSize) {
       return [{ socketId: a.socketId, event: GUESS_WHO_EVENTS.errorMsg, payload: { message: 'Catalogue insuffisant.' } }];
     }
-    const cards = this.shuffle(pool).slice(0, GRID_SIZE);
-    const secretA = cards[Math.floor(Math.random() * GRID_SIZE)]?.pokemonId ?? cards[0]!.pokemonId;
-    const secretB = cards[Math.floor(Math.random() * GRID_SIZE)]?.pokemonId ?? cards[0]!.pokemonId;
+    const cards = this.shuffle(pool).slice(0, gridSize);
+    const secretA = cards[Math.floor(Math.random() * gridSize)]?.pokemonId ?? cards[0]!.pokemonId;
+    const secretB = cards[Math.floor(Math.random() * gridSize)]?.pokemonId ?? cards[0]!.pokemonId;
     const game: Game = {
       id: uuidv4(),
       cards,

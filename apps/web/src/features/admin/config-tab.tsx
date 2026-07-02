@@ -16,6 +16,7 @@ const KEY_LABEL: Record<string, string> = {
   SHINY: 'Trouve le shiny',
   TRUE_SHINY: 'Le Bon Shiny',
   JUST_STAT: 'La Juste Stat',
+  GUESS_WHO: 'Qui est-ce',
   ANTI_REPEAT: 'Anti-répétition',
 };
 

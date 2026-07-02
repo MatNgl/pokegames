@@ -232,6 +232,7 @@ export class WhoIsItService {
     // height est stocke en metres (ETL : "0,7 m" -> 0.7). Ne pas rediviser.
     const heightStr = target.height != null ? `${target.height.toFixed(1)} m` : 'Inconnue';
     const hintCosts = this.gameConfig.whoIsIt().hintCosts;
+    const hintUnlocks = this.gameConfig.whoIsIt().hintUnlocks;
 
     const hints: WhoIsItHint[] = [
       {
@@ -239,7 +240,7 @@ export class WhoIsItService {
         label: 'Type 1',
         value: type1,
         cost: hintCosts.TYPE_1 ?? 0,
-        unlockedAtMistakeCount: 1,
+        unlockedAtMistakeCount: hintUnlocks.TYPE_1 ?? 1,
         isRevealed: false,
       },
       {
@@ -247,7 +248,7 @@ export class WhoIsItService {
         label: 'Taille',
         value: heightStr,
         cost: hintCosts.HEIGHT ?? 0,
-        unlockedAtMistakeCount: 2,
+        unlockedAtMistakeCount: hintUnlocks.HEIGHT ?? 2,
         isRevealed: false,
       },
       {
@@ -255,7 +256,7 @@ export class WhoIsItService {
         label: 'Génération',
         value: target.generation,
         cost: hintCosts.GENERATION ?? 0,
-        unlockedAtMistakeCount: 3,
+        unlockedAtMistakeCount: hintUnlocks.GENERATION ?? 3,
         isRevealed: false,
       },
       {
@@ -263,7 +264,7 @@ export class WhoIsItService {
         label: 'Aperçu couleur',
         value: 'Couleur dévoilée',
         cost: hintCosts.BLURRED_COLOR ?? 0,
-        unlockedAtMistakeCount: 4,
+        unlockedAtMistakeCount: hintUnlocks.BLURRED_COLOR ?? 4,
         isRevealed: false,
       },
     ];

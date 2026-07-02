@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   ANTI_REPEAT_DETAIL_WINDOW_DAYS,
   ANTI_REPEAT_WINDOW_DAYS,
+  GUESS_WHO_CONFIG,
   INTRUDER_CONFIG,
   JUST_STAT_CONFIG,
   MOTUS_ADMIN_CONFIG,
@@ -11,6 +12,7 @@ import {
   SHINY_CONFIG,
   TRUE_SHINY_CONFIG,
   WHO_IS_IT_ADMIN_CONFIG,
+  type GuessWhoConfig,
   type IntruderConfig,
   type JustStatConfig,
   type MotusAdminConfig,
@@ -33,6 +35,7 @@ export type GameConfigKey =
   | 'SHINY'
   | 'TRUE_SHINY'
   | 'JUST_STAT'
+  | 'GUESS_WHO'
   | 'ANTI_REPEAT';
 
 // Valeurs par defaut : ne servent qu'au seed initial. Apres seed, la base est la source de verite.
@@ -44,10 +47,41 @@ const DEFAULTS: Record<GameConfigKey, unknown> = {
   SHINY: SHINY_CONFIG,
   TRUE_SHINY: TRUE_SHINY_CONFIG,
   JUST_STAT: JUST_STAT_CONFIG,
+  GUESS_WHO: GUESS_WHO_CONFIG,
   ANTI_REPEAT: { windows: ANTI_REPEAT_WINDOW_DAYS, detailWindow: ANTI_REPEAT_DETAIL_WINDOW_DAYS },
 };
 
 const KEYS = Object.keys(DEFAULTS) as GameConfigKey[];
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Complete recursivement une valeur stockee avec les cles manquantes des valeurs par defaut, sans
+ * jamais ecraser une valeur deja presente (reglee par l'admin). Sert a introduire de nouveaux
+ * parametres sans perdre la config existante en base.
+ */
+function fillMissingDefaults(def: unknown, stored: unknown): { value: unknown; changed: boolean } {
+  if (!isPlainObject(def) || !isPlainObject(stored)) {
+    return { value: stored, changed: false };
+  }
+  let changed = false;
+  const out: Record<string, unknown> = { ...stored };
+  for (const [k, dv] of Object.entries(def)) {
+    if (!(k in out)) {
+      out[k] = dv;
+      changed = true;
+    } else {
+      const res = fillMissingDefaults(dv, out[k]);
+      if (res.changed) {
+        out[k] = res.value;
+        changed = true;
+      }
+    }
+  }
+  return { value: out, changed };
+}
 
 /**
  * Source de verite unique des parametres de jeu. Charge la config en memoire au demarrage (seed
@@ -69,7 +103,15 @@ export class GameConfigService implements OnModuleInit {
     const byKey = new Map(rows.map((r) => [r.key, r.value]));
     for (const key of KEYS) {
       if (byKey.has(key)) {
-        this.cache.set(key, byKey.get(key));
+        // Complete la valeur stockee avec les nouveaux parametres par defaut (sans ecraser l'existant).
+        const { value, changed } = fillMissingDefaults(DEFAULTS[key], byKey.get(key));
+        if (changed) {
+          await this.prisma.gameConfig.update({
+            where: { key },
+            data: { value: value as Prisma.InputJsonValue },
+          });
+        }
+        this.cache.set(key, value);
       } else {
         // Seed initial de la cle manquante avec sa valeur par defaut.
         await this.prisma.gameConfig.create({
@@ -104,6 +146,9 @@ export class GameConfigService implements OnModuleInit {
   }
   justStat(): JustStatConfig {
     return this.get<JustStatConfig>('JUST_STAT');
+  }
+  guessWho(): GuessWhoConfig {
+    return this.get<GuessWhoConfig>('GUESS_WHO');
   }
   antiRepeatWindow(game: string): number {
     return this.get<AntiRepeatConfig>('ANTI_REPEAT').windows[game] ?? 30;

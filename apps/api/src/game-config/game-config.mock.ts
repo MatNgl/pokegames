@@ -2,6 +2,7 @@ import type { GameConfigService } from './game-config.service';
 import {
   ANTI_REPEAT_DETAIL_WINDOW_DAYS,
   ANTI_REPEAT_WINDOW_DAYS,
+  GUESS_WHO_CONFIG,
   INTRUDER_CONFIG,
   JUST_STAT_CONFIG,
   MOTUS_ADMIN_CONFIG,
@@ -21,6 +22,7 @@ export function gameConfigMock(): Partial<GameConfigService> {
     shiny: () => SHINY_CONFIG,
     trueShiny: () => TRUE_SHINY_CONFIG,
     justStat: () => JUST_STAT_CONFIG,
+    guessWho: () => GUESS_WHO_CONFIG,
     antiRepeatWindow: (game: string) =>
       (ANTI_REPEAT_WINDOW_DAYS as Record<string, number>)[game] ?? 30,
     antiRepeatDetailWindow: () => ANTI_REPEAT_DETAIL_WINDOW_DAYS,

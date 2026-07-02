@@ -2,6 +2,7 @@ import type {
   IntruderLevel,
   IntruderRule,
   JustStatKey,
+  PlusMinusCriterion,
   PlusMinusLevel,
   ShinyLevel,
   TrueShinyLevel,
@@ -26,6 +27,8 @@ export interface WhoIsItAdminConfig {
   roundsCount: number;
   startCapital: number;
   hintCosts: Record<string, number>;
+  // Nombre d'erreurs requis pour debloquer chaque palier d'indice (ordre fixe reglable).
+  hintUnlocks: Record<string, number>;
   levels: Record<WhoIsItLevel, WhoIsItLevelAdminConfig>;
 }
 
@@ -37,6 +40,12 @@ export const WHO_IS_IT_ADMIN_CONFIG: WhoIsItAdminConfig = {
     HEIGHT: 0,
     GENERATION: 0,
     BLURRED_COLOR: 0,
+  },
+  hintUnlocks: {
+    TYPE_1: 1,
+    HEIGHT: 2,
+    GENERATION: 3,
+    BLURRED_COLOR: 4,
   },
   levels: {
     FACILE: { allowedGenerations: [1, 2, 3], initialZoomRatio: 1.0, zoomStepPerMistake: 0, initialRotationAngle: 0, rotationStepPerMistake: 0 },
@@ -77,6 +86,8 @@ export interface PlusMinusLevelConfig {
 
 export interface PlusMinusConfig {
   roundsCount: number;
+  // Caracteristiques tirables pour les duels. Restreindre cette liste desactive un critere.
+  enabledStats: PlusMinusCriterion[];
   levels: Record<PlusMinusLevel, PlusMinusLevelConfig>;
 }
 
@@ -84,6 +95,7 @@ export interface PlusMinusConfig {
 // Facile : ecart large (facile a trancher). Extreme : valeurs tres proches.
 export const PLUS_MINUS_CONFIG: PlusMinusConfig = {
   roundsCount: 10,
+  enabledStats: ['HP', 'HEIGHT', 'WEIGHT', 'ATK', 'DEF', 'SPEED', 'AGE'],
   levels: {
     FACILE: { minDiff: 45, maxDiff: 9999, ageMinDiff: 300 },
     MOYEN: { minDiff: 25, maxDiff: 45, ageMinDiff: 250 },
@@ -118,11 +130,14 @@ export interface IntruderLevelConfig {
 
 export interface IntruderConfig {
   roundsCount: number;
+  // Seuils candidats pour le critere "stat" (ex. "moins de 100 en Vitesse").
+  statThresholds: number[];
   levels: Record<IntruderLevel, IntruderLevelConfig>;
 }
 
 export const INTRUDER_CONFIG: IntruderConfig = {
   roundsCount: 5,
+  statThresholds: [50, 60, 70, 80, 90, 100, 110, 120],
   levels: {
     FACILE: { gridSize: 4, rules: ['GENERATION', 'TYPE'], hintMode: 'EXPLICIT' },
     MOYEN: { gridSize: 5, rules: ['STAT', 'EVOLUTION'], hintMode: 'DOMAIN' },
@@ -170,6 +185,17 @@ export const TRUE_SHINY_CONFIG: TrueShinyConfig = {
     MOYEN: { gridSize: 5, hueMin: 60, hueMax: 180 },
     DIFFICILE: { gridSize: 6, hueMin: 60, hueMax: 180 },
   },
+};
+
+export interface GuessWhoConfig {
+  gridSize: number; // nombre de Pokemon sur la grille commune
+  // Duree de chaque phase (secondes) : poser la question, y repondre, analyser/eliminer.
+  phaseSeconds: { ASKING: number; ANSWERING: number; ELIMINATING: number };
+}
+
+export const GUESS_WHO_CONFIG: GuessWhoConfig = {
+  gridSize: 25,
+  phaseSeconds: { ASKING: 30, ANSWERING: 30, ELIMINATING: 20 },
 };
 
 export interface StatDescriptor {
