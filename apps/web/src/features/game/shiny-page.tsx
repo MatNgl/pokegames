@@ -249,11 +249,6 @@ function ShinyGame({
         result={result}
         pixelated
         mark={info?.isShiny ? <Sparkles className="h-4 w-4 text-accent" aria-hidden="true" /> : undefined}
-        caption={
-          info ? (
-            <span className="text-[11px] font-extrabold leading-tight text-foreground">{info.name}</span>
-          ) : undefined
-        }
       />
     );
   };

@@ -352,9 +352,6 @@ function TrueShinyGame({ level, onBack }: { level: TrueShinyLevel; onBack: () =>
                   >
                     {reveal.correct ? 'Bien vu !' : 'Raté !'}
                   </motion.p>
-                  <p className="text-center text-sm font-bold text-foreground">
-                    C'était <span className="text-primary">{reveal.pokemonName}</span>
-                  </p>
                   <Button onClick={onContinue}>
                     {reveal.state.status === 'FINISHED' ? 'Voir le résultat' : 'Manche suivante'}
                   </Button>

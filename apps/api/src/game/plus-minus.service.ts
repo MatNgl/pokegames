@@ -44,6 +44,9 @@ interface Duel {
   a: DuelSide;
   b: DuelSide;
   correct: 'A' | 'B';
+  // true : la plus grande valeur gagne ; false : la plus petite. Pour l'anciennete (numero de
+  // Pokedex), le sens est tire au hasard par duel et enonce clairement dans la question.
+  wantHigher: boolean;
 }
 
 interface PlusMinusSession {
@@ -135,12 +138,7 @@ export class PlusMinusService {
     }
   }
 
-  private higherWins(criterion: PlusMinusCriterion): boolean {
-    // Pour l'anciennete, le plus ancien est le plus petit numero de Pokedex.
-    return criterion !== 'AGE';
-  }
-
-  private criterionLabel(criterion: PlusMinusCriterion): string {
+  private criterionLabel(criterion: PlusMinusCriterion, wantHigher: boolean): string {
     switch (criterion) {
       case 'HP':
         return 'Qui a le plus de PV ?';
@@ -155,7 +153,9 @@ export class PlusMinusService {
       case 'WEIGHT':
         return 'Lequel est le plus lourd ?';
       case 'AGE':
-        return 'Lequel est le plus ancien ?';
+        return wantHigher
+          ? 'Lequel a le plus grand numéro de Pokédex ?'
+          : 'Lequel a le plus petit numéro de Pokédex ?';
       default:
         return 'Lequel a la plus grande valeur ?';
     }
@@ -250,7 +250,9 @@ export class PlusMinusService {
         const b = candidates[Math.floor(rng() * candidates.length)];
         if (!b) continue;
         const vb = this.value(criterion, b) ?? 0;
-        const aWins = this.higherWins(criterion) ? va > vb : va < vb;
+        // Anciennete : sens tire au hasard (plus petit ou plus grand numero). Sinon, la plus grande valeur gagne.
+        const wantHigher = isAge ? rng() < 0.5 : true;
+        const aWins = wantHigher ? va > vb : va < vb;
         used.add(a.id);
         used.add(b.id);
         return {
@@ -258,6 +260,7 @@ export class PlusMinusService {
           a: { id: a.id, name: a.name, value: va },
           b: { id: b.id, name: b.name, value: vb },
           correct: aWins ? 'A' : 'B',
+          wantHigher,
         };
       }
     }
@@ -354,7 +357,7 @@ export class PlusMinusService {
       correctCount: session.correctCount,
       status: session.status,
       criterion: duel.criterion,
-      criterionLabel: this.criterionLabel(duel.criterion),
+      criterionLabel: this.criterionLabel(duel.criterion, duel.wantHigher === true),
       a: this.contestant(duel.a),
       b: this.contestant(duel.b),
     };
