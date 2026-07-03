@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useReducedMotion } from 'framer-motion';
 import { io, type Socket } from 'socket.io-client';
 import {
   GUESS_WHO_EVENTS,
@@ -8,6 +9,7 @@ import {
 } from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,6 +40,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 export function GuessWhoPage() {
   const navigate = useNavigate();
   const { user, initializing } = useAuth();
+  const reduce = useReducedMotion();
   const socketRef = useRef<Socket | null>(null);
 
   const [connected, setConnected] = useState(false);
@@ -52,6 +55,7 @@ export function GuessWhoPage() {
   const [guessMode, setGuessMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(Date.now());
+  const [turnTotal, setTurnTotal] = useState(30);
   const [showIntro, setShowIntro] = useState(false);
   const [introCount, setIntroCount] = useState(4);
   const inGameRef = useRef(false);
@@ -108,6 +112,13 @@ export function GuessWhoPage() {
     const t = setInterval(() => setNowTick(Date.now()), 500);
     return () => clearInterval(t);
   }, []);
+
+  // Duree totale du tour, capturee a l'arrivee d'une nouvelle echeance, pour l'anneau du minuteur.
+  useEffect(() => {
+    if (state?.turnDeadline) {
+      setTurnTotal(Math.max(1, Math.ceil((state.turnDeadline - Date.now()) / 1000)));
+    }
+  }, [state?.turnDeadline]);
 
   // Ecran "Adversaire trouve" : petit decompte avant le debut de la partie.
   useEffect(() => {
@@ -333,51 +344,63 @@ export function GuessWhoPage() {
     ? Math.max(0, Math.ceil((state.turnDeadline - nowTick) / 1000))
     : null;
 
+  const remaining = state.grid.length - eliminated.size;
+  const yourTurnNow = myAsking || myEliminating;
+
   return (
     <Shell>
       <div className="flex w-full flex-col gap-4 lg:flex-row">
-        {/* Plateau */}
-        <div className="flex-1">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h1 className="font-display text-xs text-foreground">Qui est-ce ?</h1>
-            <span className="text-xs font-semibold text-muted">vs {state.opponentName}</span>
+        {/* Plateau encadre */}
+        <Card className="flex-1 border-4 border-border-strong p-3 sm:p-4">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h1 className="font-display text-xs leading-relaxed text-foreground">Qui est-ce ?</h1>
+              <p className="mt-1 text-sm font-semibold text-muted">vs {state.opponentName}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge
+                className={cn(
+                  yourTurnNow
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border-strong bg-surface-2 text-muted',
+                )}
+              >
+                {yourTurnNow ? 'À toi de jouer' : 'Tour adverse'}
+              </Badge>
+              {secondsLeft !== null && <TimerRing seconds={secondsLeft} total={turnTotal} />}
+            </div>
           </div>
+
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-bold text-success">
+              {remaining} Pokémon encore possibles
+            </span>
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
+              <Pokeball className="h-3.5 w-3.5" />
+              carte rabattue = éliminée
+            </span>
+          </div>
+
           <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-            {state.grid.map((card) => {
-              const isSecret = card.pokemonId === state.yourSecretPokemonId;
-              const isOut = eliminated.has(card.pokemonId);
-              return (
-                <button
-                  key={card.pokemonId}
-                  type="button"
-                  onClick={() => toggleCard(card.pokemonId)}
-                  className={cn(
-                    'relative flex flex-col items-center rounded-md border-2 bg-white p-1 transition-colors',
-                    isSecret ? 'border-primary' : 'border-border-strong',
-                    guessMode && 'cursor-pointer hover:border-danger',
-                    isOut && 'opacity-40 grayscale',
-                  )}
-                  title={card.name}
-                >
-                  <img
-                    src={`${API_ORIGIN}/api/pokemon/${card.pokemonId}/sprite`}
-                    alt={card.name}
-                    className="h-10 w-10 object-contain sm:h-12 sm:w-12"
-                    draggable={false}
-                  />
-                  <span className="w-full truncate text-center text-[9px] font-bold text-foreground">
-                    {card.name}
-                  </span>
-                </button>
-              );
-            })}
+            {state.grid.map((card) => (
+              <BoardCard
+                key={card.pokemonId}
+                card={card}
+                isSecret={card.pokemonId === state.yourSecretPokemonId}
+                eliminated={eliminated.has(card.pokemonId)}
+                guessMode={guessMode}
+                reduce={Boolean(reduce)}
+                onClick={() => toggleCard(card.pokemonId)}
+              />
+            ))}
           </div>
+
           {guessMode && (
             <p className="mt-2 text-center text-sm font-bold text-danger">
               Clique sur le Pokémon que tu penses être celui de l'adversaire.
             </p>
           )}
-        </div>
+        </Card>
 
         {/* Panneau lateral : secret + etat + chat + actions */}
         <div className="flex w-full flex-col gap-3 lg:w-72">
@@ -389,12 +412,14 @@ export function GuessWhoPage() {
               draggable={false}
             />
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase text-muted">Ton Pokémon</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Ton Pokémon secret
+              </p>
               <p className="truncate font-display text-xs text-primary">{mySecret?.name}</p>
             </div>
           </Card>
 
-          <Card className="flex flex-col gap-2 p-3">
+          <Card className="p-3">
             <p className="text-center text-sm font-bold text-foreground">
               {myAsking && 'À toi : pose une question'}
               {myAnswering && "Réponds à la question"}
@@ -403,12 +428,12 @@ export function GuessWhoPage() {
               {!state.yourTurn && state.phase === 'ASKING' && "L'adversaire réfléchit..."}
               {!state.yourTurn && state.phase === 'ELIMINATING' && "L'adversaire élimine..."}
             </p>
-            {secondsLeft !== null && (
-              <p className="text-center font-display text-lg text-primary">{secondsLeft}s</p>
-            )}
           </Card>
 
           <Card className="flex max-h-52 flex-col gap-1.5 overflow-auto p-3">
+            <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-muted">
+              Journal du duel
+            </p>
             {chat.length === 0 ? (
               <p className="text-center text-xs text-muted">Les questions s'affichent ici.</p>
             ) : (
@@ -468,6 +493,123 @@ export function GuessWhoPage() {
         </div>
       </div>
     </Shell>
+  );
+}
+
+function Pokeball({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+      <circle cx="16" cy="16" r="14" fill="#fff" stroke="#28338c" strokeWidth="2" />
+      <path d="M2.4 15 A13.6 13.6 0 0 1 29.6 15 Z" fill="#EE1515" />
+      <rect x="2.2" y="14" width="27.6" height="4" fill="#28338c" />
+      <circle cx="16" cy="16" r="4.2" fill="#fff" stroke="#28338c" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function TimerRing({ seconds, total }: { seconds: number; total: number }) {
+  const r = 18;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - Math.max(0, seconds) / Math.max(1, total));
+  const low = seconds <= 5;
+  return (
+    <svg width="46" height="46" viewBox="0 0 46 46" aria-label={`${seconds} secondes restantes`}>
+      <circle cx="23" cy="23" r={r} fill="#fff" stroke="#ece4ba" strokeWidth="5" />
+      <circle
+        cx="23"
+        cy="23"
+        r={r}
+        fill="none"
+        stroke={low ? '#EE1515' : '#3B4CCA'}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={offset}
+        transform="rotate(-90 23 23)"
+        style={{ transition: 'stroke-dashoffset 0.5s linear' }}
+      />
+      <text x="23" y="27" textAnchor="middle" fontSize="14" fontWeight={600} fill="#2b2a24">
+        {seconds}
+      </text>
+    </svg>
+  );
+}
+
+function BoardCard({
+  card,
+  isSecret,
+  eliminated,
+  guessMode,
+  reduce,
+  onClick,
+}: {
+  card: GuessWhoStateDTO['grid'][number];
+  isSecret: boolean;
+  eliminated: boolean;
+  guessMode: boolean;
+  reduce: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={card.name}
+      aria-pressed={eliminated}
+      className={cn('relative aspect-square w-full', guessMode && 'cursor-pointer')}
+      style={{ perspective: 600 }}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: eliminated ? 'rotateY(180deg)' : 'none',
+          transition: reduce ? 'none' : 'transform 0.45s',
+        }}
+      >
+        {/* Face visible : le Pokemon */}
+        <div
+          className={cn(
+            'absolute inset-0 flex flex-col items-center justify-center gap-0.5 rounded-xl bg-white p-1',
+            guessMode && !eliminated && 'ring-2 ring-danger/40 hover:ring-4 hover:ring-danger',
+          )}
+          style={{
+            backfaceVisibility: 'hidden',
+            border: `3px solid ${isSecret ? '#3B4CCA' : '#3f5d1d'}`,
+          }}
+        >
+          {isSecret && (
+            <span
+              className="absolute -top-2 rounded-md px-1.5 py-0.5 font-display text-[7px] tracking-wide text-white"
+              style={{ background: '#3B4CCA' }}
+            >
+              SECRET
+            </span>
+          )}
+          <img
+            src={`${API_ORIGIN}/api/pokemon/${card.pokemonId}/sprite`}
+            alt={card.name}
+            className="h-9 w-9 object-contain sm:h-11 sm:w-11"
+            draggable={false}
+          />
+          <span className="w-full truncate text-center text-[9px] font-bold text-foreground">
+            {card.name}
+          </span>
+        </div>
+        {/* Dos : carte rabattue (eliminee) */}
+        <div
+          className="absolute inset-0 flex items-center justify-center rounded-xl"
+          style={{
+            backfaceVisibility: 'hidden',
+            transform: 'rotateY(180deg)',
+            background: '#3B4CCA',
+            border: '3px solid #28338c',
+          }}
+        >
+          <Pokeball className="h-6 w-6 sm:h-7 sm:w-7" />
+        </div>
+      </div>
+    </button>
   );
 }
 
