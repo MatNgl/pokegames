@@ -1,0 +1,46 @@
+# Déploiement en production
+
+Serveur : `root@serveur-perso`, projet dans `/var/www/pokegames`.
+Monorepo npm workspaces : `packages/shared-types`, `apps/api` (NestJS + Prisma), `apps/web` (Vite).
+
+Points importants :
+- `shared-types` doit être bâti **avant** le web. Le build du **backend le reconstruit automatiquement** (via `prebuild`), mais le build du **web ne le fait pas** : on le rebuild à la main pour un déploiement frontend seul.
+- Prisma est dans `apps/api` (schéma `apps/api/prisma/schema.prisma`) : les commandes Prisma se lancent depuis ce dossier.
+- Le frontend est servi en statique (`apps/web/dist`) : **aucun redémarrage** après un build web, nginx sert directement les nouveaux fichiers.
+- Ces commandes supposent **aucune modification locale non commitée** sur le serveur (pas de `git stash`). Voir la note en bas si `git pull` refuse.
+
+---
+
+## 1. Frontend seul (changement uniquement dans `apps/web`)
+
+```bash
+cd /var/www/pokegames && git pull && npm run build -w @pokegames/shared-types && npm run build -w @pokegames/web
+```
+
+## 2. Backend + Frontend (sans migration de base)
+
+```bash
+cd /var/www/pokegames && git pull && npm install && npm run build -w @pokegames/api && pm2 restart all && npm run build -w @pokegames/web
+```
+
+## 3. Backend + Frontend AVEC migration de base
+
+```bash
+cd /var/www/pokegames && git pull && npm install && ( cd apps/api && npx prisma migrate deploy && npx prisma generate ) && npm run build -w @pokegames/api && pm2 restart all && npm run build -w @pokegames/web
+```
+
+---
+
+## Notes
+
+- **`pm2 restart all`** redémarre tous les process PM2 du serveur (redémarre l'API NestJS). Si d'autres projets tournent en PM2, cible plutôt le process PokéGames : `pm2 list` puis `pm2 restart <nom-ou-id>`.
+- **`.env` non versionné** : `git pull` n'y touche pas (identifiants BDD, `JWT_SECRET`, Redis...).
+- **`git pull` refuse à cause de modifs locales ?** Deux options :
+  - annuler les modifs locales : `git checkout -- .` puis relancer ;
+  - ou les mettre de côté : `git stash` puis relancer (et `git stash pop` si tu veux les récupérer).
+- **Rafraîchir les données Pokémon (ETL Tyradex)**, si besoin après coup :
+  ```bash
+  cd /var/www/pokegames/apps/api && npm run etl
+  ```
+  (nécessite un build API à jour, l'ETL tourne sur `dist/`).
+- **Vérifier que l'API tourne** après un déploiement : `pm2 logs` (ou `pm2 status`).

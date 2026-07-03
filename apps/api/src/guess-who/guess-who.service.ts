@@ -384,7 +384,15 @@ export class GuessWhoService {
     // Le socket mort ne doit plus recevoir d'emissions ; on retire son mapping.
     this.bySocket.delete(socketId);
     this.onScheduleForfeit?.(game.id, index, player.disconnectToken, this.RECONNECT_GRACE_MS);
-    return [];
+    // Previent l'adversaire de la coupure avec l'echeance du forfait (compte a rebours cote client).
+    const opponent = game.players[index === 0 ? 1 : 0];
+    return [
+      {
+        socketId: opponent.socketId,
+        event: GUESS_WHO_EVENTS.opponentLeft,
+        payload: { untilTs: Date.now() + this.RECONNECT_GRACE_MS },
+      },
+    ];
   }
 
   /** Fin du delai de grace : forfait si le joueur ne s'est pas reconnecte entre-temps. */
@@ -413,7 +421,12 @@ export class GuessWhoService {
       player.connected = true;
       player.disconnectToken += 1;
       this.bySocket.set(user.socketId, game.id);
-      return [{ socketId: user.socketId, event: GUESS_WHO_EVENTS.state, payload: this.stateFor(game, index) }];
+      const opponent = game.players[index === 0 ? 1 : 0];
+      return [
+        { socketId: user.socketId, event: GUESS_WHO_EVENTS.state, payload: this.stateFor(game, index) },
+        // Leve la banniere "adversaire deconnecte" cote adversaire.
+        { socketId: opponent.socketId, event: GUESS_WHO_EVENTS.opponentBack, payload: {} },
+      ];
     }
     return [];
   }

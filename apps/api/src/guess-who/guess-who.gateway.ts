@@ -116,9 +116,22 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
       client.disconnect(true);
       return;
     }
-    // Invite : identifiant ephemere par socket (pas de reconnexion ni de persistance).
-    client.data = { userId: `guest:${client.id}`, username: pseudo };
+    // Invite : identifiant stable fourni par le client (sessionStorage) pour permettre la reconnexion
+    // apres un reload ; repli sur un id ephemere par socket si absent.
+    const guestId = this.sanitizeGuestId(
+      (client.handshake.auth?.['guestId'] as string | undefined) ?? '',
+    );
+    client.data = { userId: guestId ? `guest:${guestId}` : `guest:${client.id}`, username: pseudo };
     this.logger.log(`Connexion invité ${pseudo}`);
+    // Reconnexion auto a une partie en cours pour l'invite identifie.
+    if (guestId) {
+      this.dispatch(this.service.reconnect(this.user(client)));
+    }
+  }
+
+  // Id invite : borne et restreint a des caracteres surs (evite l'injection d'une cle userId arbitraire).
+  private sanitizeGuestId(raw: string): string {
+    return raw.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
   }
 
   handleDisconnect(client: Socket): void {

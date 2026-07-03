@@ -147,6 +147,8 @@ export const GUESS_WHO_EVENTS = {
   answered: 'gw:answered', // { value: boolean }
   over: 'gw:over', // GuessWhoOverDTO
   errorMsg: 'gw:error', // { message }
+  opponentLeft: 'gw:opponentLeft', // { untilTs } adversaire deconnecte, forfait a untilTs si pas de retour
+  opponentBack: 'gw:opponentBack', // {} adversaire reconnecte
 } as const;
 
 export interface PokemonStats {

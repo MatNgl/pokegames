@@ -108,7 +108,10 @@ describe('GuessWhoService', () => {
       scheduled = { gameId, index, token };
     };
     const emits = service.handleDisconnect('s1');
-    expect(emits).toHaveLength(0); // pas de forfait immediat : delai de grace pour reload / coupure
+    // Pas de forfait immediat (delai de grace), mais l'adversaire est prevenu de la coupure.
+    expect(emits).toHaveLength(1);
+    expect(emits[0]?.event).toBe(GUESS_WHO_EVENTS.opponentLeft);
+    expect(emits[0]?.socketId).toBe('s2');
     expect(scheduled).not.toBeNull();
     const s = scheduled as unknown as { gameId: string; index: 0 | 1; token: number };
     const forfeit = service.forfeitIfStillGone(s.gameId, s.index, s.token);
@@ -127,8 +130,10 @@ describe('GuessWhoService', () => {
     service.handleDisconnect('s1');
     // Alice revient avec un nouveau socket (reload / reconnexion).
     const back = service.reconnect({ userId: 'u1', username: 'Alice', socketId: 's1b' });
-    expect(back).toHaveLength(1);
-    expect(back[0]?.event).toBe(GUESS_WHO_EVENTS.state);
+    // Etat renvoye a Alice + notification "adversaire revenu" a Bob.
+    expect(back).toHaveLength(2);
+    expect(back.find((e) => e.socketId === 's1b')?.event).toBe(GUESS_WHO_EVENTS.state);
+    expect(back.find((e) => e.socketId === 's2')?.event).toBe(GUESS_WHO_EVENTS.opponentBack);
     const s = scheduled as unknown as { gameId: string; index: 0 | 1; token: number };
     expect(service.forfeitIfStillGone(s.gameId, s.index, s.token)).toHaveLength(0);
     // Alice peut de nouveau agir via son nouveau socket.
