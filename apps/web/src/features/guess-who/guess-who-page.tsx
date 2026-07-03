@@ -487,6 +487,12 @@ export function GuessWhoPage() {
             </Button>
           )}
 
+          {myEliminating && (
+            <Button variant="go" onClick={() => emit(GUESS_WHO_EVENTS.endTurn)}>
+              Terminer mon tour
+            </Button>
+          )}
+
           <Button variant="secondary" size="sm" onClick={leave}>
             Abandonner
           </Button>

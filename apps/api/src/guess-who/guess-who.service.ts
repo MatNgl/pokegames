@@ -20,6 +20,8 @@ interface Player {
   username: string;
   socketId: string;
   secret: number;
+  connected: boolean;
+  disconnectToken: number; // invalide un forfait en attente si le joueur se reconnecte
 }
 
 interface Game {
@@ -48,6 +50,13 @@ export class GuessWhoService {
   private readonly rooms = new Map<string, Waiting>(); // code -> hote en attente
   private poolCache: GuessWhoCard[] | null = null;
 
+  // Delai de grace avant forfait : couvre un reload de page ou une coupure reseau transitoire.
+  private readonly RECONNECT_GRACE_MS = 15000;
+  // Temps de preparation avant le 1er tour (revelation du secret), aligne avec l'intro du front.
+  private readonly INTRO_MS = 4000;
+  // Caracteres non ambigus pour les codes de salon (pas de I, O, 0, 1).
+  private static readonly ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly gameConfig: GameConfigService,
@@ -55,6 +64,15 @@ export class GuessWhoService {
 
   /** Programme la fin de tour (minuteur d'elimination) : le gateway rappelle expireTurn. */
   onScheduleExpire?: (gameId: string, token: number, delayMs: number) => void;
+
+  /** Programme un forfait differe apres deconnexion : le gateway rappelle forfeitIfStillGone. */
+  onScheduleForfeit?: (gameId: string, index: 0 | 1, token: number, delayMs: number) => void;
+
+  /** Programme le demarrage du 1er tour apres l'intro : le gateway rappelle startFirstTurn. */
+  onScheduleStart?: (gameId: string, delayMs: number) => void;
+
+  /** Signale la fin d'une partie : le gateway purge les minuteurs en attente pour cette partie. */
+  onGameEnd?: (gameId: string) => void;
 
   // Minuteur d'une phase (ms), lu depuis la config dynamique.
   private phaseMs(phase: GuessWhoPhase): number {
@@ -118,10 +136,18 @@ export class GuessWhoService {
   }
 
   private async startGame(a: Waiting, b: Waiting): Promise<Emit[]> {
+    // Les deux joueurs quittent toute file/salon en attente avant de demarrer.
+    this.cancel(a.socketId);
+    this.cancel(b.socketId);
     const pool = await this.loadPool();
     const gridSize = this.gameConfig.guessWho().gridSize;
     if (pool.length < gridSize) {
-      return [{ socketId: a.socketId, event: GUESS_WHO_EVENTS.errorMsg, payload: { message: 'Catalogue insuffisant.' } }];
+      // Les deux joueurs doivent etre notifies, sinon l'un reste bloque sans feedback.
+      const message = 'Catalogue insuffisant pour lancer une partie.';
+      return [
+        { socketId: a.socketId, event: GUESS_WHO_EVENTS.errorMsg, payload: { message } },
+        { socketId: b.socketId, event: GUESS_WHO_EVENTS.errorMsg, payload: { message } },
+      ];
     }
     const cards = this.shuffle(pool).slice(0, gridSize);
     const secretA = cards[Math.floor(Math.random() * gridSize)]?.pokemonId ?? cards[0]!.pokemonId;
@@ -130,8 +156,8 @@ export class GuessWhoService {
       id: uuidv4(),
       cards,
       players: [
-        { ...a, secret: secretA },
-        { ...b, secret: secretB },
+        { ...a, secret: secretA, connected: true, disconnectToken: 0 },
+        { ...b, secret: secretB, connected: true, disconnectToken: 0 },
       ],
       activeIndex: 0,
       phase: 'ASKING',
@@ -143,11 +169,45 @@ export class GuessWhoService {
     this.games.set(game.id, game);
     this.bySocket.set(a.socketId, game.id);
     this.bySocket.set(b.socketId, game.id);
+    // Le 1er tour ne demarre qu'apres l'intro : le joueur actif ne perd pas ses premieres secondes.
+    // turnDeadline reste null (aucun minuteur affiche) le temps de la revelation du secret.
+    this.onScheduleStart?.(game.id, this.INTRO_MS);
+    return this.bothStates(game);
+  }
+
+  /** Demarre le 1er tour apres l'intro (no-op si une action l'a deja demarre ou si la partie est finie). */
+  startFirstTurn(gameId: string): Emit[] {
+    const game = this.games.get(gameId);
+    if (!game || game.status !== 'PLAYING' || game.turnToken !== 0) return [];
     this.beginPhase(game, 'ASKING');
     return this.bothStates(game);
   }
 
+  // Un socket deja engage dans une partie ne peut pas relancer un matchmaking (evite d'etre dans deux parties).
+  private alreadyInGame(socketId: string): Emit[] | null {
+    if (this.bySocket.has(socketId)) {
+      return [{ socketId, event: GUESS_WHO_EVENTS.errorMsg, payload: { message: 'Tu es déjà dans une partie.' } }];
+    }
+    return null;
+  }
+
+  private generateRoomCode(): string {
+    const alphabet = GuessWhoService.ROOM_CODE_ALPHABET;
+    let code = '';
+    do {
+      code = '';
+      for (let i = 0; i < 4; i++) {
+        code += alphabet[Math.floor(Math.random() * alphabet.length)];
+      }
+    } while (this.rooms.has(code));
+    return code;
+  }
+
   async joinQueue(user: Waiting): Promise<Emit[]> {
+    const busy = this.alreadyInGame(user.socketId);
+    if (busy) return busy;
+    // Retire un eventuel salon en attente de ce joueur pour ne pas laisser d'orphelin.
+    this.cancel(user.socketId);
     if (this.queue && this.queue.socketId !== user.socketId) {
       const opponent = this.queue;
       this.queue = null;
@@ -158,12 +218,18 @@ export class GuessWhoService {
   }
 
   createRoom(user: Waiting): Emit[] {
-    const code = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const busy = this.alreadyInGame(user.socketId);
+    if (busy) return busy;
+    // Un seul salon/file par joueur : on nettoie l'etat precedent avant d'en creer un nouveau.
+    this.cancel(user.socketId);
+    const code = this.generateRoomCode();
     this.rooms.set(code, user);
     return [{ socketId: user.socketId, event: GUESS_WHO_EVENTS.roomCreated, payload: { code } }];
   }
 
   async joinRoom(code: string, user: Waiting): Promise<Emit[]> {
+    const busy = this.alreadyInGame(user.socketId);
+    if (busy) return busy;
     const host = this.rooms.get(code.toUpperCase());
     if (!host) {
       return [{ socketId: user.socketId, event: GUESS_WHO_EVENTS.errorMsg, payload: { message: 'Salon introuvable.' } }];
@@ -172,6 +238,8 @@ export class GuessWhoService {
       return [{ socketId: user.socketId, event: GUESS_WHO_EVENTS.errorMsg, payload: { message: 'Tu ne peux pas rejoindre ton propre salon.' } }];
     }
     this.rooms.delete(code.toUpperCase());
+    // Retire une eventuelle file/salon du joueur qui rejoint.
+    this.cancel(user.socketId);
     return this.startGame(host, user);
   }
 
@@ -219,6 +287,18 @@ export class GuessWhoService {
       { socketId: asker.socketId, event: GUESS_WHO_EVENTS.answered, payload: { value } },
       ...this.bothStates(game),
     ];
+  }
+
+  /** Le joueur actif clot sa phase d'elimination en avance et passe la main. */
+  endTurn(socketId: string): Emit[] {
+    const found = this.findGame(socketId);
+    if (!found) return [];
+    const { game, index } = found;
+    if (game.status !== 'PLAYING' || game.activeIndex !== index || game.phase !== 'ELIMINATING') return [];
+    this.switchTurn(game);
+    game.currentQuestion = null;
+    this.beginPhase(game, 'ASKING');
+    return this.bothStates(game);
   }
 
   /** Fin du minuteur d'une phase : fait avancer la machine a etats selon la phase courante. */
@@ -272,6 +352,8 @@ export class GuessWhoService {
     this.bySocket.delete(game.players[0].socketId);
     this.bySocket.delete(game.players[1].socketId);
     this.games.delete(game.id);
+    // Purge les minuteurs (phase, forfait, intro) encore programmes pour cette partie.
+    this.onGameEnd?.(game.id);
     return emits;
   }
 
@@ -281,6 +363,8 @@ export class GuessWhoService {
     const { game, index } = found;
     // Reponse finale autorisee seulement a son tour et avant d'avoir pose sa question (phase ASKING).
     if (game.status !== 'PLAYING' || game.activeIndex !== index || game.phase !== 'ASKING') return [];
+    // L'id doit appartenir a la grille (rejette une entree hors plateau).
+    if (!game.cards.some((c) => c.pokemonId === pokemonId)) return [];
     const opponent = game.players[index === 0 ? 1 : 0];
     const correct = opponent.secret === pokemonId;
     const winnerIndex: 0 | 1 = correct ? index : (index === 0 ? 1 : 0);
@@ -293,8 +377,44 @@ export class GuessWhoService {
     if (!found) return [];
     const { game, index } = found;
     if (game.status !== 'PLAYING') return [];
-    // L'adversaire (celui qui reste) gagne par forfait.
+    // On ne forfait pas immediatement : un reload ou une coupure transitoire doit pouvoir se reconnecter.
+    const player = game.players[index];
+    player.connected = false;
+    player.disconnectToken += 1;
+    // Le socket mort ne doit plus recevoir d'emissions ; on retire son mapping.
+    this.bySocket.delete(socketId);
+    this.onScheduleForfeit?.(game.id, index, player.disconnectToken, this.RECONNECT_GRACE_MS);
+    return [];
+  }
+
+  /** Fin du delai de grace : forfait si le joueur ne s'est pas reconnecte entre-temps. */
+  forfeitIfStillGone(gameId: string, index: 0 | 1, token: number): Emit[] {
+    const game = this.games.get(gameId);
+    if (!game || game.status !== 'PLAYING') return [];
+    const player = game.players[index];
+    // Reconnecte (connected) ou nouveau cycle de deconnexion (token perime) : on ne forfait pas.
+    if (player.connected || player.disconnectToken !== token) return [];
     const winnerIndex: 0 | 1 = index === 0 ? 1 : 0;
     return this.endGame(game, winnerIndex, 'FORFEIT');
+  }
+
+  /** Reconnexion d'un joueur (nouveau socket, meme userId) a sa partie en cours. */
+  reconnect(user: Waiting): Emit[] {
+    for (const game of this.games.values()) {
+      if (game.status !== 'PLAYING') continue;
+      const found = game.players.findIndex((p) => p.userId === user.userId);
+      if (found === -1) continue;
+      const index = found as 0 | 1;
+      const player = game.players[index];
+      // Rebranche le nouveau socket et invalide le forfait en attente.
+      this.bySocket.delete(player.socketId);
+      player.socketId = user.socketId;
+      player.username = user.username;
+      player.connected = true;
+      player.disconnectToken += 1;
+      this.bySocket.set(user.socketId, game.id);
+      return [{ socketId: user.socketId, event: GUESS_WHO_EVENTS.state, payload: this.stateFor(game, index) }];
+    }
+    return [];
   }
 }

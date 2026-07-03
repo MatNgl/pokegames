@@ -24,6 +24,8 @@ const JWT_SECRET = process.env['JWT_SECRET'] ?? 'pokegames-dev-secret-only';
 export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() private server!: Server;
   private readonly logger = new Logger(GuessWhoGateway.name);
+  // Minuteurs en attente par partie, pour les purger a la fin (evite les timers orphelins).
+  private readonly timers = new Map<string, Set<ReturnType<typeof setTimeout>>>();
 
   constructor(
     private readonly service: GuessWhoService,
@@ -31,8 +33,50 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     // Le service demande la programmation du minuteur d'elimination ; le gateway l'execute.
     this.service.onScheduleExpire = (gameId, token, delayMs) => {
-      setTimeout(() => this.dispatch(this.service.expire(gameId, token)), delayMs);
+      this.schedule(gameId, delayMs, () => this.dispatch(this.service.expire(gameId, token)), 'expire');
     };
+    // Forfait differe apres deconnexion (delai de grace pour reload / coupure transitoire).
+    this.service.onScheduleForfeit = (gameId, index, token, delayMs) => {
+      this.schedule(gameId, delayMs, () => this.dispatch(this.service.forfeitIfStillGone(gameId, index, token)), 'forfeit');
+    };
+    // Demarrage differe du 1er tour, apres l'intro.
+    this.service.onScheduleStart = (gameId, delayMs) => {
+      this.schedule(gameId, delayMs, () => this.dispatch(this.service.startFirstTurn(gameId)), 'start');
+    };
+    // Fin de partie : on annule tous les minuteurs restants de cette partie.
+    this.service.onGameEnd = (gameId) => this.clearTimers(gameId);
+  }
+
+  // Programme un minuteur rattache a une partie et l'auto-nettoie a l'echeance.
+  private schedule(gameId: string, delayMs: number, run: () => void, label: string): void {
+    const handle = setTimeout(() => {
+      this.untrack(gameId, handle);
+      try {
+        run();
+      } catch (err) {
+        this.logger.error(`Erreur minuteur ${label}`, err instanceof Error ? err.stack : String(err));
+      }
+    }, delayMs);
+    let set = this.timers.get(gameId);
+    if (!set) {
+      set = new Set();
+      this.timers.set(gameId, set);
+    }
+    set.add(handle);
+  }
+
+  private untrack(gameId: string, handle: ReturnType<typeof setTimeout>): void {
+    const set = this.timers.get(gameId);
+    if (!set) return;
+    set.delete(handle);
+    if (set.size === 0) this.timers.delete(gameId);
+  }
+
+  private clearTimers(gameId: string): void {
+    const set = this.timers.get(gameId);
+    if (!set) return;
+    for (const handle of set) clearTimeout(handle);
+    this.timers.delete(gameId);
   }
 
   private dispatch(emits: Emit[]): void {
@@ -52,6 +96,8 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
       const payload = this.jwt.verify<JwtPayload>(token, { secret: JWT_SECRET });
       client.data = { userId: payload.sub, username: payload.username };
       this.logger.log(`Connexion ${payload.username}`);
+      // Reconnexion auto a une partie en cours (reload de page ou coupure reseau transitoire).
+      this.dispatch(this.service.reconnect(this.user(client)));
     } catch {
       client.emit(GUESS_WHO_EVENTS.errorMsg, { message: 'Connexion refusée : reconnecte-toi.' });
       client.disconnect(true);
@@ -64,12 +110,22 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   @SubscribeMessage(GUESS_WHO_EVENTS.joinQueue)
   async onJoinQueue(@ConnectedSocket() client: Socket): Promise<void> {
-    this.dispatch(await this.service.joinQueue(this.user(client)));
+    try {
+      this.dispatch(await this.service.joinQueue(this.user(client)));
+    } catch (err) {
+      this.logger.error('Erreur onJoinQueue', err instanceof Error ? err.stack : String(err));
+      client.emit(GUESS_WHO_EVENTS.errorMsg, { message: 'Erreur serveur, réessaie.' });
+    }
   }
 
   @SubscribeMessage(GUESS_WHO_EVENTS.createRoom)
   onCreateRoom(@ConnectedSocket() client: Socket): void {
-    this.dispatch(this.service.createRoom(this.user(client)));
+    try {
+      this.dispatch(this.service.createRoom(this.user(client)));
+    } catch (err) {
+      this.logger.error('Erreur onCreateRoom', err instanceof Error ? err.stack : String(err));
+      client.emit(GUESS_WHO_EVENTS.errorMsg, { message: 'Erreur serveur, réessaie.' });
+    }
   }
 
   @SubscribeMessage(GUESS_WHO_EVENTS.joinRoom)
@@ -77,7 +133,12 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { code?: string },
   ): Promise<void> {
-    this.dispatch(await this.service.joinRoom(body?.code ?? '', this.user(client)));
+    try {
+      this.dispatch(await this.service.joinRoom(body?.code ?? '', this.user(client)));
+    } catch (err) {
+      this.logger.error('Erreur onJoinRoom', err instanceof Error ? err.stack : String(err));
+      client.emit(GUESS_WHO_EVENTS.errorMsg, { message: 'Erreur serveur, réessaie.' });
+    }
   }
 
   @SubscribeMessage(GUESS_WHO_EVENTS.cancel)
@@ -93,6 +154,11 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
   @SubscribeMessage(GUESS_WHO_EVENTS.answer)
   onAnswer(@ConnectedSocket() client: Socket, @MessageBody() body: { value?: boolean }): void {
     this.dispatch(this.service.answer(client.id, Boolean(body?.value)));
+  }
+
+  @SubscribeMessage(GUESS_WHO_EVENTS.endTurn)
+  onEndTurn(@ConnectedSocket() client: Socket): void {
+    this.dispatch(this.service.endTurn(client.id));
   }
 
   @SubscribeMessage(GUESS_WHO_EVENTS.finalGuess)

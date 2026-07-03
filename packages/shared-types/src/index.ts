@@ -137,6 +137,7 @@ export const GUESS_WHO_EVENTS = {
   cancel: 'gw:cancel',
   ask: 'gw:ask',
   answer: 'gw:answer',
+  endTurn: 'gw:endTurn', // clore la phase d'elimination en avance
   finalGuess: 'gw:finalGuess',
   // serveur -> client
   waiting: 'gw:waiting', // { code? } en attente d'un adversaire
