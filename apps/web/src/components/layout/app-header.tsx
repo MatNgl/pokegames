@@ -72,7 +72,7 @@ export function AppHeader() {
   const formattedTime = `${String(timeLeft.hours).padStart(2, '0')}h ${String(timeLeft.minutes).padStart(2, '0')}m ${String(timeLeft.seconds).padStart(2, '0')}s`;
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/60 px-3 backdrop-blur-md sm:px-6">
+    <header className="relative z-50 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/60 px-3 backdrop-blur-md sm:px-6">
       <div className="flex items-center gap-4">
         <Link
           to="/"
