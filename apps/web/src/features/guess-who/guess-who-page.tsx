@@ -58,12 +58,15 @@ export function GuessWhoPage() {
   const [turnTotal, setTurnTotal] = useState(30);
   const [showIntro, setShowIntro] = useState(false);
   const [introCount, setIntroCount] = useState(4);
+  const [pseudo, setPseudo] = useState('');
+  const [guestName, setGuestName] = useState<string | null>(null);
   const inGameRef = useRef(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user && !guestName) return;
     const socket = io(`${API_ORIGIN}/guess-who`, {
-      auth: { token: getAccessToken() },
+      // Utilisateur connecte : token JWT. Invite : simple pseudo, sans compte.
+      auth: { token: getAccessToken(), pseudo: user ? '' : (guestName ?? '') },
       transports: ['websocket'],
     });
     socketRef.current = socket;
@@ -106,7 +109,7 @@ export function GuessWhoPage() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [user]);
+  }, [user, guestName]);
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 500);
@@ -178,13 +181,40 @@ export function GuessWhoPage() {
 
   if (initializing) return <Shell>{null}</Shell>;
 
-  if (!user) {
+  if (!user && !guestName) {
     return (
       <Shell>
         <Card className="mt-10 flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
           <h1 className="font-display text-sm text-foreground">Qui est-ce ?</h1>
-          <p className="text-sm font-semibold text-muted">Connecte-toi pour jouer en 1 contre 1.</p>
-          <Button className="w-full" onClick={() => navigate('/connexion', { state: { from: '/qui-est-ce' } })}>
+          <p className="text-sm font-semibold text-muted">
+            Entre un pseudo et joue en 1 contre 1. Pas besoin de compte.
+          </p>
+          <form
+            className="flex w-full flex-col gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const p = pseudo.trim();
+              if (p) setGuestName(p);
+            }}
+          >
+            <Input
+              value={pseudo}
+              onChange={(e) => setPseudo(e.target.value)}
+              placeholder="Ton pseudo"
+              maxLength={20}
+              autoFocus
+              aria-label="Ton pseudo"
+            />
+            <Button type="submit" className="w-full" disabled={!pseudo.trim()}>
+              Jouer
+            </Button>
+          </form>
+          <p className="text-xs font-semibold text-muted">Tu as déjà un compte ?</p>
+          <Button
+            variant="go"
+            className="w-full"
+            onClick={() => navigate('/connexion', { state: { from: '/qui-est-ce' } })}
+          >
             Se connecter
           </Button>
           <Button className="w-full" onClick={() => navigate('/')}>

@@ -90,18 +90,35 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
     return { userId: data.userId, username: data.username, socketId: client.id };
   }
 
+  // Pseudo invite : nom d'affichage nettoye et borne, jamais persiste.
+  private sanitizePseudo(raw: string): string {
+    return raw.trim().replace(/\s+/g, ' ').slice(0, 20);
+  }
+
   handleConnection(client: Socket): void {
+    const token = (client.handshake.auth?.['token'] as string | undefined) ?? '';
     try {
-      const token = (client.handshake.auth?.['token'] as string | undefined) ?? '';
       const payload = this.jwt.verify<JwtPayload>(token, { secret: JWT_SECRET });
       client.data = { userId: payload.sub, username: payload.username };
       this.logger.log(`Connexion ${payload.username}`);
       // Reconnexion auto a une partie en cours (reload de page ou coupure reseau transitoire).
       this.dispatch(this.service.reconnect(this.user(client)));
+      return;
     } catch {
-      client.emit(GUESS_WHO_EVENTS.errorMsg, { message: 'Connexion refusée : reconnecte-toi.' });
-      client.disconnect(true);
+      // Pas de token valide : on autorise le mode invite si un pseudo est fourni.
     }
+
+    const pseudo = this.sanitizePseudo(
+      (client.handshake.auth?.['pseudo'] as string | undefined) ?? '',
+    );
+    if (!pseudo) {
+      client.emit(GUESS_WHO_EVENTS.errorMsg, { message: 'Entre un pseudo pour jouer.' });
+      client.disconnect(true);
+      return;
+    }
+    // Invite : identifiant ephemere par socket (pas de reconnexion ni de persistance).
+    client.data = { userId: `guest:${client.id}`, username: pseudo };
+    this.logger.log(`Connexion invité ${pseudo}`);
   }
 
   handleDisconnect(client: Socket): void {
