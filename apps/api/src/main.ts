@@ -7,6 +7,12 @@ async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
+  // Derriere un reverse proxy TLS en prod : necessaire pour que req.secure soit correct
+  // et que les cookies secure/sameSite=none soient poses de facon fiable.
+  if (process.env.NODE_ENV === 'production') {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
+
   app.use(cookieParser());
 
   // Toutes les routes HTTP sont servies sous /api (coherent avec spriteProxyUrl et le client web).

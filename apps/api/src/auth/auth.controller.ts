@@ -8,6 +8,20 @@ interface AuthUser {
   id: string;
 }
 
+// En prod, le front et l'API sont sur des domaines differents : le cookie refresh
+// doit etre sameSite 'none' + secure pour etre renvoye en cross-site. En dev (meme
+// site localhost, HTTP), on reste en 'lax' non secure pour que le cookie passe.
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: IS_PROD,
+  sameSite: IS_PROD ? ('none' as const) : ('lax' as const),
+  path: '/',
+};
+
+const REFRESH_COOKIE_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 jours
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -23,10 +37,8 @@ export class AuthController {
     const { accessToken, refreshToken, user } = await this.authService.login(body);
 
     res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 jours
+      ...REFRESH_COOKIE_OPTIONS,
+      maxAge: REFRESH_COOKIE_MAX_AGE,
     });
 
     return { accessToken, user };
@@ -39,10 +51,8 @@ export class AuthController {
     const { accessToken, refreshToken, user } = await this.authService.refreshTokens(oldRefreshToken || '');
 
     res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
+      ...REFRESH_COOKIE_OPTIONS,
+      maxAge: REFRESH_COOKIE_MAX_AGE,
     });
 
     return { accessToken, user };
@@ -54,7 +64,8 @@ export class AuthController {
     const refreshToken = req.cookies?.refreshToken as string | undefined;
     await this.authService.logout(refreshToken);
 
-    res.clearCookie('refreshToken');
+    // Les options (sameSite/secure/path) doivent matcher celles de pose pour que le navigateur efface bien le cookie.
+    res.clearCookie('refreshToken', REFRESH_COOKIE_OPTIONS);
     return { success: true };
   }
 
