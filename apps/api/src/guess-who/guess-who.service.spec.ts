@@ -121,6 +121,18 @@ describe('GuessWhoService', () => {
     expect(bobOver.reason).toBe('FORFEIT');
   });
 
+  it('abandon volontaire : la partie se termine et l’adversaire gagne', async () => {
+    await startMatch();
+    const emits = service.abandon('s1');
+    expect(emits).toHaveLength(2);
+    const bob = emits.find((e) => e.socketId === 's2')?.payload as { youWon: boolean; reason: string };
+    expect(bob.youWon).toBe(true);
+    expect(bob.reason).toBe('FORFEIT');
+    // La partie n'existe plus : plus aucune action possible.
+    expect(service.ask('s1', 'x')).toHaveLength(0);
+    expect(service.abandon('s1')).toHaveLength(0);
+  });
+
   it('reconnexion pendant le délai de grâce : le forfait est annulé', async () => {
     await startMatch();
     let scheduled: { gameId: string; index: 0 | 1; token: number } | null = null;

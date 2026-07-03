@@ -200,4 +200,9 @@ export class GuessWhoGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.dispatch(this.service.finalGuess(client.id, body.pokemonId));
     }
   }
+
+  @SubscribeMessage(GUESS_WHO_EVENTS.forfeit)
+  onForfeit(@ConnectedSocket() client: Socket): void {
+    this.dispatch(this.service.abandon(client.id));
+  }
 }

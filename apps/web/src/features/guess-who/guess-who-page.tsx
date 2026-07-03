@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReducedMotion } from 'framer-motion';
+import { WifiOff } from 'lucide-react';
 import { io, type Socket } from 'socket.io-client';
 import {
   GUESS_WHO_EVENTS,
@@ -27,6 +28,8 @@ interface ChatEntry {
 // Session invite persistee (sessionStorage) : survit a un reload pour permettre la reconnexion.
 const GUEST_NAME_KEY = 'gw_guest_name';
 const GUEST_ID_KEY = 'gw_guest_id';
+// Dernier pseudo utilise (localStorage) : pre-rempli d'une visite a l'autre, pas besoin de le retaper.
+const LAST_PSEUDO_KEY = 'gw_last_pseudo';
 
 function getGuestId(): string {
   let id = sessionStorage.getItem(GUEST_ID_KEY);
@@ -71,9 +74,10 @@ export function GuessWhoPage() {
   const [turnTotal, setTurnTotal] = useState(30);
   const [showIntro, setShowIntro] = useState(false);
   const [introCount, setIntroCount] = useState(4);
-  const [pseudo, setPseudo] = useState('');
+  const [pseudo, setPseudo] = useState(() => localStorage.getItem(LAST_PSEUDO_KEY) ?? '');
   const [guestName, setGuestName] = useState<string | null>(() => sessionStorage.getItem(GUEST_NAME_KEY));
   const [oppLeft, setOppLeft] = useState<number | null>(null); // echeance du forfait adverse (untilTs)
+  const [confirmLeave, setConfirmLeave] = useState(false); // modal de confirmation d'abandon
   const inGameRef = useRef(false);
 
   useEffect(() => {
@@ -209,6 +213,13 @@ export function GuessWhoPage() {
     setOppLeft(null);
   };
 
+  // Abandon confirme : le serveur termine la partie (l'adversaire gagne) et renvoie l'ecran de fin
+  // aux deux joueurs. On ne reinitialise rien ici : on attend l'evenement `over`.
+  const forfeit = () => {
+    emit(GUESS_WHO_EVENTS.forfeit);
+    setConfirmLeave(false);
+  };
+
   if (initializing) return <Shell>{null}</Shell>;
 
   if (!user && !guestName) {
@@ -225,6 +236,7 @@ export function GuessWhoPage() {
               e.preventDefault();
               const p = pseudo.trim();
               if (p) {
+                localStorage.setItem(LAST_PSEUDO_KEY, p);
                 sessionStorage.setItem(GUEST_NAME_KEY, p);
                 setGuestName(p);
               }
@@ -417,9 +429,20 @@ export function GuessWhoPage() {
         <div
           role="status"
           aria-live="polite"
-          className="mb-3 w-full rounded-control border-2 border-accent-shadow bg-accent/25 px-3 py-2 text-center text-sm font-bold text-foreground"
+          className="mb-3 flex w-full items-center gap-3 rounded-card border-2 border-accent-shadow bg-accent/25 px-4 py-3 shadow-[0_3px_0_var(--color-accent-shadow)]"
         >
-          Ton adversaire s'est déconnecté. Reprise possible pendant {oppLeftSeconds}s, sinon tu remportes la partie.
+          <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-foreground', !reduce && 'animate-pulse')}>
+            <WifiOff className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1 text-left">
+            <p className="font-display text-[10px] uppercase tracking-wide text-foreground">
+              Adversaire déconnecté
+            </p>
+            <p className="text-xs font-semibold text-muted">
+              En attente de reconnexion, sinon tu remportes la partie.
+            </p>
+          </div>
+          <span className="shrink-0 font-display text-lg tabular-nums text-foreground">{oppLeftSeconds}s</span>
         </div>
       )}
       <div className="flex w-full flex-col gap-4 lg:flex-row">
@@ -563,11 +586,41 @@ export function GuessWhoPage() {
             </Button>
           )}
 
-          <Button variant="secondary" size="sm" onClick={leave}>
+          <Button variant="secondary" size="sm" onClick={() => setConfirmLeave(true)}>
             Abandonner
           </Button>
         </div>
       </div>
+
+      {confirmLeave && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setConfirmLeave(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gw-forfeit-title"
+            onClick={(e) => e.stopPropagation()}
+            className="flex w-full max-w-sm flex-col gap-4 rounded-card border-4 border-border-strong bg-surface p-6 text-center shadow-xl"
+          >
+            <h2 id="gw-forfeit-title" className="font-display text-sm leading-relaxed text-foreground">
+              Abandonner la partie ?
+            </h2>
+            <p className="text-sm font-semibold text-muted">
+              Ton adversaire remportera la partie. La partie sera terminée pour vous deux.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmLeave(false)}>
+                Continuer
+              </Button>
+              <Button variant="danger" className="flex-1" onClick={forfeit}>
+                Abandonner
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }

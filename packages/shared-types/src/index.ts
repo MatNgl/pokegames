@@ -139,6 +139,7 @@ export const GUESS_WHO_EVENTS = {
   answer: 'gw:answer',
   endTurn: 'gw:endTurn', // clore la phase d'elimination en avance
   finalGuess: 'gw:finalGuess',
+  forfeit: 'gw:forfeit', // abandon volontaire en cours de partie (l'adversaire gagne)
   // serveur -> client
   waiting: 'gw:waiting', // { code? } en attente d'un adversaire
   roomCreated: 'gw:roomCreated', // { code }

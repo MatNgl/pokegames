@@ -371,6 +371,16 @@ export class GuessWhoService {
     return this.endGame(game, winnerIndex, 'GUESS');
   }
 
+  /** Abandon volontaire en cours de partie : la partie se termine, l'adversaire gagne. */
+  abandon(socketId: string): Emit[] {
+    const found = this.findGame(socketId);
+    if (!found) return [];
+    const { game, index } = found;
+    if (game.status !== 'PLAYING') return [];
+    const winnerIndex: 0 | 1 = index === 0 ? 1 : 0;
+    return this.endGame(game, winnerIndex, 'FORFEIT');
+  }
+
   handleDisconnect(socketId: string): Emit[] {
     this.cancel(socketId);
     const found = this.findGame(socketId);
