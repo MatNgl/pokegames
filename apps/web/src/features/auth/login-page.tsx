@@ -84,14 +84,14 @@ export function LoginPage() {
               </p>
             )}
 
-            <Button type="submit" disabled={isSubmitting} className="mt-1">
+            <Button variant="go" type="submit" disabled={isSubmitting} className="mt-1">
               {isSubmitting ? <Spinner className="h-4 w-4" /> : 'Se connecter'}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted">
             Pas encore de compte ?{' '}
-            <Link to="/inscription" state={{ from }} className="text-primary hover:underline">
+            <Link to="/inscription" state={{ from }} className="font-bold text-go hover:underline">
               Créer un compte
             </Link>
           </p>

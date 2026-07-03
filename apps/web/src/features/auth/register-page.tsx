@@ -118,14 +118,14 @@ export function RegisterPage() {
               </p>
             )}
 
-            <Button type="submit" disabled={isSubmitting} className="mt-1">
+            <Button variant="go" type="submit" disabled={isSubmitting} className="mt-1">
               {isSubmitting ? <Spinner className="h-4 w-4" /> : "Créer mon compte"}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted">
             Déjà un compte ?{' '}
-            <Link to="/connexion" state={{ from }} className="text-primary hover:underline">
+            <Link to="/connexion" state={{ from }} className="font-bold text-go hover:underline">
               Se connecter
             </Link>
           </p>

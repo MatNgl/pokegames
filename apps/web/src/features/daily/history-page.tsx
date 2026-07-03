@@ -79,7 +79,7 @@ export function HistoryPage() {
             Connecte-toi pour sauvegarder tes défis et suivre ton historique. En invité, tes
             résultats restent sur cet appareil et ne sont pas enregistrés.
           </p>
-          <Button className="w-full" onClick={() => navigate('/connexion', { state: { from: '/historique' } })}>
+          <Button variant="go" className="w-full" onClick={() => navigate('/connexion', { state: { from: '/historique' } })}>
             Se connecter
           </Button>
           <Button className="w-full" onClick={() => navigate('/')}>
