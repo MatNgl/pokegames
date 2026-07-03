@@ -11,3 +11,6 @@ dist-ssr
 postgres_data
 redis_data
 *.tsbuildinfo
+
+# Override Docker local (ports de dev), ne jamais commiter
+docker-compose.override.yml
