@@ -292,7 +292,7 @@ export function GuessWhoPage() {
             <SecretReveal label="Le tien" grid={state.grid} id={over.yourSecretPokemonId} />
             <SecretReveal label="L'adversaire" grid={state.grid} id={over.opponentSecretPokemonId} />
           </div>
-          <Button className="w-full" onClick={leave}>
+          <Button variant="go" className="w-full" onClick={leave}>
             Rejouer
           </Button>
           <Button className="w-full" onClick={() => navigate('/')}>
