@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Check } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import type {
   WhoIsItGuessResponse,
@@ -512,13 +512,24 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
             <p className="text-sm font-semibold text-muted">
               La réponse sera révélée et comptera comme un essai.
             </p>
-            <label className="flex items-center justify-center gap-2 text-xs font-semibold text-muted">
+            <label className="group flex cursor-pointer items-center justify-center gap-2 text-xs font-semibold text-muted transition-colors hover:text-foreground">
               <input
                 type="checkbox"
                 checked={dontAskSkip}
                 onChange={(e) => setDontAskSkip(e.target.checked)}
-                className="h-4 w-4 cursor-pointer"
+                className="peer sr-only"
               />
+              <span
+                aria-hidden="true"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-border-strong bg-white transition-colors peer-checked:border-primary-shadow peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-2"
+              >
+                <Check
+                  className={cn(
+                    'h-3.5 w-3.5 text-white transition-opacity',
+                    dontAskSkip ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+              </span>
               Ne plus demander
             </label>
             <div className="flex gap-2">
