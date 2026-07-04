@@ -241,6 +241,64 @@ describe('WhoIsItService', () => {
     });
   });
 
+  describe('skipRound', () => {
+    it('doit révéler le Pokémon, pénaliser comme une mauvaise réponse et clore la manche', async () => {
+      const mockSession = {
+        roundId: 'test-round-id',
+        sessionHash: 'test-session-hash',
+        targetPokemonId: 25,
+        targetNameFr: 'Pikachu',
+        targetNameEn: 'Pikachu',
+        status: 'PLAYING',
+        startTime: Date.now(),
+        currentScore: 100,
+        mistakesCount: 2,
+        hintsUsedCount: 1,
+        mode: 'CLASSIC',
+        roundIndex: 1,
+        totalRounds: 5,
+        hints: [],
+      };
+
+      mockRedisGet.mockResolvedValue(JSON.stringify(mockSession));
+
+      const res = await service.skipRound('test-round-id');
+
+      expect(res.success).toBe(true);
+      expect(res.isCorrect).toBe(false);
+      expect(res.skipped).toBe(true);
+      expect(res.status).toBe('SOLVED');
+      expect(res.currentScore).toBe(85);
+      expect(res.mistakesCount).toBe(2); // inchangé : le "passer" ne compte pas comme une erreur en plus
+      expect(res.revealedPokemon?.nameFr).toBe('Pikachu');
+      expect(mockRevealSpriteSession).toHaveBeenCalledWith('test-session-hash');
+      expect(mockEmit).toHaveBeenCalledWith('game.round.completed', expect.anything());
+    });
+
+    it('rejette un skip sur une manche déjà terminée', async () => {
+      const mockSession = {
+        roundId: 'test-round-id',
+        sessionHash: 'test-session-hash',
+        targetPokemonId: 25,
+        targetNameFr: 'Pikachu',
+        targetNameEn: 'Pikachu',
+        status: 'SOLVED',
+        startTime: Date.now(),
+        currentScore: 100,
+        mistakesCount: 0,
+        hintsUsedCount: 0,
+        mode: 'CLASSIC',
+        roundIndex: 1,
+        totalRounds: 5,
+        hints: [],
+      };
+
+      mockRedisGet.mockResolvedValue(JSON.stringify(mockSession));
+
+      await expect(service.skipRound('test-round-id')).rejects.toThrow();
+    });
+  });
+
   describe('requestHint', () => {
     it('doit débloquer l’indice si le palier d’erreur est atteint et réduire le score (-10 points)', async () => {
       const mockSession = {

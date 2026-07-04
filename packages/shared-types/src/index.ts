@@ -263,9 +263,14 @@ export interface WhoIsItHintRequest {
   hintType: WhoIsItHintType;
 }
 
+export interface WhoIsItSkipRequest {
+  roundId: string;
+}
+
 export interface WhoIsItGuessResponse {
   success: boolean;
   isCorrect: boolean;
+  skipped?: boolean; // manche passee volontairement (le joueur ne connaissait pas le Pokemon)
   status: 'PLAYING' | 'SOLVED' | 'CANCELLED';
   message?: string;
   currentScore: number;

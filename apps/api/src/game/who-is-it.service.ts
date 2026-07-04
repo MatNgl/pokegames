@@ -451,16 +451,54 @@ export class WhoIsItService {
     }
 
     // Victoire !
+    return this.finalizeRound(session, true, guess);
+  }
+
+  /**
+   * Passe la manche sans deviner : revele le Pokemon comme une victoire, mais compte comme une
+   * mauvaise reponse (meme penalite que soumettre un mauvais nom) pour rester equitable au score.
+   */
+  async skipRound(roundId: string, userId?: string): Promise<WhoIsItGuessResponse> {
+    const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
+    if (!raw) {
+      throw new NotFoundException('Manche introuvable ou expirée');
+    }
+
+    const session = JSON.parse(raw) as InternalRoundSession;
+    session.level = session.level ?? 'MOYEN';
+    if (session.status !== 'PLAYING') {
+      throw new BadRequestException('Cette manche est déjà terminée');
+    }
+
+    if (userId && !session.userId) {
+      session.userId = userId;
+    }
+
+    session.currentScore = Math.max(0, session.currentScore - 15);
+
+    return this.finalizeRound(session, false, '(passé)');
+  }
+
+  /** Cloture une manche (trouvee ou passee) : revele le sprite, journalise et renvoie l'etat final. */
+  private async finalizeRound(
+    session: InternalRoundSession,
+    isCorrect: boolean,
+    guess: string,
+  ): Promise<WhoIsItGuessResponse> {
     session.status = 'SOLVED';
     session.zoomRatio = 1.0;
     session.rotationAngle = 0;
     await this.spriteProxy.revealSpriteSession(session.sessionHash);
-    await this.redisService.set(`${this.REDIS_PREFIX}${roundId}`, JSON.stringify(session), this.ROUND_TTL_SECONDS);
+    await this.redisService.set(
+      `${this.REDIS_PREFIX}${session.roundId}`,
+      JSON.stringify(session),
+      this.ROUND_TTL_SECONDS,
+    );
 
     const fullPokemon = await this.getFullPokemonDTO(session.targetPokemonId);
     const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
 
-    const effectiveUserId = session.userId ?? userId;
+    const effectiveUserId = session.userId;
     if (effectiveUserId) {
       try {
         await this.prisma.gameHistory.create({
@@ -481,7 +519,7 @@ export class WhoIsItService {
       'WHO_IS_IT',
       session.targetPokemonId,
       session.targetNameFr,
-      true,
+      isCorrect,
       durationSeconds,
       session.hintsUsedCount,
       session.currentScore,
@@ -491,7 +529,7 @@ export class WhoIsItService {
     );
     this.eventEmitter.emit('game.round.completed', auditEvent);
 
-    // Defi quotidien termine (derniere manche resolue) : enregistrement du resultat du joueur.
+    // Defi quotidien termine (derniere manche resolue ou passee) : enregistrement du resultat du joueur.
     if (session.mode === 'DAILY' && session.roundIndex >= session.totalRounds && effectiveUserId) {
       await this.dailyResult.record(effectiveUserId, this.HISTORY_GAME, session.level, new Date(), {
         won: true,
@@ -503,9 +541,10 @@ export class WhoIsItService {
 
     return {
       success: true,
-      isCorrect: true,
+      isCorrect,
+      skipped: !isCorrect,
       status: 'SOLVED',
-      message: 'Bonne réponse !',
+      message: isCorrect ? 'Bonne réponse !' : 'Pokémon révélé.',
       currentScore: session.currentScore,
       mistakesCount: session.mistakesCount,
       level: session.level,

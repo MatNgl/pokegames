@@ -8,6 +8,7 @@ import {
   WhoIsItRoundState,
   WhoIsItGuessRequest,
   WhoIsItHintRequest,
+  WhoIsItSkipRequest,
   WhoIsItGuessResponse,
 } from '@pokegames/shared-types';
 
@@ -56,5 +57,14 @@ export class WhoIsItController {
     @Body() body: WhoIsItGuessRequest,
   ): Promise<WhoIsItGuessResponse> {
     return this.whoIsItService.submitGuess(body.roundId, body.guess, req.user?.id);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('skip')
+  async skipRound(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Body() body: WhoIsItSkipRequest,
+  ): Promise<WhoIsItGuessResponse> {
+    return this.whoIsItService.skipRound(body.roundId, req.user?.id);
   }
 }

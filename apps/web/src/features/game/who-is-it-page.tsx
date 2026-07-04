@@ -23,6 +23,7 @@ import {
   getPokemonNames,
   getRoundState,
   requestHint,
+  skipRound,
   startRound,
   submitGuess,
 } from './game-api';
@@ -235,6 +236,17 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
   const isLastRound = round ? round.roundIndex >= round.totalRounds : false;
   const liveAttempts = round ? totalAttempts + round.mistakesCount : totalAttempts;
 
+  // Manche resolue (trouvee ou passee) : revele le sprite et affiche le resultat apres l'animation.
+  const revealRound = (res: WhoIsItGuessResponse) => {
+    setResult(res);
+    setSpriteVersion((v) => v + 1);
+    if (reduceMotion) {
+      setRevealReady(true);
+    } else {
+      window.setTimeout(() => setRevealReady(true), 650);
+    }
+  };
+
   const onGuess = async (event: FormEvent) => {
     event.preventDefault();
     if (!round || !guess.trim() || busy) return;
@@ -245,13 +257,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
       const attempt = guess.trim();
       const res = await submitGuess(round.roundId, attempt);
       if (res.isCorrect) {
-        setResult(res);
-        setSpriteVersion((v) => v + 1);
-        if (reduceMotion) {
-          setRevealReady(true);
-        } else {
-          window.setTimeout(() => setRevealReady(true), 650);
-        }
+        revealRound(res);
       } else {
         const nextTried = [...tried, attempt];
         setTried(nextTried);
@@ -276,6 +282,23 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
       }
     } catch (err) {
       setError(getApiErrorMessage(err, 'Erreur lors de la validation'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Passer la manche : le joueur ne connaît pas le Pokémon malgré les indices. Révèle la réponse et
+  // compte comme un essai supplémentaire (même poids qu'une bonne réponse), sans jamais bloquer.
+  const onSkip = async () => {
+    if (!round || busy) return;
+    setBusy(true);
+    setError(null);
+    setFeedback(null);
+    try {
+      const res = await skipRound(round.roundId);
+      revealRound(res);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Impossible de passer cette manche'));
     } finally {
       setBusy(false);
     }
@@ -434,6 +457,14 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
                     <p role="alert" aria-live="assertive" className="min-h-5 text-center text-sm font-semibold text-danger">
                       {feedback ?? error ?? ''}
                     </p>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void onSkip()}
+                      className="mx-auto text-xs font-semibold text-muted underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50"
+                    >
+                      Je ne connais pas ce Pokémon, passer
+                    </button>
                   </form>
                 )}
               </div>
