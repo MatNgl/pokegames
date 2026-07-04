@@ -81,6 +81,25 @@ export function saveDailyDone(level: WhoIsItLevel, done: DailyDone): void {
   writeJson(doneKey(level), done);
 }
 
+// Preference globale (pas liee au niveau ni au jour) : ne plus demander confirmation avant de passer.
+const SKIP_NO_CONFIRM_KEY = 'pokegames:who-is-it:skip-no-confirm';
+
+export function getSkipNoConfirm(): boolean {
+  try {
+    return localStorage.getItem(SKIP_NO_CONFIRM_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function setSkipNoConfirm(value: boolean): void {
+  try {
+    localStorage.setItem(SKIP_NO_CONFIRM_KEY, value ? 'true' : 'false');
+  } catch {
+    // Stockage indisponible : la confirmation sera simplement redemandee.
+  }
+}
+
 export type WhoIsItDailyStatus = 'idle' | 'in-progress' | 'done';
 
 export function whoIsItDailyStatus(level: WhoIsItLevel): WhoIsItDailyStatus {

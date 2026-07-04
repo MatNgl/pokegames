@@ -29,10 +29,12 @@ import {
 } from './game-api';
 import {
   clearSavedGame,
+  getSkipNoConfirm,
   loadDailyDone,
   loadSavedGame,
   saveDailyDone,
   saveGame,
+  setSkipNoConfirm,
   todayKey,
   whoIsItDailyStatus,
 } from './daily-storage';
@@ -123,6 +125,8 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
   const [shakeKey, setShakeKey] = useState(0);
   const [revealReady, setRevealReady] = useState(false);
   const [alreadyDone, setAlreadyDone] = useState(false);
+  const [confirmSkip, setConfirmSkip] = useState(false);
+  const [dontAskSkip, setDontAskSkip] = useState(false);
 
   const { data: names = [] } = useQuery({
     queryKey: ['pokemon-names'],
@@ -304,6 +308,23 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
     }
   };
 
+  // Clic sur "Passer" : demande confirmation, sauf si le joueur a coché "ne plus demander" avant.
+  const requestSkip = () => {
+    if (busy) return;
+    if (getSkipNoConfirm()) {
+      void onSkip();
+    } else {
+      setDontAskSkip(false);
+      setConfirmSkip(true);
+    }
+  };
+
+  const confirmSkipNow = () => {
+    if (dontAskSkip) setSkipNoConfirm(true);
+    setConfirmSkip(false);
+    void onSkip();
+  };
+
   const onReveal = async (type: WhoIsItHintType) => {
     if (!round || busy) return;
     setBusy(true);
@@ -460,7 +481,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => void onSkip()}
+                      onClick={requestSkip}
                       className="mx-auto text-xs font-semibold text-muted underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50"
                     >
                       Je ne connais pas ce Pokémon, passer
@@ -472,6 +493,45 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
           )}
         </main>
       </div>
+
+      {confirmSkip && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setConfirmSkip(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="skip-confirm-title"
+            onClick={(e) => e.stopPropagation()}
+            className="flex w-full max-w-sm flex-col gap-4 rounded-card border-4 border-border-strong bg-surface p-6 text-center shadow-xl"
+          >
+            <h2 id="skip-confirm-title" className="font-display text-sm leading-relaxed text-foreground">
+              Êtes-vous sûr de vouloir passer ?
+            </h2>
+            <p className="text-sm font-semibold text-muted">
+              La réponse sera révélée et comptera comme un essai.
+            </p>
+            <label className="flex items-center justify-center gap-2 text-xs font-semibold text-muted">
+              <input
+                type="checkbox"
+                checked={dontAskSkip}
+                onChange={(e) => setDontAskSkip(e.target.checked)}
+                className="h-4 w-4 cursor-pointer"
+              />
+              Ne plus demander
+            </label>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmSkip(false)}>
+                Annuler
+              </Button>
+              <Button className="flex-1" onClick={confirmSkipNow}>
+                Passer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppBackground>
   );
 }
