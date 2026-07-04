@@ -282,14 +282,6 @@ function ShinyGame({
                 <ArrowLeft className="h-4 w-4" />
                 Changer de niveau
               </Button>
-              <button
-                type="button"
-                onClick={() => navigate(other.route)}
-                className="flex items-center gap-2 text-sm font-bold text-primary hover:underline"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {MODE_TITLE[other.mode]}
-              </button>
             </Card>
           ) : !state ? (
             <Card className="max-w-md p-6 text-center">
