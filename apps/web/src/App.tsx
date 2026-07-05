@@ -14,10 +14,13 @@ import { QuestsPage } from '@/features/daily/quests-page';
 import { AdminPage } from '@/features/admin/admin-page';
 import { GuessWhoPage } from '@/features/guess-who/guess-who-page';
 import { HomePage } from '@/features/home/home-page';
+import { PokedexPage } from '@/features/pokedex/pokedex-page';
+import { EasterEggLayer } from '@/features/pokedex/easter-egg-layer';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <EasterEggLayer />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/connexion" element={<LoginPage />} />
@@ -35,6 +38,7 @@ export default function App() {
         <Route path="/quetes" element={<QuestsPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/qui-est-ce" element={<GuessWhoPage />} />
+        <Route path="/pokedex" element={<PokedexPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

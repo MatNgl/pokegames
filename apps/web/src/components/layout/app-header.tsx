@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { History, ListChecks, LogOut, Menu, Shield, Trophy, X } from 'lucide-react';
 import { FolderKanbanIcon } from '@/components/ui/icons/folder-kanban-icon';
 import { SettingsIcon } from '@/components/ui/icons/settings-icon';
@@ -7,6 +8,7 @@ import { SettingsModal } from '@/features/settings/settings-modal';
 import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-context';
+import { getPokedexCollection } from '@/features/pokedex/pokedex-api';
 import { api } from '@/lib/api';
 
 const iconButtonClass =
@@ -40,6 +42,15 @@ export function AppHeader() {
   const [onlineCount, setOnlineCount] = useState<number>(1);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Pastille Pokédex : nombre de Pokémon collectés pas encore consultés.
+  const { data: pokedex } = useQuery({
+    queryKey: ['pokedex-collection'],
+    queryFn: getPokedexCollection,
+    enabled: Boolean(user),
+    staleTime: 30_000,
+  });
+  const pokedexNew = pokedex?.newCount ?? 0;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -118,9 +129,14 @@ export function AppHeader() {
         <Link to="/historique" className={iconButtonClass} title="Mon historique" aria-label="Mon historique">
           <History className="h-5 w-5" />
         </Link>
-        <button type="button" className={iconButtonClass} title="Pokédex (bientôt)" aria-label="Pokédex">
+        <Link to="/pokedex" className={`relative ${iconButtonClass}`} title="Pokédex" aria-label="Pokédex">
           <FolderKanbanIcon size={20} />
-        </button>
+          {pokedexNew > 0 && (
+            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 font-display text-[8px] text-white">
+              {pokedexNew > 9 ? '9+' : pokedexNew}
+            </span>
+          )}
+        </Link>
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
@@ -218,9 +234,18 @@ export function AppHeader() {
               >
                 <History className="h-4 w-4" /> Mon historique
               </Link>
-              <span className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-muted/60">
-                <FolderKanbanIcon size={16} /> Pokédex (bientôt)
-              </span>
+              <Link
+                to="/pokedex"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 rounded-control px-2 py-2 text-sm font-semibold text-foreground hover:bg-surface-2"
+              >
+                <FolderKanbanIcon size={16} /> Pokédex
+                {pokedexNew > 0 && (
+                  <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 font-display text-[8px] text-white">
+                    {pokedexNew > 9 ? '9+' : pokedexNew}
+                  </span>
+                )}
+              </Link>
               <button
                 type="button"
                 onClick={() => {
