@@ -67,15 +67,17 @@ model Evolution {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  username     String        @unique
-  passwordHash String
-  role         String        @default("USER")
-  avatarUrl    String?
-  createdAt    DateTime      @default(now())
-  gameHistory  GameHistory[]
-  dailyResults DailyResult[]
+  id             String             @id @default(uuid())
+  email          String             @unique
+  username       String             @unique
+  passwordHash   String
+  role           String             @default("USER")
+  avatarUrl      String?
+  createdAt      DateTime           @default(now())
+  gameHistory    GameHistory[]
+  dailyResults   DailyResult[]
+  pokedexEntries UserPokedexEntry[]
+  pokedexSpawns  PokedexSpawn[]
 }
 
 model GameHistory {
@@ -158,6 +160,43 @@ model DailyResult {
 
   @@unique([userId, gameType, scope, dayDate])
   @@index([gameType, scope, dayDate])
+  @@index([userId, dayDate])
+}
+
+/// Pokedex personnel : chaque Pokemon collecte (easter egg aujourd'hui, autres sources plus tard).
+/// `seen` sert la pastille "nouveau" : passe a true quand le joueur ouvre son Pokedex.
+model UserPokedexEntry {
+  id          String   @id @default(uuid())
+  userId      String
+  pokemonId   Int // Pokemon.id (= numero de Pokedex national)
+  source      String   @default("EASTER_EGG") // origine de la capture
+  seen        Boolean  @default(false)
+  collectedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pokemonId, source])
+  @@index([userId])
+}
+
+/// Apparitions du jour d'un joueur (10/jour). Une par zone (ecran) : fixe pour la journee, ce qui
+/// empeche de rafraichir une page pour en faire apparaitre de nouvelles. Le token opaque valide la
+/// collecte (idempotente). Autorite serveur : le client ne connait jamais le pokemonId avant collecte.
+model PokedexSpawn {
+  id          String    @id @default(uuid())
+  userId      String
+  dayDate     DateTime  @db.Date
+  zone        String // ecran ou apparait la silhouette (ex. "home", "quests", "motus")
+  pokemonId   Int
+  sessionHash String // sprite masque (proxy /api/sprites/:sessionHash)
+  token       String    @unique
+  collected   Boolean   @default(false)
+  collectedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayDate, zone])
   @@index([userId, dayDate])
 }
 

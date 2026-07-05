@@ -10,6 +10,7 @@ import { GuessWhoModule } from './guess-who/guess-who.module';
 import { HistoryModule } from './history/history.module';
 import { DailyResultModule } from './daily-result/daily-result.module';
 import { PokemonModule } from './pokemon/pokemon.module';
+import { PokedexModule } from './pokedex/pokedex.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -27,6 +28,7 @@ import { UsersModule } from './users/users.module';
     HistoryModule,
     DailyResultModule,
     PokemonModule,
+    PokedexModule,
     AdminModule,
     AuthModule,
     UsersModule,

@@ -624,3 +624,78 @@ export interface PlayerHistoryItem {
   isMulti: boolean;
 }
 
+/* ==========================================================================
+ * POKÉDEX PERSONNEL & EASTER EGGS (collection cachée)
+ * ========================================================================== */
+
+// Zones (écrans) où une silhouette peut apparaître. Une apparition par zone et par jour : stable
+// toute la journée (rafraîchir ne fait pas apparaître d'autres Pokémon).
+export const POKEDEX_ZONES = [
+  'home',
+  'quests',
+  'leaderboard',
+  'history',
+  'silhouette',
+  'motus',
+  'plus-minus',
+  'intruder',
+  'just-stat',
+  'true-shiny',
+  'shiny',
+  'guess-who',
+] as const;
+export type PokedexZone = (typeof POKEDEX_ZONES)[number];
+
+// Apparition masquée : le client ne connaît ni le nom ni le pokedexId avant la collecte.
+export interface PokedexSpawnDTO {
+  token: string;
+  zone: string;
+  spriteProxyUrl: string; // silhouette noire (proxy masqué)
+}
+
+export interface PokedexCollectRequest {
+  token: string;
+}
+
+export interface PokedexRevealedPokemon {
+  id: number;
+  pokedexId: number;
+  nameFr: string;
+  generation: number;
+  spriteUrl: string; // sprite couleur, révélé
+}
+
+export interface PokedexCollectResponse {
+  collected: boolean; // false si déjà collecté / apparition inconnue
+  requiresLogin: boolean; // invité : capture non enregistrée, l'inciter à se connecter
+  pokemon: PokedexRevealedPokemon | null;
+}
+
+export interface PokedexCatalogEntry {
+  id: number;
+  pokedexId: number;
+  nameFr: string;
+  generation: number;
+}
+
+export interface PokedexCollectionDTO {
+  total: number; // nombre total d'espèces au catalogue
+  collectedCount: number;
+  newCount: number; // collectés non encore consultés (pastille)
+  collectedIds: number[];
+}
+
+export interface PokedexDetailDTO {
+  id: number;
+  pokedexId: number;
+  nameFr: string;
+  nameEn: string;
+  category: string | null;
+  generation: number;
+  height: number | null;
+  weight: number | null;
+  spriteUrl: string;
+  types: { nameFr: string; image: string }[];
+  stats: { hp: number; atk: number; def: number; speAtk: number; speDef: number; speed: number };
+}
+
