@@ -1,5 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { API_URL } from './env';
+import { getGuestIdentity } from './guest-identity';
 
 // L'access token vit uniquement en memoire (jamais en localStorage), le refresh est un cookie httpOnly.
 let accessToken: string | null = null;
@@ -20,6 +21,12 @@ export const api = axios.create({
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (accessToken) {
     config.headers.set('Authorization', `Bearer ${accessToken}`);
+  } else {
+    // Joueur non connecte : on joint une identite invite stable pour apparaitre dans les
+    // classements du jour. Le serveur ignore ces en-tetes des qu'un compte est authentifie.
+    const guest = getGuestIdentity();
+    config.headers.set('X-Guest-Id', guest.id);
+    config.headers.set('X-Guest-Name', guest.name);
   }
   return config;
 });

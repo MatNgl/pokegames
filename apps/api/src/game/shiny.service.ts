@@ -11,7 +11,12 @@ import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
-import { DailyResultService } from '../daily-result/daily-result.service';
+import {
+  DailyResultService,
+  guestSessionFields,
+  playerFromSession,
+  type PlayerIdentity,
+} from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
 import type {
   ShinyChoiceResponse,
@@ -47,6 +52,8 @@ interface ShinySession {
   status: 'PLAYING' | 'FINISHED';
   startTime: number;
   userId?: string;
+  guestId?: string;
+  guestName?: string;
 }
 
 const SHINY_LEVELS: ShinyLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE'];
@@ -247,7 +254,12 @@ export class ShinyService {
     };
   }
 
-  async startDaily(mode: ShinyMode, level: ShinyLevel, userId?: string): Promise<ShinyRoundState> {
+  async startDaily(
+    mode: ShinyMode,
+    level: ShinyLevel,
+    player: PlayerIdentity = {},
+  ): Promise<ShinyRoundState> {
+    const userId = player.userId;
     if (!SHINY_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
@@ -276,7 +288,7 @@ export class ShinyService {
       correctCount: 0,
       status: 'PLAYING',
       startTime: Date.now(),
-      ...(userId ? { userId } : {}),
+      ...(userId ? { userId } : guestSessionFields(player)),
     };
     await this.redisService.set(
       `${this.REDIS_PREFIX}${roundId}`,
@@ -394,9 +406,10 @@ export class ShinyService {
           false,
         ),
       );
-      if (session.userId) {
+      const player = playerFromSession(session);
+      if (player.userId || player.guestId) {
         await this.dailyResult.record(
-          session.userId,
+          player,
           this.HISTORY_GAME,
           this.resultScope(session.mode, session.level),
           new Date(),

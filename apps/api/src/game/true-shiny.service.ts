@@ -12,7 +12,12 @@ import { RedisService } from '../redis/redis.service';
 import { PokemonService } from '../pokemon/pokemon.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
-import { DailyResultService } from '../daily-result/daily-result.service';
+import {
+  DailyResultService,
+  guestSessionFields,
+  playerFromSession,
+  type PlayerIdentity,
+} from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
 import type {
   TrueShinyChoiceResponse,
@@ -46,6 +51,8 @@ interface TrueShinySession {
   status: 'PLAYING' | 'FINISHED';
   startTime: number;
   userId?: string;
+  guestId?: string;
+  guestName?: string;
 }
 
 const TRUE_SHINY_LEVELS: TrueShinyLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE'];
@@ -226,7 +233,8 @@ export class TrueShinyService {
     };
   }
 
-  async startDaily(level: TrueShinyLevel, userId?: string): Promise<TrueShinyRoundState> {
+  async startDaily(level: TrueShinyLevel, player: PlayerIdentity = {}): Promise<TrueShinyRoundState> {
+    const userId = player.userId;
     if (!TRUE_SHINY_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
@@ -251,7 +259,7 @@ export class TrueShinyService {
       correctCount: 0,
       status: 'PLAYING',
       startTime: Date.now(),
-      ...(userId ? { userId } : {}),
+      ...(userId ? { userId } : guestSessionFields(player)),
     };
     await this.persist(session);
     return this.toState(session);
@@ -368,8 +376,9 @@ export class TrueShinyService {
           false,
         ),
       );
-      if (session.userId) {
-        await this.dailyResult.record(session.userId, this.HISTORY_GAME, session.level, new Date(), {
+      const player = playerFromSession(session);
+      if (player.userId || player.guestId) {
+        await this.dailyResult.record(player, this.HISTORY_GAME, session.level, new Date(), {
           won,
           correctCount: session.correctCount,
           totalRounds: session.rounds.length,

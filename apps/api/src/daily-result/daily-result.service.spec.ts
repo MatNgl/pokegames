@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
-import { DailyResultService } from './daily-result.service';
+import { DailyResultService, guestSessionFields, playerFromSession } from './daily-result.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('DailyResultService', () => {
@@ -42,15 +42,45 @@ describe('DailyResultService', () => {
   });
 
   it('record persiste les metriques du jour', async () => {
-    await service.record('u1', 'PLUS_MINUS', 'FACILE', new Date('2026-07-01T10:00:00Z'), {
+    await service.record({ userId: 'u1' }, 'PLUS_MINUS', 'FACILE', new Date('2026-07-01T10:00:00Z'), {
       won: true,
       correctCount: 8,
       totalRounds: 10,
     });
     const data = mockCreate.mock.calls[0]?.[0]?.data;
     expect(data.userId).toBe('u1');
+    expect(data.guestId).toBeNull();
     expect(data.correctCount).toBe(8);
     expect(data.dayDate).toEqual(new Date(Date.UTC(2026, 6, 1)));
+  });
+
+  it('record enregistre un invite (guestId + guestName, sans userId)', async () => {
+    await service.record(
+      { guestId: 'g_abcd', guestName: 'player_abcd' },
+      'MOTUS',
+      'FACILE',
+      new Date('2026-07-01T10:00:00Z'),
+      { won: true, attempts: 3 },
+    );
+    const data = mockCreate.mock.calls[0]?.[0]?.data;
+    expect(data.userId).toBeNull();
+    expect(data.guestId).toBe('g_abcd');
+    expect(data.guestName).toBe('player_abcd');
+    expect(data.attempts).toBe(3);
+  });
+
+  it('record sans identite de joueur (ni userId ni guestId) : rien enregistre', async () => {
+    await service.record({}, 'MOTUS', 'FACILE', new Date('2026-07-01T10:00:00Z'), { won: true });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('leaderboard : un invite est affiche via guestName et marque isGuest', async () => {
+    mockFindMany.mockResolvedValue([
+      { userId: null, guestId: 'g_1', guestName: 'player_1', won: true, attempts: 2, score: null, correctCount: null, totalRounds: null, durationSeconds: 30, user: null },
+    ]);
+    const rows = await service.leaderboard('MOTUS', 'FACILE', new Date('2026-07-01T10:00:00Z'));
+    expect(rows[0]?.username).toBe('player_1');
+    expect(rows[0]?.isGuest).toBe(true);
   });
 
   it('leaderboard Motus : gagnants d’abord, puis moins d’essais', async () => {
@@ -73,6 +103,56 @@ describe('DailyResultService', () => {
     expect(rows.map((r) => r.username)).toEqual(['Bob', 'Cara', 'Alice']);
   });
 
+  describe('playerFromSession', () => {
+    it('le compte prime sur l’invité', () => {
+      expect(playerFromSession({ userId: 'u1', guestId: 'g1', guestName: 'player_1' })).toEqual({
+        userId: 'u1',
+      });
+    });
+
+    it('retourne l’identité invité si pas de compte', () => {
+      expect(playerFromSession({ guestId: 'g1', guestName: 'player_1' })).toEqual({
+        guestId: 'g1',
+        guestName: 'player_1',
+      });
+    });
+
+    it('session anonyme : objet vide', () => {
+      expect(playerFromSession({})).toEqual({});
+    });
+  });
+
+  describe('guestSessionFields', () => {
+    it('joueur connecté : aucun champ invité stocké', () => {
+      expect(guestSessionFields({ userId: 'u1' })).toEqual({});
+    });
+
+    it('joueur anonyme (ni userId ni guestId) : aucun champ', () => {
+      expect(guestSessionFields({})).toEqual({});
+    });
+
+    it('invité : conserve guestId et guestName', () => {
+      expect(guestSessionFields({ guestId: 'g_abcd', guestName: 'player_abcd' })).toEqual({
+        guestId: 'g_abcd',
+        guestName: 'player_abcd',
+      });
+    });
+
+    it('invité sans pseudo : repli player_<4 derniers caractères>', () => {
+      expect(guestSessionFields({ guestId: 'guest-xy12' })).toEqual({
+        guestId: 'guest-xy12',
+        guestName: 'player_xy12',
+      });
+    });
+
+    it('invité sans pseudo et guestId sans caractères alphanumériques : repli player_0000', () => {
+      expect(guestSessionFields({ guestId: '----' })).toEqual({
+        guestId: '----',
+        guestName: 'player_0000',
+      });
+    });
+  });
+
   it('record est idempotent : ignore le doublon (verrou strict)', async () => {
     const dup = new Prisma.PrismaClientKnownRequestError('dup', {
       code: 'P2002',
@@ -80,7 +160,9 @@ describe('DailyResultService', () => {
     });
     mockCreate.mockRejectedValueOnce(dup);
     await expect(
-      service.record('u1', 'PLUS_MINUS', 'FACILE', new Date('2026-07-01T10:00:00Z'), { won: true }),
+      service.record({ userId: 'u1' }, 'PLUS_MINUS', 'FACILE', new Date('2026-07-01T10:00:00Z'), {
+        won: true,
+      }),
     ).resolves.toBeUndefined();
   });
 });

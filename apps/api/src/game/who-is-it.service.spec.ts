@@ -17,6 +17,7 @@ describe('WhoIsItService', () => {
   let mockRevealSpriteSession: jest.Mock;
   let mockEmit: jest.Mock;
   let mockFindMany: jest.Mock;
+  let mockRecord: jest.Mock;
 
   const mockPokemon = {
     id: 25,
@@ -54,6 +55,7 @@ describe('WhoIsItService', () => {
     mockRevealSpriteSession = jest.fn().mockResolvedValue(undefined);
     mockEmit = jest.fn().mockReturnValue(true);
     mockFindMany = jest.fn().mockResolvedValue([mockPokemon]);
+    mockRecord = jest.fn().mockResolvedValue(undefined);
 
     const mockPrismaService = {
       pokemon: {
@@ -101,7 +103,7 @@ describe('WhoIsItService', () => {
           provide: DailyResultService,
           useValue: {
             hasCompleted: jest.fn().mockResolvedValue(false),
-            record: jest.fn().mockResolvedValue(undefined),
+            record: mockRecord,
           },
         },
         { provide: GameConfigService, useValue: gameConfigMock() },
@@ -132,6 +134,16 @@ describe('WhoIsItService', () => {
         mockPokemon.spriteRegular,
         3600,
       );
+    });
+
+    it('enregistre l’identité invité dans la session (guestId + guestName, sans userId)', async () => {
+      await service.startRound({ generations: [1] }, { guestId: 'g_abcd', guestName: 'player_abcd' });
+      const session = JSON.parse(
+        mockRedisSet.mock.calls[mockRedisSet.mock.calls.length - 1]?.[1] as string,
+      ) as { userId?: string; guestId?: string; guestName?: string };
+      expect(session.userId).toBeUndefined();
+      expect(session.guestId).toBe('g_abcd');
+      expect(session.guestName).toBe('player_abcd');
     });
   });
 
@@ -238,6 +250,40 @@ describe('WhoIsItService', () => {
       expect(res.currentScore).toBe(100);
       expect(res.mistakesCount).toBe(1);
       expect(res.revealedPokemon).toBeNull();
+    });
+
+    it('défi quotidien terminé par un invité : record reçoit l’identité invité', async () => {
+      const mockSession = {
+        roundId: 'test-round-id',
+        sessionHash: 'test-session-hash',
+        targetPokemonId: 25,
+        targetNameFr: 'Pikachu',
+        targetNameEn: 'Pikachu',
+        status: 'PLAYING',
+        startTime: Date.now() - 2000,
+        currentScore: 100,
+        mistakesCount: 0,
+        hintsUsedCount: 0,
+        mode: 'DAILY',
+        level: 'MOYEN',
+        roundIndex: 5,
+        totalRounds: 5,
+        hints: [],
+        guestId: 'g_abcd',
+        guestName: 'player_abcd',
+      };
+
+      mockRedisGet.mockResolvedValue(JSON.stringify(mockSession));
+
+      await service.submitGuess('test-round-id', 'Pikachu');
+
+      expect(mockRecord).toHaveBeenCalledWith(
+        { guestId: 'g_abcd', guestName: 'player_abcd' },
+        expect.any(String),
+        'MOYEN',
+        expect.any(Date),
+        expect.objectContaining({ won: true, attempts: 1 }),
+      );
     });
   });
 

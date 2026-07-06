@@ -3,6 +3,7 @@ import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RegisterRequest, LoginRequest, ChangePasswordRequest } from '@pokegames/shared-types';
+import { playerFromRequest } from '../common/player-identity';
 
 interface AuthUser {
   id: string;
@@ -27,8 +28,12 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  async register(@Body() body: RegisterRequest) {
-    return this.authService.register(body);
+  async register(@Body() body: RegisterRequest, @Req() req: Request & { user?: AuthUser }) {
+    // L'identité invite arrive via l'en-tête X-Guest-Id (requête non authentifiée) : on rattache
+    // les scores du jour joués en invité au compte créé. Le body peut aussi la porter (repli).
+    // exactOptionalPropertyTypes : n'ajoute guestId que s'il est defini (jamais `guestId: undefined`).
+    const guestId = playerFromRequest(req).guestId ?? body.guestId;
+    return this.authService.register(guestId ? { ...body, guestId } : body);
   }
 
   @Post('login')

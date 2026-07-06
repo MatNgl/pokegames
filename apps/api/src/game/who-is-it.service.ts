@@ -21,7 +21,12 @@ import {
 } from '@pokegames/shared-types';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
-import { DailyResultService } from '../daily-result/daily-result.service';
+import {
+  DailyResultService,
+  guestSessionFields,
+  playerFromSession,
+  type PlayerIdentity,
+} from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
 
 const WHO_IS_IT_LEVELS: WhoIsItLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
@@ -45,6 +50,8 @@ interface InternalRoundSession {
   totalRounds: number;
   hints: WhoIsItHint[];
   userId?: string;
+  guestId?: string;
+  guestName?: string;
 }
 
 @Injectable()
@@ -139,7 +146,12 @@ export class WhoIsItService {
   /**
    * Démarre une nouvelle manche avec capital 100 points, pas d'échec au temps et indices payants.
    */
-  async startRound(config: WhoIsItConfig = { generations: [] }, userId?: string, roundIndex = 1): Promise<WhoIsItRoundState> {
+  async startRound(
+    config: WhoIsItConfig = { generations: [] },
+    player: PlayerIdentity = {},
+    roundIndex = 1,
+  ): Promise<WhoIsItRoundState> {
+    const userId = player.userId;
     const mode = config.mode ?? 'CLASSIC';
     const level = config.level ?? 'MOYEN';
     if (!WHO_IS_IT_LEVELS.includes(level)) {
@@ -289,7 +301,7 @@ export class WhoIsItService {
       roundIndex,
       totalRounds,
       hints,
-      ...(userId ? { userId } : {}),
+      ...(userId ? { userId } : guestSessionFields(player)),
     };
 
     await this.redisService.set(
@@ -539,9 +551,14 @@ export class WhoIsItService {
     // Defi quotidien termine (derniere manche resolue ou passee) : enregistrement du resultat du joueur.
     // Classement par nombre d'essais (plus de points) : une manche trouvee coute (erreurs + 1),
     // une manche passee coute 3 essais. carriedAttempts porte le total des manches precedentes.
-    if (session.mode === 'DAILY' && session.roundIndex >= session.totalRounds && effectiveUserId) {
+    const player: PlayerIdentity = playerFromSession(session);
+    if (
+      session.mode === 'DAILY' &&
+      session.roundIndex >= session.totalRounds &&
+      (player.userId || player.guestId)
+    ) {
       const roundCost = session.mistakesCount + (isCorrect ? 1 : 3);
-      await this.dailyResult.record(effectiveUserId, this.HISTORY_GAME, session.level, new Date(), {
+      await this.dailyResult.record(player, this.HISTORY_GAME, session.level, new Date(), {
         won: true,
         attempts: (carriedAttempts ?? 0) + roundCost,
         totalRounds: session.totalRounds,

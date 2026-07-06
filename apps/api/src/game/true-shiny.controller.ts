@@ -14,6 +14,7 @@ import {
 import { Request, Response } from 'express';
 import { TrueShinyService } from './true-shiny.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { playerFromRequest } from '../common/player-identity';
 import type {
   TrueShinyChoiceRequest,
   TrueShinyChoiceResponse,
@@ -41,7 +42,7 @@ export class TrueShinyController {
     if (!level || !TRUE_SHINY_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
-    return this.trueShinyService.startDaily(level, req.user?.id);
+    return this.trueShinyService.startDaily(level, playerFromRequest(req));
   }
 
   @Get('round/:roundId')

@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/comm
 import { Request } from 'express';
 import { IntruderService } from './intruder.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { playerFromRequest } from '../common/player-identity';
 import type {
   IntruderChoiceRequest,
   IntruderChoiceResponse,
@@ -23,7 +24,7 @@ export class IntruderController {
     @Req() req: Request & { user?: AuthenticatedUser },
     @Body() body: IntruderStartRequest,
   ): Promise<IntruderRoundState> {
-    return this.intruderService.startDaily(body.level, req.user?.id);
+    return this.intruderService.startDaily(body.level, playerFromRequest(req));
   }
 
   @Get('round/:roundId')

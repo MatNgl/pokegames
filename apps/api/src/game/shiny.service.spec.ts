@@ -105,6 +105,18 @@ describe('ShinyService', () => {
       expect(serialized).not.toContain('isShiny');
     });
 
+    it('enregistre l’identité invité dans la session (guestId + guestName, sans userId)', async () => {
+      await service.startDaily('FIND_SHINY', 'FACILE', { guestId: 'g_abcd', guestName: 'player_abcd' });
+      const session = JSON.parse(mockSet.mock.calls[mockSet.mock.calls.length - 1]?.[1] as string) as {
+        userId?: string;
+        guestId?: string;
+        guestName?: string;
+      };
+      expect(session.userId).toBeUndefined();
+      expect(session.guestId).toBe('g_abcd');
+      expect(session.guestName).toBe('player_abcd');
+    });
+
     it('adapte le nombre de vignettes au niveau (Moyen 4, Difficile 6)', async () => {
       const moyen = await service.startDaily('FIND_SHINY', 'MOYEN');
       expect(moyen.tiles).toHaveLength(4);

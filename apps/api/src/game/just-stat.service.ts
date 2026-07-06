@@ -6,7 +6,12 @@ import { RedisService } from '../redis/redis.service';
 import { ConflictException } from '@nestjs/common';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
-import { DailyResultService } from '../daily-result/daily-result.service';
+import {
+  DailyResultService,
+  guestSessionFields,
+  playerFromSession,
+  type PlayerIdentity,
+} from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
 import { JUST_STAT_DESCRIPTORS } from './game-config';
 import type {
@@ -47,6 +52,8 @@ interface JustStatSession {
   status: 'PLAYING' | 'FINISHED';
   startTime: number;
   userId?: string;
+  guestId?: string;
+  guestName?: string;
 }
 
 @Injectable()
@@ -69,9 +76,11 @@ export class JustStatService {
   ) {}
 
   private async recordIfFinished(session: JustStatSession): Promise<void> {
-    if (session.status !== 'FINISHED' || !session.userId) return;
+    if (session.status !== 'FINISHED') return;
+    const player = playerFromSession(session);
+    if (!player.userId && !player.guestId) return;
     const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
-    await this.dailyResult.record(session.userId, this.HISTORY_GAME, this.RESULT_SCOPE, new Date(), {
+    await this.dailyResult.record(player, this.HISTORY_GAME, this.RESULT_SCOPE, new Date(), {
       won: session.correctCount === session.rounds.length,
       correctCount: session.correctCount,
       totalRounds: session.rounds.length,
@@ -279,7 +288,8 @@ export class JustStatService {
     };
   }
 
-  async startDaily(userId?: string): Promise<JustStatRoundState> {
+  async startDaily(player: PlayerIdentity = {}): Promise<JustStatRoundState> {
+    const userId = player.userId;
     if (
       userId &&
       (await this.dailyResult.hasCompleted(userId, this.HISTORY_GAME, this.RESULT_SCOPE, new Date()))
@@ -303,7 +313,7 @@ export class JustStatService {
       correctCount: 0,
       status: 'PLAYING',
       startTime: Date.now(),
-      ...(userId ? { userId } : {}),
+      ...(userId ? { userId } : guestSessionFields(player)),
     };
     await this.persist(session);
     return this.toState(session);

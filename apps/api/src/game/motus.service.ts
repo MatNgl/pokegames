@@ -10,7 +10,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
-import { DailyResultService } from '../daily-result/daily-result.service';
+import {
+  DailyResultService,
+  guestSessionFields,
+  playerFromSession,
+  type PlayerIdentity,
+} from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
 import type {
   MotusGuessResponse,
@@ -39,6 +44,8 @@ interface MotusSession {
   status: 'PLAYING' | 'WON' | 'LOST';
   startTime: number;
   userId?: string;
+  guestId?: string;
+  guestName?: string;
 }
 
 @Injectable()
@@ -192,7 +199,8 @@ export class MotusService {
     return Array.from({ length }, (_, i) => ({ letter: guess[i] ?? '', state: states[i] ?? 'ABSENT' }));
   }
 
-  async startDaily(level: MotusLevel = 'FACILE', userId?: string): Promise<MotusRoundState> {
+  async startDaily(level: MotusLevel = 'FACILE', player: PlayerIdentity = {}): Promise<MotusRoundState> {
+    const userId = player.userId;
     if (!MOTUS_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
@@ -221,7 +229,7 @@ export class MotusService {
       attempts: [],
       status: 'PLAYING',
       startTime: Date.now(),
-      ...(userId ? { userId } : {}),
+      ...(userId ? { userId } : guestSessionFields(player)),
     };
 
     await this.redisService.set(
@@ -301,14 +309,13 @@ export class MotusService {
           false,
         ),
       );
-      if (session.userId) {
-        await this.dailyResult.record(
-          session.userId,
-          this.HISTORY_GAME,
-          session.level ?? 'MOYEN',
-          new Date(),
-          { won, attempts: session.attempts.length, durationSeconds },
-        );
+      const player = playerFromSession(session);
+      if (player.userId || player.guestId) {
+        await this.dailyResult.record(player, this.HISTORY_GAME, session.level ?? 'MOYEN', new Date(), {
+          won,
+          attempts: session.attempts.length,
+          durationSeconds,
+        });
       }
     }
 

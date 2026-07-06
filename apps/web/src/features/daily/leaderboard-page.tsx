@@ -124,6 +124,9 @@ export function LeaderboardPage() {
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm font-extrabold text-foreground">
                       {e.username}
+                      {e.isGuest && (
+                        <span className="ml-1 text-xs font-semibold text-muted">invité</span>
+                      )}
                       {e.isMe && <span className="ml-1 text-xs font-semibold text-primary">(toi)</span>}
                     </span>
                     <span className="shrink-0 text-xs font-semibold text-muted">

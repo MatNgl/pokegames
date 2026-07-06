@@ -10,7 +10,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { GameRoundCompletedEvent } from '../events/game-round-completed.event';
 import { HistoryService } from '../history/history.service';
-import { DailyResultService } from '../daily-result/daily-result.service';
+import {
+  DailyResultService,
+  guestSessionFields,
+  playerFromSession,
+  type PlayerIdentity,
+} from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
 import { type IntruderHintMode } from './game-config';
 import type {
@@ -67,6 +72,8 @@ interface IntruderSession {
   status: 'PLAYING' | 'FINISHED';
   startTime: number;
   userId?: string;
+  guestId?: string;
+  guestName?: string;
 }
 
 interface StatDescriptor {
@@ -572,7 +579,8 @@ export class IntruderService {
     };
   }
 
-  async startDaily(level: IntruderLevel, userId?: string): Promise<IntruderRoundState> {
+  async startDaily(level: IntruderLevel, player: PlayerIdentity = {}): Promise<IntruderRoundState> {
+    const userId = player.userId;
     if (!INTRUDER_LEVELS.includes(level)) {
       throw new BadRequestException('Niveau invalide');
     }
@@ -597,7 +605,7 @@ export class IntruderService {
       correctCount: 0,
       status: 'PLAYING',
       startTime: Date.now(),
-      ...(userId ? { userId } : {}),
+      ...(userId ? { userId } : guestSessionFields(player)),
     };
     await this.redisService.set(
       `${this.REDIS_PREFIX}${roundId}`,
@@ -691,8 +699,9 @@ export class IntruderService {
           false,
         ),
       );
-      if (session.userId) {
-        await this.dailyResult.record(session.userId, this.HISTORY_GAME, session.level, new Date(), {
+      const player = playerFromSession(session);
+      if (player.userId || player.guestId) {
+        await this.dailyResult.record(player, this.HISTORY_GAME, session.level, new Date(), {
           won,
           correctCount: session.correctCount,
           totalRounds: session.rounds.length,

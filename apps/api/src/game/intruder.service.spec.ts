@@ -108,6 +108,18 @@ describe('IntruderService', () => {
       expect(serialized).not.toContain('commonLabel');
     });
 
+    it('enregistre l’identité invité dans la session (guestId + guestName, sans userId)', async () => {
+      await service.startDaily('FACILE', { guestId: 'g_abcd', guestName: 'player_abcd' });
+      const session = JSON.parse(mockSet.mock.calls[mockSet.mock.calls.length - 1]?.[1] as string) as {
+        userId?: string;
+        guestId?: string;
+        guestName?: string;
+      };
+      expect(session.userId).toBeUndefined();
+      expect(session.guestId).toBe('g_abcd');
+      expect(session.guestName).toBe('player_abcd');
+    });
+
     it('adapte la taille de grille au niveau (Moyen 5, Difficile 6)', async () => {
       const moyen = await service.startDaily('MOYEN');
       expect(moyen.members).toHaveLength(5);

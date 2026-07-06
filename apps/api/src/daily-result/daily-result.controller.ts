@@ -12,6 +12,13 @@ interface AuthenticatedUser {
   id: string;
 }
 
+/** Identifiant invite transmis dans l'en-tete `x-guest-id` (pour marquer sa propre entree). */
+function headerGuestId(req: Request): string | undefined {
+  const value = req.headers['x-guest-id'];
+  const raw = Array.isArray(value) ? value[0] : value;
+  return typeof raw === 'string' && raw.length > 0 ? raw.slice(0, 64) : undefined;
+}
+
 function toDTO(row: DailyResultRow): DailyResultDTO {
   return {
     gameType: row.gameType,
@@ -53,13 +60,17 @@ export class DailyResultController {
     const scopeValue = scope ?? '';
     const rows = await this.dailyResult.leaderboard(gameType, scopeValue, new Date());
     const meId = req.user?.id;
+    const guestId = req.user?.id ? undefined : headerGuestId(req);
     return {
       gameType,
       scope: scopeValue,
       entries: rows.map((row, index) => ({
         rank: index + 1,
         username: row.username,
-        isMe: Boolean(meId) && row.userId === meId,
+        isMe: meId
+          ? row.userId === meId
+          : Boolean(guestId) && row.guestId === guestId,
+        isGuest: row.isGuest,
         won: row.won ?? false,
         attempts: row.attempts ?? null,
         score: row.score ?? null,

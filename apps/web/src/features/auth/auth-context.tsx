@@ -10,6 +10,7 @@ import {
 import axios from 'axios';
 import type { UserDTO } from '@pokegames/shared-types';
 import { setAccessToken } from '@/lib/api';
+import { clearGuestIdentity } from '@/lib/guest-identity';
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from './auth-api';
 
 interface AuthContextValue {
@@ -99,7 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (email: string, username: string, password: string) => {
+      // L'intercepteur joint l'en-tete X-Guest-Id a cette requete non authentifiee : le serveur
+      // rattache les scores invites au compte cree. On efface ensuite l'identite invite locale.
       await registerRequest(email, username, password);
+      clearGuestIdentity();
       await login(email, password);
     },
     [login],

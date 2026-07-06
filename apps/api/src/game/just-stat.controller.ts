@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/comm
 import { Request } from 'express';
 import { JustStatService } from './just-stat.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { playerFromRequest } from '../common/player-identity';
 import type {
   JustStatGuessRequest,
   JustStatGuessResponse,
@@ -20,7 +21,7 @@ export class JustStatController {
   @UseGuards(OptionalJwtAuthGuard)
   @Post('start')
   async start(@Req() req: Request & { user?: AuthenticatedUser }): Promise<JustStatRoundState> {
-    return this.justStatService.startDaily(req.user?.id);
+    return this.justStatService.startDaily(playerFromRequest(req));
   }
 
   @Get('round/:roundId')

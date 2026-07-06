@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/comm
 import { Request } from 'express';
 import { MotusService } from './motus.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { playerFromRequest } from '../common/player-identity';
 import type {
   MotusGuessRequest,
   MotusGuessResponse,
@@ -23,7 +24,7 @@ export class MotusController {
     @Req() req: Request & { user?: AuthenticatedUser },
     @Body() body?: { level?: MotusLevel },
   ): Promise<MotusRoundState> {
-    return this.motusService.startDaily(body?.level, req.user?.id);
+    return this.motusService.startDaily(body?.level, playerFromRequest(req));
   }
 
   @Get('round/:roundId')

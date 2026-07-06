@@ -125,6 +125,18 @@ describe('PlusMinusService', () => {
       expect('value' in state.a).toBe(false);
     });
 
+    it('enregistre l’identité invité dans la session (guestId + guestName, sans userId)', async () => {
+      await service.startDaily('FACILE', { guestId: 'g_abcd', guestName: 'player_abcd' });
+      const session = JSON.parse(mockSet.mock.calls[mockSet.mock.calls.length - 1]?.[1] as string) as {
+        userId?: string;
+        guestId?: string;
+        guestName?: string;
+      };
+      expect(session.userId).toBeUndefined();
+      expect(session.guestId).toBe('g_abcd');
+      expect(session.guestName).toBe('player_abcd');
+    });
+
     it('rejette un niveau invalide', async () => {
       await expect(service.startDaily('IMPOSSIBLE' as PlusMinusLevel)).rejects.toThrow('Niveau invalide');
     });

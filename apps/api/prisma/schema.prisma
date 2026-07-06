@@ -142,8 +142,13 @@ model GameConfig {
 }
 
 model DailyResult {
-  id              String   @id @default(uuid())
-  userId          String
+  id String @id @default(uuid())
+  // Un resultat appartient soit a un compte (userId), soit a un invite (guestId + guestName).
+  // Exactement un des deux est renseigne ; les nulls rendent chaque contrainte unique inoffensive
+  // pour l'autre type de joueur (Postgres traite les nulls comme distincts).
+  userId          String?
+  guestId         String? // identifiant invite persiste cote client (localStorage), ex. "g_xxxx"
+  guestName       String? // pseudo affiche de l'invite, ex. "player_a3f9"
   gameType        String // "WHO_IS_IT", "MOTUS", ...
   scope           String   @default("") // niveau et/ou mode ("FACILE", "FIND_SHINY:MOYEN", ...)
   dayDate         DateTime @db.Date // jour UTC du defi
@@ -156,9 +161,10 @@ model DailyResult {
   durationSeconds Int?
   createdAt       DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, gameType, scope, dayDate])
+  @@unique([guestId, gameType, scope, dayDate])
   @@index([gameType, scope, dayDate])
   @@index([userId, dayDate])
 }

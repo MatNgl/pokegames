@@ -17,9 +17,53 @@ export interface DailyResultRow extends DailyMetrics {
   dayDate: Date;
 }
 
+/**
+ * Identite d'un joueur pour l'enregistrement d'un resultat : soit un compte (userId), soit un
+ * invite (guestId + guestName genere cote client). Exactement un des deux doit etre renseigne.
+ */
+export interface PlayerIdentity {
+  userId?: string | undefined;
+  guestId?: string | undefined;
+  guestName?: string | undefined;
+}
+
 export interface LeaderboardRow extends DailyMetrics {
-  userId: string;
+  userId: string | null;
+  guestId: string | null;
   username: string;
+  isGuest: boolean;
+}
+
+/**
+ * Extrait l'identite de joueur d'une session de jeu (Redis). Le compte prime sur l'invite.
+ * Retourne {} si la session est anonyme (aucun resultat ne sera enregistre).
+ */
+export function playerFromSession(session: {
+  userId?: string | undefined;
+  guestId?: string | undefined;
+  guestName?: string | undefined;
+}): PlayerIdentity {
+  if (session.userId) {
+    return { userId: session.userId };
+  }
+  if (session.guestId) {
+    return { guestId: session.guestId, guestName: session.guestName };
+  }
+  return {};
+}
+
+/**
+ * Champs invite prets a etre stockes dans une session (chaines toujours definies), ou objet vide
+ * si le joueur est connecte ou anonyme. Evite d'ecrire `undefined` sous exactOptionalPropertyTypes.
+ */
+export function guestSessionFields(
+  player: PlayerIdentity,
+): { guestId: string; guestName: string } | Record<string, never> {
+  if (player.userId || !player.guestId) {
+    return {};
+  }
+  const suffix = player.guestId.replace(/[^A-Za-z0-9]/g, '').slice(-4) || '0000';
+  return { guestId: player.guestId, guestName: player.guestName ?? `player_${suffix}` };
 }
 
 /**
@@ -42,18 +86,27 @@ export class DailyResultService {
     return count > 0;
   }
 
-  /** Enregistre le resultat du jour. Idempotent : le premier resultat fait foi (verrou strict). */
+  /**
+   * Enregistre le resultat du jour pour un compte ou un invite. Idempotent : le premier resultat
+   * fait foi (verrou strict via l'index unique userId/guestId x jeu x scope x jour).
+   * Sans identite de joueur (ni userId ni guestId), on n'enregistre rien.
+   */
   async record(
-    userId: string,
+    player: PlayerIdentity,
     gameType: string,
     scope: string,
     day: Date,
     metrics: DailyMetrics,
   ): Promise<void> {
+    if (!player.userId && !player.guestId) {
+      return;
+    }
     try {
       await this.prisma.dailyResult.create({
         data: {
-          userId,
+          userId: player.userId ?? null,
+          guestId: player.userId ? null : (player.guestId ?? null),
+          guestName: player.userId ? null : (player.guestName ?? null),
           gameType,
           scope,
           dayDate: this.utcDateOnly(day),
@@ -114,6 +167,8 @@ export class DailyResultService {
       where: { gameType, scope, dayDate: this.utcDateOnly(day) },
       select: {
         userId: true,
+        guestId: true,
+        guestName: true,
         won: true,
         attempts: true,
         score: true,
@@ -125,7 +180,9 @@ export class DailyResultService {
     });
     const mapped: LeaderboardRow[] = rows.map((r) => ({
       userId: r.userId,
-      username: r.user.username,
+      guestId: r.guestId,
+      username: r.user?.username ?? r.guestName ?? 'Invité',
+      isGuest: !r.userId,
       won: r.won,
       attempts: r.attempts,
       score: r.score,

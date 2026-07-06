@@ -15,6 +15,7 @@ describe('AuthService', () => {
   let mockPrismaCreate: jest.Mock;
   let mockPrismaFindUnique: jest.Mock;
   let mockPrismaUpdate: jest.Mock;
+  let mockDailyResultUpdateMany: jest.Mock;
   let mockJwtSign: jest.Mock;
   let mockRedisSet: jest.Mock;
   let mockRedisGet: jest.Mock;
@@ -25,18 +26,27 @@ describe('AuthService', () => {
     mockPrismaCreate = jest.fn();
     mockPrismaFindUnique = jest.fn();
     mockPrismaUpdate = jest.fn().mockResolvedValue({});
+    mockDailyResultUpdateMany = jest.fn().mockResolvedValue({ count: 0 });
     mockJwtSign = jest.fn().mockReturnValue('access-token-123');
     mockRedisSet = jest.fn().mockResolvedValue(undefined);
     mockRedisGet = jest.fn();
     mockRedisDel = jest.fn().mockResolvedValue(undefined);
 
-    const mockPrismaService = {
+    const prismaModels = {
       user: {
         findFirst: mockPrismaFindFirst,
         create: mockPrismaCreate,
         findUnique: mockPrismaFindUnique,
         update: mockPrismaUpdate,
       },
+      dailyResult: {
+        updateMany: mockDailyResultUpdateMany,
+      },
+    };
+    const mockPrismaService = {
+      ...prismaModels,
+      // Transaction interactive : exécute le callback avec le client mocké (mêmes fonctions mockées).
+      $transaction: jest.fn((cb: (tx: typeof prismaModels) => unknown) => cb(prismaModels)),
     };
 
     const mockJwtService = { sign: mockJwtSign };
@@ -79,6 +89,50 @@ describe('AuthService', () => {
       expect(res.id).toBe('user-1');
       expect(mockedBcrypt.hash).toHaveBeenCalledWith('Password123!', 10);
       expect(mockPrismaCreate).toHaveBeenCalled();
+    });
+
+    it('doit rattacher les scores invites au compte cree quand un guestId est fourni', async () => {
+      mockPrismaFindFirst.mockResolvedValue(null);
+      mockedBcrypt.hash.mockImplementation(async () => 'hashed-pwd');
+      mockPrismaCreate.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        username: 'sacha',
+        role: 'USER',
+        createdAt: new Date(),
+      });
+
+      await service.register({
+        email: 'test@example.com',
+        username: 'sacha',
+        password: 'Password123!',
+        guestId: 'g_abcd1234',
+      });
+
+      expect(mockDailyResultUpdateMany).toHaveBeenCalledWith({
+        where: { guestId: 'g_abcd1234', userId: null },
+        data: { userId: 'user-1', guestId: null, guestName: null },
+      });
+    });
+
+    it('ne rattache aucun score en absence de guestId', async () => {
+      mockPrismaFindFirst.mockResolvedValue(null);
+      mockedBcrypt.hash.mockImplementation(async () => 'hashed-pwd');
+      mockPrismaCreate.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        username: 'sacha',
+        role: 'USER',
+        createdAt: new Date(),
+      });
+
+      await service.register({
+        email: 'test@example.com',
+        username: 'sacha',
+        password: 'Password123!',
+      });
+
+      expect(mockDailyResultUpdateMany).not.toHaveBeenCalled();
     });
 
     it('doit lever une exception si l’email ou l’username existe déjà', async () => {

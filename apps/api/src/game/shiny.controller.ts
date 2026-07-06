@@ -14,6 +14,7 @@ import {
 import { Request, Response } from 'express';
 import { ShinyService } from './shiny.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { playerFromRequest } from '../common/player-identity';
 import type {
   ShinyChoiceRequest,
   ShinyChoiceResponse,
@@ -43,7 +44,7 @@ export class ShinyController {
       throw new BadRequestException('Mode invalide');
     }
     const level = body.level ?? 'FACILE';
-    return this.shinyService.startDaily(mode, level, req.user?.id);
+    return this.shinyService.startDaily(mode, level, playerFromRequest(req));
   }
 
   @Get('round/:roundId')

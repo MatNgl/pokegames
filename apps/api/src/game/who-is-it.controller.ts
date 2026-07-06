@@ -3,6 +3,7 @@ import { Request } from 'express';
 import { WhoIsItService } from './who-is-it.service';
 import { GameConfigService } from '../game-config/game-config.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { playerFromRequest } from '../common/player-identity';
 import {
   WhoIsItConfig,
   WhoIsItRoundState,
@@ -36,7 +37,7 @@ export class WhoIsItController {
       // exactOptionalPropertyTypes : ne pas assigner explicitement undefined a une propriete optionnelle.
       ...(config?.level ? { level: config.level } : {}),
     };
-    return this.whoIsItService.startRound(fullConfig, req.user?.id, config?.roundIndex ?? 1);
+    return this.whoIsItService.startRound(fullConfig, playerFromRequest(req), config?.roundIndex ?? 1);
   }
 
   @Get('round/:roundId')

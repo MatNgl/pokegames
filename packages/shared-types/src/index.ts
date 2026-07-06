@@ -32,6 +32,7 @@ export interface LeaderboardEntry {
   rank: number;
   username: string;
   isMe: boolean;
+  isGuest: boolean;
   won: boolean;
   attempts: number | null;
   score: number | null;
@@ -601,6 +602,9 @@ export interface RegisterRequest {
   email: string;
   username: string;
   password?: string; // optionnel dans la réponse ou type partagé si utilisé pour payload
+  // Identité invite du navigateur (localStorage) : si présente, les résultats du jour joués en
+  // invité sont rattachés au nouveau compte à l'inscription. Transmise via l'en-tête X-Guest-Id.
+  guestId?: string;
 }
 
 export interface LoginRequest {

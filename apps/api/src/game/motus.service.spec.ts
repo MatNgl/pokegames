@@ -88,6 +88,18 @@ describe('MotusService', () => {
       expect(mockSet).toHaveBeenCalled();
     });
 
+    it('enregistre l’identité invité dans la session (guestId + guestName, sans userId)', async () => {
+      await service.startDaily('FACILE', { guestId: 'g_abcd', guestName: 'player_abcd' });
+      const session = JSON.parse(mockSet.mock.calls[mockSet.mock.calls.length - 1]?.[1] as string) as {
+        userId?: string;
+        guestId?: string;
+        guestName?: string;
+      };
+      expect(session.userId).toBeUndefined();
+      expect(session.guestId).toBe('g_abcd');
+      expect(session.guestName).toBe('player_abcd');
+    });
+
     it('donne la première lettre dès le départ sans révéler le mot complet', async () => {
       const state = await service.startDaily();
 

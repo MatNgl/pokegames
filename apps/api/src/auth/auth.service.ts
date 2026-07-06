@@ -34,12 +34,29 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(req.password, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: req.email,
-        username: req.username,
-        passwordHash,
-      },
+    // Création du compte et rattachement des scores invités dans une même transaction : soit les
+    // deux réussissent, soit rien n'est écrit (jamais de compte orphelin avec des scores non migrés).
+    const guestId = req.guestId;
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: req.email,
+          username: req.username,
+          passwordHash,
+        },
+      });
+
+      // Le compte vient d'être créé (aucun résultat), donc aucun conflit d'unicité possible. Les
+      // lignes invité passent sous le userId, le pseudo invité est effacé pour que le classement
+      // affiche le nom du compte.
+      if (guestId) {
+        await tx.dailyResult.updateMany({
+          where: { guestId, userId: null },
+          data: { userId: created.id, guestId: null, guestName: null },
+        });
+      }
+
+      return created;
     });
 
     return {
