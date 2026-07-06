@@ -88,7 +88,7 @@ type MetricFields = Pick<
 /** Metrique d'affichage selon le jeu (essais, score, bonnes reponses). */
 export function resultMetric(result: MetricFields): string {
   if (result.attempts != null) {
-    return result.won ? `Gagné en ${result.attempts} essai${result.attempts > 1 ? 's' : ''}` : 'Perdu';
+    return result.won ? ` ${result.attempts} essai${result.attempts > 1 ? 's' : ''}` : 'Perdu';
   }
   if (result.correctCount != null && result.totalRounds != null) {
     return `${result.correctCount}/${result.totalRounds} bonnes réponses`;
