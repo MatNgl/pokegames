@@ -403,7 +403,12 @@ export class WhoIsItService {
     };
   }
 
-  async submitGuess(roundId: string, guess: string, userId?: string): Promise<WhoIsItGuessResponse> {
+  async submitGuess(
+    roundId: string,
+    guess: string,
+    userId?: string,
+    carriedAttempts?: number,
+  ): Promise<WhoIsItGuessResponse> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
     if (!raw) {
       throw new NotFoundException('Manche introuvable ou expirée');
@@ -427,7 +432,6 @@ export class WhoIsItService {
 
     if (!isCorrect) {
       session.mistakesCount++;
-      session.currentScore = Math.max(0, session.currentScore - 15);
       const visuals = this.computeVisuals(session.level, session.mistakesCount);
       session.zoomRatio = visuals.zoomRatio;
       session.rotationAngle = visuals.rotationAngle;
@@ -451,14 +455,18 @@ export class WhoIsItService {
     }
 
     // Victoire !
-    return this.finalizeRound(session, true, guess);
+    return this.finalizeRound(session, true, guess, carriedAttempts);
   }
 
   /**
-   * Passe la manche sans deviner : revele le Pokemon comme une victoire, mais compte comme une
-   * mauvaise reponse (meme penalite que soumettre un mauvais nom) pour rester equitable au score.
+   * Passe la manche sans deviner : revele le Pokemon comme une victoire, mais coute 3 essais au
+   * classement (contre 1 pour une manche trouvee du premier coup), pour dissuader de tout passer.
    */
-  async skipRound(roundId: string, userId?: string): Promise<WhoIsItGuessResponse> {
+  async skipRound(
+    roundId: string,
+    userId?: string,
+    carriedAttempts?: number,
+  ): Promise<WhoIsItGuessResponse> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
     if (!raw) {
       throw new NotFoundException('Manche introuvable ou expirée');
@@ -474,9 +482,7 @@ export class WhoIsItService {
       session.userId = userId;
     }
 
-    session.currentScore = Math.max(0, session.currentScore - 15);
-
-    return this.finalizeRound(session, false, '(passé)');
+    return this.finalizeRound(session, false, '(passé)', carriedAttempts);
   }
 
   /** Cloture une manche (trouvee ou passee) : revele le sprite, journalise et renvoie l'etat final. */
@@ -484,6 +490,7 @@ export class WhoIsItService {
     session: InternalRoundSession,
     isCorrect: boolean,
     guess: string,
+    carriedAttempts?: number,
   ): Promise<WhoIsItGuessResponse> {
     session.status = 'SOLVED';
     session.zoomRatio = 1.0;
@@ -530,10 +537,13 @@ export class WhoIsItService {
     this.eventEmitter.emit('game.round.completed', auditEvent);
 
     // Defi quotidien termine (derniere manche resolue ou passee) : enregistrement du resultat du joueur.
+    // Classement par nombre d'essais (plus de points) : une manche trouvee coute (erreurs + 1),
+    // une manche passee coute 3 essais. carriedAttempts porte le total des manches precedentes.
     if (session.mode === 'DAILY' && session.roundIndex >= session.totalRounds && effectiveUserId) {
+      const roundCost = session.mistakesCount + (isCorrect ? 1 : 3);
       await this.dailyResult.record(effectiveUserId, this.HISTORY_GAME, session.level, new Date(), {
         won: true,
-        score: session.currentScore,
+        attempts: (carriedAttempts ?? 0) + roundCost,
         totalRounds: session.totalRounds,
         durationSeconds,
       });

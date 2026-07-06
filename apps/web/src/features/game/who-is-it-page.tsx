@@ -259,7 +259,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
     setFeedback(null);
     try {
       const attempt = guess.trim();
-      const res = await submitGuess(round.roundId, attempt);
+      const res = await submitGuess(round.roundId, attempt, totalAttempts);
       if (res.isCorrect) {
         revealRound(res);
       } else {
@@ -292,14 +292,14 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
   };
 
   // Passer la manche : le joueur ne connaît pas le Pokémon malgré les indices. Révèle la réponse et
-  // compte comme un essai supplémentaire (même poids qu'une bonne réponse), sans jamais bloquer.
+  // compte 3 essais (contre 1 pour une bonne réponse), pour dissuader de tout passer, sans bloquer.
   const onSkip = async () => {
     if (!round || busy) return;
     setBusy(true);
     setError(null);
     setFeedback(null);
     try {
-      const res = await skipRound(round.roundId);
+      const res = await skipRound(round.roundId, totalAttempts);
       revealRound(res);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Impossible de passer cette manche'));
@@ -344,7 +344,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
 
   const advance = () => {
     if (!round || !result) return;
-    const carried = totalAttempts + result.mistakesCount + 1;
+    const carried = totalAttempts + result.mistakesCount + (result.skipped ? 3 : 1);
     if (round.roundIndex >= round.totalRounds) {
       finishGame(carried);
     } else {

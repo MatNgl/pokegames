@@ -211,7 +211,7 @@ describe('WhoIsItService', () => {
       expect(mockEmit).toHaveBeenCalledWith('game.round.completed', expect.anything());
     });
 
-    it('doit pénaliser une mauvaise réponse (-15 points) sans clore la manche', async () => {
+    it("doit compter une erreur sur une mauvaise réponse sans clore la manche (score inchangé, plus de points)", async () => {
       const mockSession = {
         roundId: 'test-round-id',
         sessionHash: 'test-session-hash',
@@ -235,14 +235,14 @@ describe('WhoIsItService', () => {
 
       expect(res.isCorrect).toBe(false);
       expect(res.status).toBe('PLAYING');
-      expect(res.currentScore).toBe(85);
+      expect(res.currentScore).toBe(100);
       expect(res.mistakesCount).toBe(1);
       expect(res.revealedPokemon).toBeNull();
     });
   });
 
   describe('skipRound', () => {
-    it('doit révéler le Pokémon, pénaliser comme une mauvaise réponse et clore la manche', async () => {
+    it('doit révéler le Pokémon et clore la manche sans toucher au score (classement par essais)', async () => {
       const mockSession = {
         roundId: 'test-round-id',
         sessionHash: 'test-session-hash',
@@ -268,7 +268,7 @@ describe('WhoIsItService', () => {
       expect(res.isCorrect).toBe(false);
       expect(res.skipped).toBe(true);
       expect(res.status).toBe('SOLVED');
-      expect(res.currentScore).toBe(85);
+      expect(res.currentScore).toBe(100); // plus de points : le classement se fait au nombre d'essais
       expect(res.mistakesCount).toBe(2); // inchangé : le "passer" ne compte pas comme une erreur en plus
       expect(res.revealedPokemon?.nameFr).toBe('Pikachu');
       expect(mockRevealSpriteSession).toHaveBeenCalledWith('test-session-hash');

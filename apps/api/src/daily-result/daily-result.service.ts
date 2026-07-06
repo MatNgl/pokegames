@@ -94,18 +94,14 @@ export class DailyResultService {
   }
 
   /**
-   * Ordre du classement selon le jeu : Motus (gagne puis moins d'essais), Silhouette (meilleur
-   * score), autres (plus de bonnes reponses). Egalite departagee par la duree (plus rapide devant).
+   * Ordre du classement selon le jeu : Motus et Silhouette (gagne puis moins d'essais), autres
+   * (plus de bonnes reponses). Egalite departagee par la duree (plus rapide devant).
    */
   private compare(gameType: string, a: LeaderboardRow, b: LeaderboardRow): number {
     const duration = (a.durationSeconds ?? Infinity) - (b.durationSeconds ?? Infinity);
-    if (gameType === 'MOTUS') {
+    if (gameType === 'MOTUS' || gameType === 'WHO_IS_IT') {
       if ((a.won ?? false) !== (b.won ?? false)) return a.won ? -1 : 1;
       const diff = (a.attempts ?? Infinity) - (b.attempts ?? Infinity);
-      return diff !== 0 ? diff : duration;
-    }
-    if (gameType === 'WHO_IS_IT') {
-      const diff = (b.score ?? -Infinity) - (a.score ?? -Infinity);
       return diff !== 0 ? diff : duration;
     }
     const diff = (b.correctCount ?? -Infinity) - (a.correctCount ?? -Infinity);

@@ -19,13 +19,27 @@ export async function requestHint(
   return res.data;
 }
 
-export async function submitGuess(roundId: string, guess: string): Promise<WhoIsItGuessResponse> {
-  const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/guess', { roundId, guess });
+export async function submitGuess(
+  roundId: string,
+  guess: string,
+  carriedAttempts?: number,
+): Promise<WhoIsItGuessResponse> {
+  const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/guess', {
+    roundId,
+    guess,
+    carriedAttempts,
+  });
   return res.data;
 }
 
-export async function skipRound(roundId: string): Promise<WhoIsItGuessResponse> {
-  const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/skip', { roundId });
+export async function skipRound(
+  roundId: string,
+  carriedAttempts?: number,
+): Promise<WhoIsItGuessResponse> {
+  const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/skip', {
+    roundId,
+    carriedAttempts,
+  });
   return res.data;
 }
 

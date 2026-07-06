@@ -256,6 +256,7 @@ export interface WhoIsItRoundState {
 export interface WhoIsItGuessRequest {
   roundId: string;
   guess: string;
+  carriedAttempts?: number; // total d'essais des manches precedentes (classement par essais)
 }
 
 export interface WhoIsItHintRequest {
@@ -265,6 +266,7 @@ export interface WhoIsItHintRequest {
 
 export interface WhoIsItSkipRequest {
   roundId: string;
+  carriedAttempts?: number; // total d'essais des manches precedentes (classement par essais)
 }
 
 export interface WhoIsItGuessResponse {

@@ -56,7 +56,7 @@ export class WhoIsItController {
     @Req() req: Request & { user?: AuthenticatedUser },
     @Body() body: WhoIsItGuessRequest,
   ): Promise<WhoIsItGuessResponse> {
-    return this.whoIsItService.submitGuess(body.roundId, body.guess, req.user?.id);
+    return this.whoIsItService.submitGuess(body.roundId, body.guess, req.user?.id, body.carriedAttempts);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -65,6 +65,6 @@ export class WhoIsItController {
     @Req() req: Request & { user?: AuthenticatedUser },
     @Body() body: WhoIsItSkipRequest,
   ): Promise<WhoIsItGuessResponse> {
-    return this.whoIsItService.skipRound(body.roundId, req.user?.id);
+    return this.whoIsItService.skipRound(body.roundId, req.user?.id, body.carriedAttempts);
   }
 }
