@@ -50,6 +50,12 @@ interface TrueShinySession {
 
 const TRUE_SHINY_LEVELS: TrueShinyLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE'];
 
+// Palette de 10 filtres distincts (rotations de teinte en degres), d'amplitudes variees : des
+// subtils (proches de l'intacte, donc durs a distinguer) aux francs. On en tire gridSize-1 par
+// manche, sans repetition, pour que les leurres ne se ressemblent jamais et que l'intacte ne
+// saute pas aux yeux (notamment quand il y a 6 cartes).
+const TRUE_SHINY_HUE_FILTERS = [15, -22, 30, -45, 60, -80, 105, -135, 160, -175];
+
 @Injectable()
 export class TrueShinyService {
   private readonly REDIS_PREFIX = 'game_trueshiny:';
@@ -121,23 +127,23 @@ export class TrueShinyService {
     used: Set<number>,
   ): RoundDef[] {
     const { roundsCount, levels } = this.gameConfig.trueShiny();
-    const { gridSize, hueMin, hueMax } = levels[level];
+    const { gridSize } = levels[level];
     const available = pool.filter((p) => !used.has(p.id));
     const pokemons = this.shuffle(available, rng).slice(0, roundsCount);
     for (const p of pokemons) used.add(p.id);
     const rounds: RoundDef[] = [];
     for (const p of pokemons) {
       const answerSlot = Math.floor(rng() * gridSize);
+      // Filtres distincts pour les leurres : jamais deux fois le meme dans la manche.
+      const decoyFilters = this.shuffle([...TRUE_SHINY_HUE_FILTERS], rng).slice(0, gridSize - 1);
       const slots: SlotDef[] = [];
+      let d = 0;
       for (let s = 0; s < gridSize; s++) {
         if (s === answerSlot) {
           slots.push({ hue: 0 });
           continue;
         }
-        // Amplitude dans la plage du niveau, signe aleatoire, jamais nulle.
-        const amplitude = Math.round(hueMin + rng() * (hueMax - hueMin));
-        const sign = rng() < 0.5 ? -1 : 1;
-        slots.push({ hue: amplitude * sign });
+        slots.push({ hue: decoyFilters[d++] ?? 90 });
       }
       rounds.push({ pokemonId: p.id, name: p.name, slots, answerSlot });
     }
