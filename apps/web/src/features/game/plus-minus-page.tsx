@@ -10,6 +10,7 @@ import type {
 } from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
+import { useActiveLevel } from './active-level';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -74,12 +75,12 @@ interface EndInfo {
 }
 
 export function PlusMinusPage() {
-  const [level, setLevel] = useState<PlusMinusLevel | null>(null);
+  const [level, pickLevel, backToSelect] = useActiveLevel<PlusMinusLevel>('plus-minus');
 
   if (!level) {
-    return <PlusMinusLevelSelect onPick={setLevel} />;
+    return <PlusMinusLevelSelect onPick={pickLevel} />;
   }
-  return <PlusMinusGame key={level} level={level} onBack={() => setLevel(null)} />;
+  return <PlusMinusGame key={level} level={level} onBack={backToSelect} />;
 }
 
 function PlusMinusLevelSelect({ onPick }: { onPick: (level: PlusMinusLevel) => void }) {

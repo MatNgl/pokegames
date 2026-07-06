@@ -11,6 +11,7 @@ import type {
 } from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
+import { useActiveLevel } from './active-level';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -81,12 +82,12 @@ interface EndInfo {
 }
 
 export function ShinyPage({ mode }: ShinyPageProps) {
-  const [level, setLevel] = useState<ShinyLevel | null>(null);
+  const [level, pickLevel, backToSelect] = useActiveLevel<ShinyLevel>(`shiny:${mode}`);
 
   if (!level) {
-    return <ShinyLevelSelect mode={mode} onPick={setLevel} />;
+    return <ShinyLevelSelect mode={mode} onPick={pickLevel} />;
   }
-  return <ShinyGame key={`${mode}-${level}`} mode={mode} level={level} onBack={() => setLevel(null)} />;
+  return <ShinyGame key={`${mode}-${level}`} mode={mode} level={level} onBack={backToSelect} />;
 }
 
 function ShinyLevelSelect({ mode, onPick }: { mode: ShinyMode; onPick: (level: ShinyLevel) => void }) {

@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 
 jest.mock('bcrypt');
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
@@ -15,7 +16,8 @@ describe('AuthService', () => {
   let mockPrismaCreate: jest.Mock;
   let mockPrismaFindUnique: jest.Mock;
   let mockPrismaUpdate: jest.Mock;
-  let mockDailyResultUpdateMany: jest.Mock;
+  let mockClaimGuestResultsTx: jest.Mock;
+  let mockClaimGuestResults: jest.Mock;
   let mockJwtSign: jest.Mock;
   let mockRedisSet: jest.Mock;
   let mockRedisGet: jest.Mock;
@@ -26,7 +28,8 @@ describe('AuthService', () => {
     mockPrismaCreate = jest.fn();
     mockPrismaFindUnique = jest.fn();
     mockPrismaUpdate = jest.fn().mockResolvedValue({});
-    mockDailyResultUpdateMany = jest.fn().mockResolvedValue({ count: 0 });
+    mockClaimGuestResultsTx = jest.fn().mockResolvedValue(undefined);
+    mockClaimGuestResults = jest.fn().mockResolvedValue(undefined);
     mockJwtSign = jest.fn().mockReturnValue('access-token-123');
     mockRedisSet = jest.fn().mockResolvedValue(undefined);
     mockRedisGet = jest.fn();
@@ -39,9 +42,6 @@ describe('AuthService', () => {
         findUnique: mockPrismaFindUnique,
         update: mockPrismaUpdate,
       },
-      dailyResult: {
-        updateMany: mockDailyResultUpdateMany,
-      },
     };
     const mockPrismaService = {
       ...prismaModels,
@@ -51,6 +51,10 @@ describe('AuthService', () => {
 
     const mockJwtService = { sign: mockJwtSign };
     const mockRedisService = { set: mockRedisSet, get: mockRedisGet, del: mockRedisDel };
+    const mockDailyResultService = {
+      claimGuestResultsTx: mockClaimGuestResultsTx,
+      claimGuestResults: mockClaimGuestResults,
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -58,6 +62,7 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: RedisService, useValue: mockRedisService },
+        { provide: DailyResultService, useValue: mockDailyResultService },
       ],
     }).compile();
 
@@ -109,10 +114,11 @@ describe('AuthService', () => {
         guestId: 'g_abcd1234',
       });
 
-      expect(mockDailyResultUpdateMany).toHaveBeenCalledWith({
-        where: { guestId: 'g_abcd1234', userId: null },
-        data: { userId: 'user-1', guestId: null, guestName: null },
-      });
+      expect(mockClaimGuestResultsTx).toHaveBeenCalledWith(
+        expect.anything(),
+        'user-1',
+        'g_abcd1234',
+      );
     });
 
     it('ne rattache aucun score en absence de guestId', async () => {
@@ -132,7 +138,7 @@ describe('AuthService', () => {
         password: 'Password123!',
       });
 
-      expect(mockDailyResultUpdateMany).not.toHaveBeenCalled();
+      expect(mockClaimGuestResultsTx).not.toHaveBeenCalled();
     });
 
     it('doit lever une exception si l’email ou l’username existe déjà', async () => {
@@ -165,6 +171,22 @@ describe('AuthService', () => {
         'user-1',
         604800,
       );
+    });
+
+    it('rattache les scores invites au compte quand un guestId est fourni', async () => {
+      mockPrismaFindFirst.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        username: 'sacha',
+        passwordHash: 'hashed-pwd',
+        role: 'USER',
+        createdAt: new Date(),
+      });
+      mockedBcrypt.compare.mockImplementation(async () => true);
+
+      await service.login({ emailOrUsername: 'sacha', password: 'Password123!' }, 'g_abcd1234');
+
+      expect(mockClaimGuestResults).toHaveBeenCalledWith('user-1', 'g_abcd1234');
     });
 
     it('doit lever UnauthorizedException en cas de mauvais mot de passe', async () => {

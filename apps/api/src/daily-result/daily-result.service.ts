@@ -127,6 +127,61 @@ export class DailyResultService {
     }
   }
 
+  /**
+   * Rattache a un compte les resultats du jour joues en invite (guestId). Les lignes invitees
+   * passent sous le userId, le pseudo invite est efface pour que le classement affiche le nom du
+   * compte. Si le compte possede deja un resultat pour le meme defi (jeu x scope x jour), la ligne
+   * invitee est supprimee au lieu d'etre migree, pour ne pas violer l'unicite userId x defi.
+   * Opere sur un client de transaction (utilise a l'inscription, dans la meme transaction que la
+   * creation du compte).
+   */
+  async claimGuestResultsTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    guestId: string,
+  ): Promise<void> {
+    const guestRows = await tx.dailyResult.findMany({
+      where: { guestId, userId: null },
+      select: { id: true, gameType: true, scope: true, dayDate: true },
+    });
+    if (guestRows.length === 0) {
+      return;
+    }
+    const owned = await tx.dailyResult.findMany({
+      where: {
+        userId,
+        OR: guestRows.map((r) => ({ gameType: r.gameType, scope: r.scope, dayDate: r.dayDate })),
+      },
+      select: { gameType: true, scope: true, dayDate: true },
+    });
+    const ownedKeys = new Set(
+      owned.map((o) => `${o.gameType}|${o.scope}|${o.dayDate.toISOString()}`),
+    );
+    const toMigrate: string[] = [];
+    const toDrop: string[] = [];
+    for (const r of guestRows) {
+      const key = `${r.gameType}|${r.scope}|${r.dayDate.toISOString()}`;
+      (ownedKeys.has(key) ? toDrop : toMigrate).push(r.id);
+    }
+    if (toMigrate.length > 0) {
+      await tx.dailyResult.updateMany({
+        where: { id: { in: toMigrate } },
+        data: { userId, guestId: null, guestName: null },
+      });
+    }
+    if (toDrop.length > 0) {
+      await tx.dailyResult.deleteMany({ where: { id: { in: toDrop } } });
+    }
+  }
+
+  /** Variante autonome (ouvre sa propre transaction) : rattachement lors de la connexion a un compte. */
+  async claimGuestResults(userId: string, guestId: string): Promise<void> {
+    if (!guestId) {
+      return;
+    }
+    await this.prisma.$transaction((tx) => this.claimGuestResultsTx(tx, userId, guestId));
+  }
+
   /** Resultats du joueur pour un jour donne (statut d'accueil, quetes). */
   async listForDay(userId: string, day: Date): Promise<DailyResultRow[]> {
     const rows = await this.prisma.dailyResult.findMany({

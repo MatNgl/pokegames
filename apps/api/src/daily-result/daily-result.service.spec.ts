@@ -153,6 +153,47 @@ describe('DailyResultService', () => {
     });
   });
 
+  describe('claimGuestResultsTx', () => {
+    it('migre les lignes invitees non conflictuelles et supprime les doublons du compte', async () => {
+      const day = new Date(Date.UTC(2026, 6, 1));
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([
+          { id: 'r1', gameType: 'MOTUS', scope: 'FACILE', dayDate: day },
+          { id: 'r2', gameType: 'SHINY', scope: 'FIND_SHINY:MOYEN', dayDate: day },
+        ])
+        .mockResolvedValueOnce([{ gameType: 'MOTUS', scope: 'FACILE', dayDate: day }]);
+      const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      const deleteMany = jest.fn().mockResolvedValue({ count: 1 });
+      const tx = {
+        dailyResult: { findMany, updateMany, deleteMany },
+      } as unknown as Prisma.TransactionClient;
+
+      await service.claimGuestResultsTx(tx, 'user-1', 'g_abcd');
+
+      // r2 (aucun equivalent chez le compte) est migre ; r1 (MOTUS/FACILE deja possede) est supprime.
+      expect(updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['r2'] } },
+        data: { userId: 'user-1', guestId: null, guestName: null },
+      });
+      expect(deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['r1'] } } });
+    });
+
+    it('aucune ligne invitee : ne migre ni ne supprime rien', async () => {
+      const findMany = jest.fn().mockResolvedValue([]);
+      const updateMany = jest.fn();
+      const deleteMany = jest.fn();
+      const tx = {
+        dailyResult: { findMany, updateMany, deleteMany },
+      } as unknown as Prisma.TransactionClient;
+
+      await service.claimGuestResultsTx(tx, 'user-1', 'g_none');
+
+      expect(updateMany).not.toHaveBeenCalled();
+      expect(deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
   it('record est idempotent : ignore le doublon (verrou strict)', async () => {
     const dup = new Prisma.PrismaClientKnownRequestError('dup', {
       code: 'P2002',

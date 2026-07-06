@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import axios from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
 import type { UserDTO } from '@pokegames/shared-types';
 import { setAccessToken } from '@/lib/api';
 import { clearGuestIdentity } from '@/lib/guest-identity';
@@ -48,6 +49,7 @@ function bootstrapSession(): Promise<UserDTO | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDTO | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let active = true;
@@ -92,18 +94,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [initializing, user]);
 
-  const login = useCallback(async (emailOrUsername: string, password: string) => {
-    const session = await loginRequest(emailOrUsername, password);
-    setAccessToken(session.accessToken);
-    setUser(session.user);
-  }, []);
+  const login = useCallback(
+    async (emailOrUsername: string, password: string) => {
+      // L'intercepteur joint l'en-tete X-Guest-Id a cette requete : le serveur rattache au compte
+      // les scores joues en invite. On efface ensuite l'identite invite locale et on invalide les
+      // requetes en cache (classements, statut du jour) pour qu'elles refletent le compte connecte.
+      const session = await loginRequest(emailOrUsername, password);
+      setAccessToken(session.accessToken);
+      setUser(session.user);
+      clearGuestIdentity();
+      void queryClient.invalidateQueries();
+    },
+    [queryClient],
+  );
 
   const register = useCallback(
     async (email: string, username: string, password: string) => {
       // L'intercepteur joint l'en-tete X-Guest-Id a cette requete non authentifiee : le serveur
-      // rattache les scores invites au compte cree. On efface ensuite l'identite invite locale.
+      // rattache les scores invites au compte cree. La connexion qui suit efface l'identite invite.
       await registerRequest(email, username, password);
-      clearGuestIdentity();
       await login(email, password);
     },
     [login],

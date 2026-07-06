@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import type { MotusLetterState, MotusLevel, MotusRoundState } from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
+import { useActiveLevel } from './active-level';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -57,7 +58,7 @@ const LEVEL_LABEL: Record<MotusLevel, string> = {
 };
 
 export function MotusPage() {
-  const [level, setLevel] = useState<MotusLevel | null>(null);
+  const [level, pickLevel, backToSelect] = useActiveLevel<MotusLevel>('motus');
 
   if (!level) {
     return (
@@ -65,11 +66,11 @@ export function MotusPage() {
         title="Poké-Motus"
         rules={MOTUS_RULES}
         options={LEVELS.map((l) => ({ ...l, status: motusDailyStatus(l.level) }))}
-        onPick={setLevel}
+        onPick={pickLevel}
       />
     );
   }
-  return <MotusGame key={level} level={level} onBack={() => setLevel(null)} />;
+  return <MotusGame key={level} level={level} onBack={backToSelect} />;
 }
 
 function MotusGame({ level, onBack }: { level: MotusLevel; onBack: () => void }) {

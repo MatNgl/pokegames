@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { DailyResultService } from '../daily-result/daily-result.service';
 import { UserDTO, RegisterRequest, LoginRequest } from '@pokegames/shared-types';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
+    private readonly dailyResult: DailyResultService,
   ) {}
 
   async register(req: RegisterRequest): Promise<UserDTO> {
@@ -46,14 +48,11 @@ export class AuthService {
         },
       });
 
-      // Le compte vient d'être créé (aucun résultat), donc aucun conflit d'unicité possible. Les
-      // lignes invité passent sous le userId, le pseudo invité est effacé pour que le classement
-      // affiche le nom du compte.
+      // Les lignes invité passent sous le userId, le pseudo invité est effacé pour que le classement
+      // affiche le nom du compte. Dans la même transaction que la création (jamais de compte
+      // orphelin avec des scores non migrés).
       if (guestId) {
-        await tx.dailyResult.updateMany({
-          where: { guestId, userId: null },
-          data: { userId: created.id, guestId: null, guestName: null },
-        });
+        await this.dailyResult.claimGuestResultsTx(tx, created.id, guestId);
       }
 
       return created;
@@ -68,7 +67,10 @@ export class AuthService {
     };
   }
 
-  async login(req: LoginRequest): Promise<{ accessToken: string; refreshToken: string; user: UserDTO }> {
+  async login(
+    req: LoginRequest,
+    guestId?: string,
+  ): Promise<{ accessToken: string; refreshToken: string; user: UserDTO }> {
     if (!req.emailOrUsername || !req.password) {
       throw new BadRequestException('Identifiants incomplets');
     }
@@ -104,6 +106,16 @@ export class AuthService {
       user.id,
       this.REFRESH_TTL_SECONDS,
     );
+
+    // Rattachement des scores joués en invité sur ce navigateur (best-effort : ne doit jamais faire
+    // échouer la connexion). Les lignes invité passent sous le compte et affichent désormais son nom.
+    if (guestId) {
+      try {
+        await this.dailyResult.claimGuestResults(user.id, guestId);
+      } catch {
+        // Échec du rattachement (aléa base) : la connexion reste valide, les scores restent invités.
+      }
+    }
 
     return { accessToken, refreshToken, user: userDto };
   }

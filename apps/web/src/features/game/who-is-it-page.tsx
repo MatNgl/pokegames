@@ -42,6 +42,7 @@ import { levelColor, LEVEL_BADGE_TEXT, LEVEL_BADGE_TEXT_SHADOW } from './level-c
 import { GuessAutocomplete } from './components/guess-autocomplete';
 import { HintIcons } from './components/hint-icons';
 import { LevelSelectScreen } from './components/level-select-screen';
+import { useActiveLevel } from './active-level';
 import { RoundResult } from './components/round-result';
 import { SilhouetteStage } from './components/silhouette-stage';
 import { WhoIsItSkeleton } from './components/who-is-it-skeleton';
@@ -93,7 +94,7 @@ function RoundPills({ current, total }: { current: number; total: number }) {
 }
 
 export function WhoIsItPage() {
-  const [level, setLevel] = useState<WhoIsItLevel | null>(null);
+  const [level, pickLevel, backToSelect] = useActiveLevel<WhoIsItLevel>('who-is-it');
 
   if (!level) {
     return (
@@ -101,11 +102,11 @@ export function WhoIsItPage() {
         title="Quel est ce Pokémon ?"
         rules={WHO_IS_IT_RULES}
         options={LEVELS.map((l) => ({ ...l, status: whoIsItDailyStatus(l.level) }))}
-        onPick={setLevel}
+        onPick={pickLevel}
       />
     );
   }
-  return <WhoIsItGame key={level} level={level} onBack={() => setLevel(null)} />;
+  return <WhoIsItGame key={level} level={level} onBack={backToSelect} />;
 }
 
 function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => void }) {

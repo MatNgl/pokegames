@@ -38,8 +38,14 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() body: LoginRequest, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, refreshToken, user } = await this.authService.login(body);
+  async login(
+    @Body() body: LoginRequest,
+    @Req() req: Request & { user?: AuthUser },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Identité invite via l'en-tête X-Guest-Id : rattache au compte les scores joués en invité.
+    const guestId = playerFromRequest(req).guestId;
+    const { accessToken, refreshToken, user } = await this.authService.login(body, guestId);
 
     res.cookie('refreshToken', refreshToken, {
       ...REFRESH_COOKIE_OPTIONS,

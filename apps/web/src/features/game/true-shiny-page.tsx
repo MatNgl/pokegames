@@ -10,6 +10,7 @@ import type {
 } from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
+import { useActiveLevel } from './active-level';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -60,12 +61,12 @@ interface EndInfo {
 }
 
 export function TrueShinyPage() {
-  const [level, setLevel] = useState<TrueShinyLevel | null>(null);
+  const [level, pickLevel, backToSelect] = useActiveLevel<TrueShinyLevel>('true-shiny');
 
   if (!level) {
-    return <LevelSelect onPick={setLevel} />;
+    return <LevelSelect onPick={pickLevel} />;
   }
-  return <TrueShinyGame key={level} level={level} onBack={() => setLevel(null)} />;
+  return <TrueShinyGame key={level} level={level} onBack={backToSelect} />;
 }
 
 function LevelSelect({ onPick }: { onPick: (level: TrueShinyLevel) => void }) {
