@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import axios from 'axios';
 import type { UserDTO } from '@pokegames/shared-types';
 import { setAccessToken } from '@/lib/api';
 import { loginRequest, logoutRequest, refreshRequest, registerRequest } from './auth-api';
@@ -30,8 +31,14 @@ function bootstrapSession(): Promise<UserDTO | null> {
       setAccessToken(session.accessToken);
       return session.user;
     })
-    .catch(() => {
+    .catch((error: unknown) => {
       setAccessToken(null);
+      // Echec reseau (API injoignable, aucune reponse HTTP) : on ne memorise pas l'echec, afin de
+      // pouvoir reessayer des que l'API redevient joignable, sans imposer un rechargement complet de
+      // la page. Un vrai refus (401 : pas de session) reste memorise, l'utilisateur est un invite.
+      if (axios.isAxiosError(error) && !error.response) {
+        bootstrapPromise = null;
+      }
       return null;
     });
   return bootstrapPromise;
@@ -53,6 +60,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
     };
   }, []);
+
+  // Reprise apres un echec reseau au demarrage : tant qu'aucune session n'est restauree et que la
+  // derniere tentative etait un echec reseau (bootstrapPromise remis a null), on reessaye en
+  // arriere-plan avec un delai croissant. S'arrete des qu'une session revient ou qu'un refus 401 ferme
+  // le cas (invite legitime, bootstrapPromise conserve). Corrige le cas "connecte mais vu invite" quand
+  // l'API etait injoignable au chargement, sans devoir rafraichir la page.
+  useEffect(() => {
+    if (initializing || user || bootstrapPromise !== null) return;
+    let active = true;
+    let delay = 2000;
+    let timer: ReturnType<typeof setTimeout>;
+    const attempt = () => {
+      void bootstrapSession().then((restored) => {
+        if (!active) return;
+        if (restored) {
+          setUser(restored);
+          return;
+        }
+        if (bootstrapPromise === null) {
+          delay = Math.min(Math.round(delay * 1.5), 15000);
+          timer = setTimeout(attempt, delay);
+        }
+      });
+    };
+    timer = setTimeout(attempt, delay);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [initializing, user]);
 
   const login = useCallback(async (emailOrUsername: string, password: string) => {
     const session = await loginRequest(emailOrUsername, password);

@@ -1,18 +1,20 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 import type { PokedexCollectResponse, PokedexSpawnDTO } from '@pokegames/shared-types';
 import { API_ORIGIN } from '@/lib/env';
+import { useAuth } from '@/features/auth/auth-context';
 import { collectSpawn, getSpawns, ROUTE_ZONE } from './pokedex-api';
 
 // Couche globale des easter eggs : une petite silhouette cachée par zone (écran), fixe pour la
-// journée. Cliquer la collecte et l'ajoute au Pokédex (ou invite à se connecter pour un invité).
+// journée. Réservée aux utilisateurs connectés : cliquer la collecte et l'ajoute à leur Pokédex.
 export function EasterEggLayer() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const reduce = useReducedMotion();
+  const { user } = useAuth();
   const [collected, setCollected] = useState<Set<string>>(new Set());
   const [reveal, setReveal] = useState<PokedexCollectResponse | null>(null);
 
@@ -21,6 +23,7 @@ export function EasterEggLayer() {
   const { data: spawns = [] } = useQuery({
     queryKey: ['pokedex-spawns'],
     queryFn: getSpawns,
+    enabled: Boolean(user),
     staleTime: 60_000,
   });
 
@@ -34,10 +37,9 @@ export function EasterEggLayer() {
     },
   });
 
-  // Apparition de la zone courante, non encore collectée localement.
-  const spawn: PokedexSpawnDTO | undefined = zone
-    ? spawns.find((s) => s.zone === zone && !collected.has(s.token))
-    : undefined;
+  // Apparition de la zone courante, non encore collectée localement (connecté uniquement).
+  const spawn: PokedexSpawnDTO | undefined =
+    user && zone ? spawns.find((s) => s.zone === zone && !collected.has(s.token)) : undefined;
 
   return (
     <>
@@ -110,14 +112,7 @@ export function EasterEggLayer() {
                 <p className="text-xs font-semibold text-muted">
                   N°{String(reveal.pokemon.pokedexId).padStart(4, '0')} · Génération {reveal.pokemon.generation}
                 </p>
-                {reveal.requiresLogin ? (
-                  <p className="text-sm font-semibold text-muted">
-                    <Link to="/connexion" className="text-primary underline">
-                      Connecte-toi
-                    </Link>{' '}
-                    pour l'ajouter à ton Pokédex.
-                  </p>
-                ) : reveal.collected ? (
+                {reveal.collected ? (
                   <p className="text-sm font-bold text-go-shadow">Ajouté à ton Pokédex.</p>
                 ) : (
                   <p className="text-sm font-semibold text-muted">Tu l'avais déjà.</p>

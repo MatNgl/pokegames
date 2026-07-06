@@ -100,6 +100,7 @@ export function PokedexPage() {
   const navigate = useNavigate();
   const { user, initializing } = useAuth();
   const [gen, setGen] = useState<number | 'all'>('all');
+  const [ownedOnly, setOwnedOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -125,9 +126,10 @@ export function PokedexPage() {
   const collectedIds = useMemo(() => new Set(collection?.collectedIds ?? []), [collection]);
 
   const filtered = useMemo(() => {
-    const list = gen === 'all' ? catalog : catalog.filter((p) => p.generation === gen);
+    let list = gen === 'all' ? catalog : catalog.filter((p) => p.generation === gen);
+    if (ownedOnly) list = list.filter((p) => collectedIds.has(p.id));
     return [...list].sort((a, b) => a.pokedexId - b.pokedexId);
-  }, [catalog, gen]);
+  }, [catalog, gen, ownedOnly, collectedIds]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -135,6 +137,12 @@ export function PokedexPage() {
 
   const setGeneration = (g: number | 'all') => {
     setGen(g);
+    setPage(0);
+    setSelected(null);
+  };
+
+  const toggleOwnedOnly = () => {
+    setOwnedOnly((v) => !v);
     setPage(0);
     setSelected(null);
   };
@@ -205,6 +213,19 @@ export function PokedexPage() {
                   {g}
                 </FilterChip>
               ))}
+              <button
+                type="button"
+                onClick={toggleOwnedOnly}
+                aria-pressed={ownedOnly}
+                className={cn(
+                  'ml-1 rounded-control border-2 px-2.5 py-1 font-display text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                  ownedOnly
+                    ? 'border-go-shadow bg-go text-go-foreground'
+                    : 'border-border-strong bg-surface-2/60 text-muted hover:border-primary hover:text-foreground',
+                )}
+              >
+                Possédés
+              </button>
             </div>
           </Card>
 
@@ -213,6 +234,12 @@ export function PokedexPage() {
             <Card className="flex-1 border-4 border-border-strong p-3 sm:p-4">
               {catalogLoading ? (
                 <Spinner className="mx-auto my-10 h-6 w-6 text-primary" />
+              ) : filtered.length === 0 ? (
+                <p className="py-10 text-center text-sm font-semibold text-muted">
+                  {ownedOnly
+                    ? "Tu n'as pas encore capturé de Pokémon ici. Explore le site pour en trouver !"
+                    : 'Aucun Pokémon à afficher.'}
+                </p>
               ) : (
                 <>
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
