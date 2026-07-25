@@ -1,22 +1,37 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminGuard } from '../auth/admin.guard';
-import type { AdminAuditLogEntry, AdminPage, AdminStats } from '@pokegames/shared-types';
+import { AdminStatsService } from './admin-stats.service';
+import type {
+  AdminAnomaly,
+  AdminAuditLogEntry,
+  AdminPage,
+  AdminStats,
+} from '@pokegames/shared-types';
 
 const AUDIT_PAGE_SIZE = 20;
 
 @UseGuards(AdminGuard)
 @Controller('admin/audit')
 export class AdminController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly stats: AdminStatsService,
+  ) {}
 
   @Get('logs')
   async getAuditLogs(
     @Query('gameType') gameType?: string,
+    @Query('outcome') outcome?: string,
     @Query('page') page = '1',
   ): Promise<AdminPage<AdminAuditLogEntry>> {
     const pageNum = Math.max(1, Number(page) || 1);
-    const where = gameType ? { gameType } : {};
+    const where: Prisma.GameAuditLogWhereInput = {
+      ...(gameType ? { gameType } : {}),
+      ...(outcome === 'success' ? { isSuccess: true } : {}),
+      ...(outcome === 'fail' ? { isSuccess: false } : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.gameAuditLog.findMany({
         where,
@@ -47,16 +62,11 @@ export class AdminController {
 
   @Get('stats')
   async getGlobalStats(): Promise<AdminStats> {
-    const [totalGames, successfulGames, totalUsers] = await Promise.all([
-      this.prisma.gameAuditLog.count(),
-      this.prisma.gameAuditLog.count({ where: { isSuccess: true } }),
-      this.prisma.user.count(),
-    ]);
-    return {
-      totalUsers,
-      totalGames,
-      successfulGames,
-      successRatePct: totalGames > 0 ? Math.round((successfulGames / totalGames) * 100) : 0,
-    };
+    return this.stats.getStats();
+  }
+
+  @Get('anomalies')
+  async getAnomalies(): Promise<AdminAnomaly[]> {
+    return this.stats.getAnomalies();
   }
 }

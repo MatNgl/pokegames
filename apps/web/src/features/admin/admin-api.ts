@@ -1,5 +1,6 @@
 import { api } from '@/lib/api';
 import type {
+  AdminAnomaly,
   AdminAuditLogEntry,
   AdminGameConfigEntry,
   AdminPage,
@@ -22,19 +23,45 @@ export async function getAdminStats(): Promise<AdminStats> {
   return res.data;
 }
 
-export async function getAdminAuditLogs(page = 1): Promise<AdminPage<AdminAuditLogEntry>> {
-  const res = await api.get<AdminPage<AdminAuditLogEntry>>('/admin/audit/logs', { params: { page } });
+export async function getAdminAuditLogs(
+  page = 1,
+  gameType?: string,
+  outcome?: string,
+): Promise<AdminPage<AdminAuditLogEntry>> {
+  const res = await api.get<AdminPage<AdminAuditLogEntry>>('/admin/audit/logs', {
+    params: { page, ...(gameType ? { gameType } : {}), ...(outcome ? { outcome } : {}) },
+  });
   return res.data;
 }
 
-export async function getAdminUsers(page = 1): Promise<AdminPage<AdminUserSummary>> {
-  const res = await api.get<AdminPage<AdminUserSummary>>('/admin/users', { params: { page } });
+export async function getAdminAnomalies(): Promise<AdminAnomaly[]> {
+  const res = await api.get<AdminAnomaly[]>('/admin/audit/anomalies');
+  return res.data;
+}
+
+export async function getAdminUsers(page = 1, q?: string): Promise<AdminPage<AdminUserSummary>> {
+  const res = await api.get<AdminPage<AdminUserSummary>>('/admin/users', {
+    params: { page, ...(q ? { q } : {}) },
+  });
   return res.data;
 }
 
 export async function getAdminUser(id: string): Promise<AdminUserDetail> {
   const res = await api.get<AdminUserDetail>(`/admin/users/${id}`);
   return res.data;
+}
+
+export async function updateAdminUserRole(id: string, role: 'USER' | 'ADMIN'): Promise<void> {
+  await api.patch(`/admin/users/${id}/role`, { role });
+}
+
+export async function deleteAdminUser(id: string): Promise<void> {
+  await api.delete(`/admin/users/${id}`);
+}
+
+export async function resetAdminUserDaily(id: string): Promise<number> {
+  const res = await api.post<{ deleted: number }>(`/admin/users/${id}/reset-daily`, {});
+  return res.data.deleted;
 }
 
 export function formatDuration(totalSeconds: number): string {

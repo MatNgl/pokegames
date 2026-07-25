@@ -1,21 +1,28 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { RotateCcw, Search, Shield, ShieldAlert, ShieldOff, Trash2 } from 'lucide-react';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { getApiErrorMessage } from '@/lib/errors';
 import { useAuth } from '@/features/auth/auth-context';
 import { gameLabel } from '@/features/daily/daily-catalog';
 import {
+  deleteAdminUser,
   formatDuration,
+  getAdminAnomalies,
   getAdminAuditLogs,
   getAdminStats,
   getAdminUser,
   getAdminUsers,
+  resetAdminUserDaily,
+  updateAdminUserRole,
 } from './admin-api';
 import { ConfigTab } from './config-tab';
 
@@ -147,23 +154,122 @@ function Pager({
 
 function DashboardTab() {
   const [page, setPage] = useState(1);
+  const [gameFilter, setGameFilter] = useState('');
+  const [outcome, setOutcome] = useState('');
   const { data: stats } = useQuery({ queryKey: ['admin-stats'], queryFn: getAdminStats });
+  const { data: anomalies } = useQuery({ queryKey: ['admin-anomalies'], queryFn: getAdminAnomalies });
   const { data: logs, isLoading } = useQuery({
-    queryKey: ['admin-logs', page],
-    queryFn: () => getAdminAuditLogs(page),
+    queryKey: ['admin-logs', page, gameFilter, outcome],
+    queryFn: () => getAdminAuditLogs(page, gameFilter || undefined, outcome || undefined),
   });
+
+  const applyFilter = (next: { game?: string; outcome?: string }) => {
+    if (next.game !== undefined) setGameFilter(next.game);
+    if (next.outcome !== undefined) setOutcome(next.outcome);
+    setPage(1);
+  };
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Utilisateurs" value={stats?.totalUsers ?? '—'} />
+        <StatCard label="Actifs aujourd'hui" value={stats?.activeUsersToday ?? '—'} />
+        <StatCard label="Actifs 7 jours" value={stats?.activeUsers7d ?? '—'} />
+        <StatCard label="Inscrits 7 jours" value={stats?.newUsers7d ?? '—'} />
         <StatCard label="Parties" value={stats?.totalGames ?? '—'} />
+        <StatCard label="Parties aujourd'hui" value={stats?.gamesToday ?? '—'} />
         <StatCard label="Réussies" value={stats?.successfulGames ?? '—'} />
         <StatCard label="Taux de réussite" value={stats ? `${stats.successRatePct}%` : '—'} />
       </div>
 
+      {/* Anomalies : exploitation du journal d'audit (manches trop rapides, sans-faute anormal). */}
+      <Card className="flex flex-col gap-2 p-4">
+        <h2 className="flex items-center gap-2 font-display text-xs uppercase text-foreground">
+          <ShieldAlert className="h-4 w-4 text-danger" />
+          Anomalies détectées
+        </h2>
+        {!anomalies ? (
+          <Spinner className="mx-auto my-4 h-5 w-5 text-primary" />
+        ) : anomalies.length === 0 ? (
+          <p className="py-3 text-center text-sm font-semibold text-muted">
+            Rien à signaler, aucun comportement suspect.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {anomalies.map((a, i) => (
+              <div
+                key={`${a.userId}-${a.kind}-${i}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-control border-2 border-danger/40 bg-danger/5 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-foreground">
+                    {a.username ?? 'Invité'}
+                    <span className="font-semibold text-muted"> · {gameLabel(a.gameType)}</span>
+                  </p>
+                  <p className="text-xs font-semibold text-muted">{a.detail}</p>
+                </div>
+                <Badge className="shrink-0 border-danger bg-danger text-white">
+                  {a.kind === 'FAST_SOLVE' ? 'Trop rapide' : 'Sans-faute'}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Volumes par jeu : reperer un jeu delaisse ou anormalement facile/difficile. */}
+      {stats && stats.perGame.length > 0 && (
+        <Card className="flex flex-col gap-2 p-4">
+          <h2 className="font-display text-xs uppercase text-foreground">Par jeu</h2>
+          <div className="flex flex-col gap-1.5">
+            {stats.perGame.map((g) => (
+              <div
+                key={g.gameType}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-control border-2 border-border-strong bg-surface-2/50 px-3 py-2"
+              >
+                <span className="min-w-0 truncate text-sm font-bold text-foreground">
+                  {gameLabel(g.gameType)}
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-muted">
+                  {g.games} parties · {g.successRatePct}% réussite · médiane{' '}
+                  {formatDuration(g.medianDurationSeconds)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card className="flex flex-col gap-3 p-4">
         <h2 className="font-display text-xs uppercase text-foreground">Historique des parties</h2>
+
+        {/* Filtres : le back acceptait deja gameType, le front ne l'utilisait jamais. */}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <select
+            value={gameFilter}
+            onChange={(e) => applyFilter({ game: e.target.value })}
+            aria-label="Filtrer par jeu"
+            className="h-11 flex-1 rounded-control border-2 border-border-strong bg-white px-2 text-sm font-semibold text-foreground focus-visible:border-primary focus-visible:outline-none"
+          >
+            <option value="">Tous les jeux</option>
+            {(stats?.perGame ?? []).map((g) => (
+              <option key={g.gameType} value={g.gameType}>
+                {gameLabel(g.gameType)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={outcome}
+            onChange={(e) => applyFilter({ outcome: e.target.value })}
+            aria-label="Filtrer par issue"
+            className="h-11 flex-1 rounded-control border-2 border-border-strong bg-white px-2 text-sm font-semibold text-foreground focus-visible:border-primary focus-visible:outline-none"
+          >
+            <option value="">Toutes les issues</option>
+            <option value="success">Réussies</option>
+            <option value="fail">Échouées</option>
+          </select>
+        </div>
+
         {isLoading ? (
           <Spinner className="mx-auto my-6 h-6 w-6 text-primary" />
         ) : (logs?.items.length ?? 0) === 0 ? (
@@ -208,11 +314,19 @@ function DashboardTab() {
 }
 
 function UsersTab() {
+  const queryClient = useQueryClient();
+  const { user: me } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionOk, setActionOk] = useState<string | null>(null);
+
   const { data: users, isLoading } = useQuery({
-    queryKey: ['admin-users', page],
-    queryFn: () => getAdminUsers(page),
+    queryKey: ['admin-users', page, query],
+    queryFn: () => getAdminUsers(page, query || undefined),
   });
   const { data: detail } = useQuery({
     queryKey: ['admin-user', selected],
@@ -220,10 +334,73 @@ function UsersTab() {
     enabled: Boolean(selected),
   });
 
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin-user'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+  };
+
+  const run = async (label: string, fn: () => Promise<unknown>) => {
+    setActionError(null);
+    setActionOk(null);
+    try {
+      await fn();
+      setActionOk(label);
+      refresh();
+    } catch (err) {
+      setActionError(getApiErrorMessage(err, 'Action impossible'));
+    }
+  };
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setQuery(search.trim());
+    setPage(1);
+    setSelected(null);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <Card className="flex flex-col gap-2 p-4">
         <h2 className="font-display text-xs uppercase text-foreground">Utilisateurs</h2>
+
+        <form onSubmit={submitSearch} className="flex gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un pseudo ou un email"
+            aria-label="Rechercher un utilisateur"
+          />
+          <Button type="submit" size="sm">
+            <Search className="h-4 w-4" />
+          </Button>
+          {query && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setSearch('');
+                setQuery('');
+                setPage(1);
+              }}
+            >
+              Effacer
+            </Button>
+          )}
+        </form>
+
+        {actionError && (
+          <p role="alert" className="rounded-control bg-danger/10 px-3 py-2 text-sm text-danger">
+            {actionError}
+          </p>
+        )}
+        {actionOk && (
+          <p role="status" className="rounded-control bg-go/10 px-3 py-2 text-sm font-semibold text-go-shadow">
+            {actionOk}
+          </p>
+        )}
+
         {isLoading ? (
           <Spinner className="mx-auto my-6 h-6 w-6 text-primary" />
         ) : (
@@ -276,10 +453,86 @@ function UsersTab() {
               <p className="text-xs text-muted">Défis (jour)</p>
               <p className="font-bold text-foreground">{detail.dailyResultsCount}</p>
             </div>
+            <div>
+              <p className="text-xs text-muted">Pokédex</p>
+              <p className="font-bold text-foreground">{detail.pokedexCount}</p>
+            </div>
           </div>
           <p className="text-xs font-semibold text-muted">
-            {detail.email} · inscrit le {formatDate(detail.createdAt)}
+            {detail.email} · inscrit le {formatDate(detail.createdAt)} · rôle {detail.role}
           </p>
+
+          {/* Actions de moderation : evitent de passer par psql pour la moindre operation. */}
+          <div className="flex flex-wrap gap-2 border-t-2 border-border-strong/40 pt-3">
+            {detail.role === 'ADMIN' ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={detail.id === me?.id}
+                onClick={() =>
+                  void run('Rôle mis à jour : USER', () => updateAdminUserRole(detail.id, 'USER'))
+                }
+              >
+                <ShieldOff className="h-4 w-4" />
+                Retirer admin
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() =>
+                  void run('Rôle mis à jour : ADMIN', () => updateAdminUserRole(detail.id, 'ADMIN'))
+                }
+              >
+                <Shield className="h-4 w-4" />
+                Promouvoir admin
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                void run('Défis du jour réinitialisés', () => resetAdminUserDaily(detail.id))
+              }
+            >
+              <RotateCcw className="h-4 w-4" />
+              Réinitialiser ses défis du jour
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              disabled={detail.id === me?.id}
+              onClick={() => setConfirmDelete(detail.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
+          </div>
+
+          {detail.recentDailyResults.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <p className="font-display text-[10px] uppercase tracking-widest text-muted">
+                Défis quotidiens récents
+              </p>
+              {detail.recentDailyResults.map((d) => (
+                <div
+                  key={`${d.gameType}-${d.scope}-${d.dayDate}`}
+                  className="flex items-center justify-between gap-2 text-xs"
+                >
+                  <span className="truncate font-semibold text-foreground">
+                    {d.dayDate} · {gameLabel(d.gameType)}
+                    {d.scope && <span className="text-muted"> · {d.scope}</span>}
+                  </span>
+                  <span className={cn('shrink-0', d.won ? 'text-success' : 'text-muted')}>
+                    {d.correctCount != null && d.totalRounds != null
+                      ? `${d.correctCount}/${d.totalRounds}`
+                      : d.attempts != null
+                        ? `${d.attempts} essais`
+                        : (d.score ?? '—')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           {detail.recentGames.length > 0 && (
             <div className="flex flex-col gap-1">
               <p className="font-display text-[10px] uppercase tracking-widest text-muted">
@@ -298,6 +551,45 @@ function UsersTab() {
             </div>
           )}
         </Card>
+      )}
+
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-delete-title"
+            onClick={(e) => e.stopPropagation()}
+            className="flex w-full max-w-sm flex-col gap-4 rounded-card border-4 border-border-strong bg-surface p-6 text-center shadow-xl"
+          >
+            <h2 id="admin-delete-title" className="font-display text-sm leading-relaxed text-foreground">
+              Supprimer ce compte ?
+            </h2>
+            <p className="text-sm font-semibold text-muted">
+              Le compte, son historique, ses résultats et son Pokédex seront définitivement effacés.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(null)}>
+                Annuler
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1"
+                onClick={() => {
+                  const id = confirmDelete;
+                  setConfirmDelete(null);
+                  setSelected(null);
+                  void run('Compte supprimé', () => deleteAdminUser(id));
+                }}
+              >
+                Supprimer
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

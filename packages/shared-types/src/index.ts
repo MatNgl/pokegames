@@ -56,6 +56,30 @@ export interface AdminStats {
   totalGames: number;
   successfulGames: number;
   successRatePct: number;
+  // Activite recente : joueurs distincts et parties sur les dernieres 24 h / 7 jours.
+  activeUsersToday: number;
+  activeUsers7d: number;
+  gamesToday: number;
+  newUsers7d: number;
+  perGame: AdminGameStat[];
+}
+
+export interface AdminGameStat {
+  gameType: string;
+  games: number;
+  successRatePct: number;
+  medianDurationSeconds: number;
+}
+
+/** Partie suspecte : trop rapide, ou serie de reussites anormale (Regle 5, detection d'anomalies). */
+export interface AdminAnomaly {
+  kind: 'FAST_SOLVE' | 'PERFECT_STREAK';
+  userId: string | null;
+  username: string | null;
+  gameType: string;
+  detail: string;
+  count: number;
+  lastAt: string;
 }
 
 export interface AdminAuditLogEntry {
@@ -83,7 +107,24 @@ export interface AdminUserSummary {
 
 export interface AdminUserDetail extends AdminUserSummary {
   dailyResultsCount: number;
+  pokedexCount: number;
   recentGames: AdminAuditLogEntry[];
+  recentDailyResults: AdminDailyResultEntry[];
+}
+
+export interface AdminDailyResultEntry {
+  gameType: string;
+  scope: string;
+  dayDate: string;
+  won: boolean;
+  score: number | null;
+  attempts: number | null;
+  correctCount: number | null;
+  totalRounds: number | null;
+}
+
+export interface AdminUpdateRoleRequest {
+  role: 'USER' | 'ADMIN';
 }
 
 export interface AdminGameConfigEntry {
