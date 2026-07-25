@@ -16,10 +16,12 @@ import { GuessWhoPage } from '@/features/guess-who/guess-who-page';
 import { HomePage } from '@/features/home/home-page';
 import { PokedexPage } from '@/features/pokedex/pokedex-page';
 import { EasterEggLayer } from '@/features/pokedex/easter-egg-layer';
+import { Seo } from '@/lib/seo/seo';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <Seo />
       <EasterEggLayer />
       <Routes>
         <Route path="/" element={<HomePage />} />

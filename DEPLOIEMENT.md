@@ -31,6 +31,29 @@ cd /var/www/pokegames && git pull && npm install && ( cd apps/api && npx prisma 
 
 ---
 
+## Référencement : configuration nginx requise
+
+Le build génère un fichier HTML **par route publique** (`dist/motus/index.html`, `dist/jouer/index.html`...) contenant les métadonnées et le contenu textuel de la page. C'est ce que lisent les moteurs de recherche et les robots IA, qui n'exécutent pas JavaScript.
+
+Pour que ces fichiers soient réellement servis, nginx doit tenter le dossier **avant** de retomber sur l'index :
+
+```nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```
+
+L'ordre compte : `$uri/` résout `/motus` vers `dist/motus/index.html`. Sans cette étape, toutes les routes renverraient l'accueil et le prerendu ne servirait à rien.
+
+Sont aussi générés à la racine : `robots.txt` et `sitemap.xml` (12 URLs indexables).
+
+Le domaine de production est défini par la constante `SITE_URL` dans `apps/web/src/lib/seo/site-meta.ts` (URL canoniques, Open Graph, sitemap). Une seule ligne à changer en cas de changement de domaine, puis rebuild.
+
+L'image de partage (`public/og-image.png`) se régénère avec :
+```bash
+cd /var/www/pokegames/apps/web && node scripts/generate-og-image.mjs
+```
+
 ## Notes
 
 - **`pm2 restart all`** redémarre tous les process PM2 du serveur (redémarre l'API NestJS). Si d'autres projets tournent en PM2, cible plutôt le process PokéGames : `pm2 list` puis `pm2 restart <nom-ou-id>`.
