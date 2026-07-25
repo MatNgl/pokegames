@@ -162,6 +162,32 @@ function StatCard({
   );
 }
 
+/**
+ * Auteur d'une partie dans le journal. Trois cas distincts : un compte (pseudo), un invite (pas de
+ * compte), ou un compte supprime depuis (l'userId subsiste dans GameAuditLog, sans cle etrangere).
+ */
+function PlayerTag({ userId, username }: { userId: string | null; username: string | null }) {
+  if (!userId) {
+    return (
+      <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-muted">
+        Invité
+      </span>
+    );
+  }
+  if (!username) {
+    return (
+      <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-muted italic">
+        Compte supprimé
+      </span>
+    );
+  }
+  return (
+    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+      {username}
+    </span>
+  );
+}
+
 /** Intitule de section : c'est ici que la police pixel de la marque garde sa place. */
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -373,13 +399,15 @@ function DashboardTab() {
                 className="flex items-center justify-between gap-2 rounded-control border-2 border-border-strong bg-surface-2/50 px-3 py-2"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-foreground">
-                    {gameLabel(log.gameType)}
-                    <span className="font-semibold text-muted"> · {log.targetNameFr}</span>
+                  {/* Le joueur en premier : c'est la question qu'on se pose en lisant le journal. */}
+                  <p className="flex items-center gap-1.5 truncate text-sm font-bold text-foreground">
+                    <PlayerTag userId={log.userId} username={log.username} />
+                    <span className="truncate font-semibold text-muted">
+                      {gameLabel(log.gameType)} · {log.targetNameFr}
+                    </span>
                   </p>
                   <p className="text-xs font-semibold text-muted">
                     {formatDate(log.createdAt)} · {formatDuration(log.durationSeconds)}
-                    {log.userId ? '' : ' · invité'}
                   </p>
                 </div>
                 <Badge

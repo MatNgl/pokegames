@@ -73,22 +73,28 @@ export class AdminUsersService {
     };
   }
 
-  private toAuditEntry(row: {
-    id: string;
-    gameType: string;
-    userId: string | null;
-    targetNameFr: string;
-    userGuess: string | null;
-    isSuccess: boolean;
-    scoreEarned: number;
-    durationSeconds: number;
-    hintsUsedCount: number;
-    createdAt: Date;
-  }): AdminAuditLogEntry {
+  // username est passe par l'appelant : dans le detail d'un utilisateur, toutes les parties sont
+  // les siennes, inutile de refaire une requete par ligne.
+  private toAuditEntry(
+    row: {
+      id: string;
+      gameType: string;
+      userId: string | null;
+      targetNameFr: string;
+      userGuess: string | null;
+      isSuccess: boolean;
+      scoreEarned: number;
+      durationSeconds: number;
+      hintsUsedCount: number;
+      createdAt: Date;
+    },
+    username: string | null = null,
+  ): AdminAuditLogEntry {
     return {
       id: row.id,
       gameType: row.gameType,
       userId: row.userId,
+      username,
       targetNameFr: row.targetNameFr,
       userGuess: row.userGuess,
       isSuccess: row.isSuccess,
@@ -144,7 +150,7 @@ export class AdminUsersService {
       totalTimeSeconds: agg._sum.durationSeconds ?? 0,
       dailyResultsCount,
       pokedexCount,
-      recentGames: recent.map((r) => this.toAuditEntry(r)),
+      recentGames: recent.map((r) => this.toAuditEntry(r, user.username)),
       recentDailyResults: recentDaily.map((d) => ({
         gameType: d.gameType,
         scope: d.scope,

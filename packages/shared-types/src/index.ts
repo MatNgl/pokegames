@@ -86,6 +86,9 @@ export interface AdminAuditLogEntry {
   id: string;
   gameType: string;
   userId: string | null;
+  // Pseudo resolu depuis le compte. null si partie d'un invite (userId null) ou si le compte a
+  // ete supprime depuis : GameAuditLog conserve l'userId sans cle etrangere.
+  username: string | null;
   targetNameFr: string;
   userGuess: string | null;
   isSuccess: boolean;

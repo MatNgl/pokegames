@@ -41,11 +41,24 @@ export class AdminController {
       }),
       this.prisma.gameAuditLog.count({ where }),
     ]);
+
+    // GameAuditLog ne stocke que l'userId : on resout les pseudos en une requete pour savoir qui a
+    // joue (sinon toutes les parties de joueurs connectes sont anonymes dans l'admin).
+    const userIds = [...new Set(rows.map((r) => r.userId).filter((id): id is string => Boolean(id)))];
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, username: true },
+        })
+      : [];
+    const nameById = new Map(users.map((u) => [u.id, u.username]));
+
     return {
       items: rows.map((r) => ({
         id: r.id,
         gameType: r.gameType,
         userId: r.userId,
+        username: r.userId ? (nameById.get(r.userId) ?? null) : null,
         targetNameFr: r.targetNameFr,
         userGuess: r.userGuess,
         isSuccess: r.isSuccess,
