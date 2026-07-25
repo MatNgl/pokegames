@@ -1,7 +1,22 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { RotateCcw, Search, Shield, ShieldAlert, ShieldOff, Trash2 } from 'lucide-react';
+import {
+  Activity,
+  CalendarDays,
+  Gamepad2,
+  RotateCcw,
+  Search,
+  Shield,
+  ShieldAlert,
+  ShieldOff,
+  Trash2,
+  Trophy,
+  UserPlus,
+  Users,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
 import { Badge } from '@/components/ui/badge';
@@ -115,12 +130,63 @@ export function AdminPage() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+/**
+ * Tuile de statistique. La valeur est en Nunito (police du corps) et non en Press Start 2P : un
+ * chiffre en police pixel est illisible en grand. Le pixel reste sur les intitules de section, ou
+ * il joue son role de signature de marque sans gener la lecture.
+ */
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
   return (
-    <Card className="flex flex-col items-center gap-1 p-4 text-center">
-      <span className="font-display text-2xl text-primary">{value}</span>
-      <span className="text-xs font-semibold text-muted">{label}</span>
+    <Card className="flex items-center gap-3 p-3 sm:p-4">
+      {/* Icone masquee sous sm : a 375px elle volait la place du libelle, qui se retrouvait tronque.
+          Elle est decorative, c'est le libelle qui porte le sens. */}
+      <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary sm:flex">
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[2rem] font-extrabold leading-none text-foreground">{value}</p>
+        <p className="mt-1 text-xs font-semibold text-muted">{label}</p>
+        {hint && <p className="text-[11px] font-semibold text-muted/70">{hint}</p>}
+      </div>
     </Card>
+  );
+}
+
+/** Intitule de section : c'est ici que la police pixel de la marque garde sa place. */
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="font-display text-[10px] uppercase tracking-widest text-muted">{children}</h2>
+  );
+}
+
+/**
+ * Jauge d'un ratio (0 a 100). Teinte unique : le fond est une version claire de la meme couleur que
+ * le remplissage. Le pourcentage est toujours ecrit a cote, car ces verts et oranges passent sous
+ * 3:1 sur le fond creme : la couleur seule ne doit jamais porter l'information.
+ */
+function RateMeter({ pct }: { pct: number }) {
+  const value = Math.max(0, Math.min(100, pct));
+  return (
+    <span
+      role="img"
+      aria-label={`${value} % de réussite`}
+      className="block h-2 w-full overflow-hidden rounded-full bg-primary/15"
+    >
+      <span
+        className="block h-full rounded-full bg-primary transition-[width] duration-300"
+        style={{ width: `${value}%` }}
+      />
+    </span>
   );
 }
 
@@ -171,16 +237,34 @@ function DashboardTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Utilisateurs" value={stats?.totalUsers ?? '—'} />
-        <StatCard label="Actifs aujourd'hui" value={stats?.activeUsersToday ?? '—'} />
-        <StatCard label="Actifs 7 jours" value={stats?.activeUsers7d ?? '—'} />
-        <StatCard label="Inscrits 7 jours" value={stats?.newUsers7d ?? '—'} />
-        <StatCard label="Parties" value={stats?.totalGames ?? '—'} />
-        <StatCard label="Parties aujourd'hui" value={stats?.gamesToday ?? '—'} />
-        <StatCard label="Réussies" value={stats?.successfulGames ?? '—'} />
-        <StatCard label="Taux de réussite" value={stats ? `${stats.successRatePct}%` : '—'} />
-      </div>
+      {/* Deux groupes nommes plutot que huit tuiles indifferenciees : on sait ce qu'on lit. */}
+      <section className="flex flex-col gap-2">
+        <SectionTitle>Joueurs</SectionTitle>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard icon={Users} label="Comptes au total" value={stats?.totalUsers ?? '—'} />
+          <StatCard icon={Activity} label="Actifs aujourd'hui" value={stats?.activeUsersToday ?? '—'} />
+          <StatCard icon={CalendarDays} label="Actifs sur 7 jours" value={stats?.activeUsers7d ?? '—'} />
+          <StatCard icon={UserPlus} label="Inscrits sur 7 jours" value={stats?.newUsers7d ?? '—'} />
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <SectionTitle>Parties</SectionTitle>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard icon={Gamepad2} label="Parties au total" value={stats?.totalGames ?? '—'} />
+          <StatCard icon={Zap} label="Parties aujourd'hui" value={stats?.gamesToday ?? '—'} />
+          <StatCard icon={Trophy} label="Parties réussies" value={stats?.successfulGames ?? '—'} />
+          <Card className="flex flex-col justify-center gap-2 p-3 sm:p-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[2rem] font-extrabold leading-none text-foreground">
+                {stats ? `${stats.successRatePct}%` : '—'}
+              </span>
+            </div>
+            {stats && <RateMeter pct={stats.successRatePct} />}
+            <p className="text-xs font-semibold text-muted">Taux de réussite</p>
+          </Card>
+        </div>
+      </section>
 
       {/* Anomalies : exploitation du journal d'audit (manches trop rapides, sans-faute anormal). */}
       <Card className="flex flex-col gap-2 p-4">
@@ -218,22 +302,29 @@ function DashboardTab() {
       </Card>
 
       {/* Volumes par jeu : reperer un jeu delaisse ou anormalement facile/difficile. */}
+      {/* Une jauge par jeu au lieu d'une ligne de texte : le taux se compare d'un coup d'oeil.
+          Chiffres en tabular-nums car ils forment des colonnes qui doivent s'aligner. */}
       {stats && stats.perGame.length > 0 && (
-        <Card className="flex flex-col gap-2 p-4">
-          <h2 className="font-display text-xs uppercase text-foreground">Par jeu</h2>
-          <div className="flex flex-col gap-1.5">
+        <Card className="flex flex-col gap-3 p-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <SectionTitle>Par jeu</SectionTitle>
+            <span className="text-[11px] font-semibold text-muted">
+              parties · réussite · durée médiane
+            </span>
+          </div>
+          <div className="flex flex-col gap-2.5">
             {stats.perGame.map((g) => (
-              <div
-                key={g.gameType}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-control border-2 border-border-strong bg-surface-2/50 px-3 py-2"
-              >
-                <span className="min-w-0 truncate text-sm font-bold text-foreground">
-                  {gameLabel(g.gameType)}
-                </span>
-                <span className="shrink-0 text-xs font-semibold text-muted">
-                  {g.games} parties · {g.successRatePct}% réussite · médiane{' '}
-                  {formatDuration(g.medianDurationSeconds)}
-                </span>
+              <div key={g.gameType} className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate text-sm font-bold text-foreground">
+                    {gameLabel(g.gameType)}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold tabular-nums text-muted">
+                    {g.games} · <span className="text-foreground">{g.successRatePct}%</span> ·{' '}
+                    {formatDuration(g.medianDurationSeconds)}
+                  </span>
+                </div>
+                <RateMeter pct={g.successRatePct} />
               </div>
             ))}
           </div>
