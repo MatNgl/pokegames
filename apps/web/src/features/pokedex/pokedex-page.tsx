@@ -283,7 +283,7 @@ export function PokedexPage() {
                       onClick={() => setPage((p) => Math.max(0, p - 1))}
                       disabled={safePage === 0}
                       aria-label="Page précédente"
-                      className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-border-strong bg-surface text-foreground transition-colors hover:border-primary disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-border-strong bg-surface text-foreground transition-colors hover:border-primary disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </button>
@@ -295,7 +295,7 @@ export function PokedexPage() {
                       onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
                       disabled={safePage >= pageCount - 1}
                       aria-label="Page suivante"
-                      className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-border-strong bg-surface text-foreground transition-colors hover:border-primary disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-border-strong bg-surface text-foreground transition-colors hover:border-primary disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     >
                       <ChevronRight className="h-5 w-5" />
                     </button>
@@ -336,7 +336,8 @@ function FilterChip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'rounded-control border-2 px-2.5 py-1 font-display text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+        // min 44px : les filtres de generation etaient a 34x27px, trop petits au doigt.
+        'flex min-h-11 min-w-11 items-center justify-center rounded-control border-2 px-3 font-display text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:min-h-9 sm:min-w-9',
         active
           ? 'border-primary-shadow bg-primary text-primary-foreground'
           : 'border-border-strong bg-surface-2/60 text-muted hover:border-primary hover:text-foreground',

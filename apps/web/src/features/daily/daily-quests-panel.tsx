@@ -90,7 +90,8 @@ export function DailyQuestsPanel() {
                       type="button"
                       onClick={() => navigate(c.route)}
                       className={cn(
-                        'flex items-center gap-1 rounded-control border-2 px-2 py-1 text-xs font-bold transition-colors',
+                        // min-h-11 : les pastilles etaient a 28px de haut, difficiles a viser au doigt.
+                        'flex min-h-11 items-center gap-1 rounded-control border-2 px-2.5 py-1 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 sm:min-h-9',
                         done
                           ? 'border-go-shadow bg-go/10 text-go-shadow'
                           : inProgress

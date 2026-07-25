@@ -35,7 +35,7 @@ export function HelpPopover({ rules, legend, title = 'Règles', ariaLabel = 'Rè
         onClick={() => setOpen((v) => !v)}
         aria-label={ariaLabel}
         aria-expanded={open}
-        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:text-foreground"
+        className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
       >
         <HelpCircle className="h-6 w-6" />
       </button>

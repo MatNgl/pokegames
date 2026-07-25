@@ -19,7 +19,16 @@ import {
 } from './admin-api';
 import { ConfigTab } from './config-tab';
 
-const TAB_BASE = 'rounded-control border-2 px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer';
+const TAB_BASE =
+  'flex-1 rounded-control border-2 px-3 py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 sm:flex-none';
+
+const TABS = [
+  { key: 'dashboard', label: 'Tableau de bord' },
+  { key: 'users', label: 'Utilisateurs' },
+  { key: 'config', label: 'Configuration' },
+] as const;
+
+type AdminTab = (typeof TABS)[number]['key'];
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -39,7 +48,7 @@ function formatDate(iso: string): string {
 export function AdminPage() {
   const navigate = useNavigate();
   const { user, initializing } = useAuth();
-  const [tab, setTab] = useState<'dashboard' | 'users' | 'config'>('dashboard');
+  const [tab, setTab] = useState<AdminTab>('dashboard');
 
   if (initializing) {
     return (
@@ -67,45 +76,27 @@ export function AdminPage() {
 
   return (
     <Shell>
-      <div className="flex items-center justify-between gap-3">
+      {/* flex-wrap + onglets pleine largeur sous sm : sans ca la ligne reclame ~489px pour 343px
+          disponibles sur mobile, et l'onglet Configuration sort du viewport (overflow-x masque). */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-sm text-foreground">Administration</h1>
-        <div className="flex gap-1.5">
-          <button
-            type="button"
-            onClick={() => setTab('dashboard')}
-            className={cn(
-              TAB_BASE,
-              tab === 'dashboard'
-                ? 'border-primary-shadow bg-primary text-primary-foreground'
-                : 'border-border-strong bg-surface-2/60 text-muted',
-            )}
-          >
-            Tableau de bord
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('users')}
-            className={cn(
-              TAB_BASE,
-              tab === 'users'
-                ? 'border-primary-shadow bg-primary text-primary-foreground'
-                : 'border-border-strong bg-surface-2/60 text-muted',
-            )}
-          >
-            Utilisateurs
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('config')}
-            className={cn(
-              TAB_BASE,
-              tab === 'config'
-                ? 'border-primary-shadow bg-primary text-primary-foreground'
-                : 'border-border-strong bg-surface-2/60 text-muted',
-            )}
-          >
-            Configuration
-          </button>
+        <div className="flex w-full gap-1.5 sm:w-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              aria-pressed={tab === t.key}
+              onClick={() => setTab(t.key)}
+              className={cn(
+                TAB_BASE,
+                tab === t.key
+                  ? 'border-primary-shadow bg-primary text-primary-foreground'
+                  : 'border-border-strong bg-surface-2/60 text-muted',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
