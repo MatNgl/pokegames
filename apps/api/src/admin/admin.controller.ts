@@ -3,11 +3,20 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminGuard } from '../auth/admin.guard';
 import { AdminStatsService } from './admin-stats.service';
+import { AdminGamesStatsService } from './admin-games-stats.service';
+import { AdminRetentionService } from './admin-retention.service';
+import { AdminPokedexStatsService } from './admin-pokedex-stats.service';
+import { parsePeriod } from './admin-period';
 import type {
   AdminAnomaly,
   AdminAuditLogEntry,
+  AdminGamesReport,
+  AdminOverview,
   AdminPage,
+  AdminPokedexReport,
+  AdminRetentionReport,
   AdminStats,
+  AdminSystemInfo,
 } from '@pokegames/shared-types';
 
 const AUDIT_PAGE_SIZE = 20;
@@ -18,6 +27,9 @@ export class AdminController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stats: AdminStatsService,
+    private readonly gamesStats: AdminGamesStatsService,
+    private readonly retention: AdminRetentionService,
+    private readonly pokedexStats: AdminPokedexStatsService,
   ) {}
 
   @Get('logs')
@@ -81,5 +93,30 @@ export class AdminController {
   @Get('anomalies')
   async getAnomalies(): Promise<AdminAnomaly[]> {
     return this.stats.getAnomalies();
+  }
+
+  @Get('overview')
+  async getOverview(@Query('days') days?: string): Promise<AdminOverview> {
+    return this.stats.getOverview(parsePeriod(days));
+  }
+
+  @Get('games')
+  async getGamesReport(@Query('days') days?: string): Promise<AdminGamesReport> {
+    return this.gamesStats.getReport(parsePeriod(days));
+  }
+
+  @Get('retention')
+  async getRetention(): Promise<AdminRetentionReport> {
+    return this.retention.getReport();
+  }
+
+  @Get('pokedex')
+  async getPokedexReport(): Promise<AdminPokedexReport> {
+    return this.pokedexStats.getReport();
+  }
+
+  @Get('system')
+  async getSystemInfo(): Promise<AdminSystemInfo> {
+    return this.pokedexStats.getSystemInfo();
   }
 }

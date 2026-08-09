@@ -113,6 +113,18 @@ export interface AdminUserDetail extends AdminUserSummary {
   pokedexCount: number;
   recentGames: AdminAuditLogEntry[];
   recentDailyResults: AdminDailyResultEntry[];
+  // Progression du Pokedex : total, detail par generation et courbe cumulee des captures.
+  pokedexTotalSpecies: number;
+  pokedexByGeneration: { generation: number; collected: number; total: number }[];
+  pokedexTimeline: { date: string; total: number }[];
+  // Assiduite : jours joues, serie en cours et record (incite au retour quotidien).
+  activeDays: number;
+  currentStreakDays: number;
+  longestStreakDays: number;
+  lastPlayedAt: string | null;
+  // Positionnement face aux autres joueurs, en centiles.
+  percentileGames: number;
+  percentilePokedex: number;
 }
 
 export interface AdminDailyResultEntry {
@@ -141,6 +153,136 @@ export interface AdminPage<T> {
   total: number;
   page: number; // 1-indexe
   pageSize: number;
+}
+
+/* --- Admin : rapports analytiques ---------------------------------------- */
+
+/** Fenetre d'analyse en jours ; 0 signifie « depuis le debut ». */
+export type AdminPeriodDays = 7 | 30 | 90 | 0;
+
+/** Un jour de la frise d'activite. */
+export interface AdminTimePoint {
+  date: string; // AAAA-MM-JJ (UTC)
+  games: number; // parties terminees
+  players: number; // joueurs distincts (comptes uniquement)
+  signups: number; // inscriptions du jour
+}
+
+/** Part d'un jeu dans le volume total de parties. */
+export interface AdminGameShare {
+  gameType: string;
+  games: number;
+  pct: number;
+}
+
+export interface AdminOverview {
+  stats: AdminStats;
+  timeline: AdminTimePoint[];
+  shares: AdminGameShare[];
+  pokedexAvgCollected: number; // progression moyenne du Pokedex, en especes
+  pokedexAvgPct: number;
+  pokedexTotalSpecies: number;
+}
+
+/** Difficulte reelle d'un couple jeu x niveau. */
+export interface AdminLevelDifficulty {
+  gameType: string;
+  scope: string; // niveau ou mode ; vide si le jeu n'en a pas
+  played: number;
+  successRatePct: number;
+  medianDurationSeconds: number;
+  avgAttempts: number | null;
+}
+
+export interface AdminPokemonDifficulty {
+  pokemonId: number;
+  nameFr: string;
+  played: number;
+  successRatePct: number;
+}
+
+/** Histogramme du nombre d'essais (Silhouette, Motus). */
+export interface AdminAttemptsDistribution {
+  gameType: string;
+  buckets: { attempts: number; count: number }[];
+}
+
+/** Usage des indices et effet sur la reussite. */
+export interface AdminHintUsage {
+  gameType: string;
+  avgHints: number;
+  successWithHintsPct: number | null;
+  successWithoutHintsPct: number | null;
+}
+
+export interface AdminCompletion {
+  gameType: string;
+  scope: string;
+  completed: number; // defis quotidiens menes a terme
+  won: number;
+  wonPct: number;
+}
+
+export interface AdminGamesReport {
+  levels: AdminLevelDifficulty[];
+  hardestPokemon: AdminPokemonDifficulty[];
+  easiestPokemon: AdminPokemonDifficulty[];
+  attempts: AdminAttemptsDistribution[];
+  hints: AdminHintUsage[];
+  completion: AdminCompletion[];
+}
+
+/** Retention par cohorte hebdomadaire : part des inscrits encore actifs les semaines suivantes. */
+export interface AdminCohort {
+  week: string; // lundi de la semaine d'inscription (AAAA-MM-JJ)
+  size: number;
+  retentionPct: (number | null)[]; // index 0 = semaine d'inscription
+}
+
+export interface AdminAtRiskUser {
+  id: string;
+  username: string;
+  lastPlayedAt: string | null;
+  daysSinceLastPlay: number | null;
+  gamesPlayed: number;
+}
+
+export interface AdminRetentionReport {
+  cohorts: AdminCohort[];
+  atRisk: AdminAtRiskUser[];
+  daysPlayed: { days: number; users: number }[]; // distribution du nombre de jours joues
+}
+
+/** Efficacite des apparitions d'easter eggs, ecran par ecran. */
+export interface AdminZoneCollect {
+  zone: string;
+  spawned: number;
+  collected: number;
+  ratePct: number;
+}
+
+export interface AdminPokedexReport {
+  zones: AdminZoneCollect[];
+  avgCollected: number;
+  avgPct: number;
+  totalSpecies: number;
+  collectors: number; // joueurs ayant au moins une capture
+}
+
+/** Etat des donnees et du catalogue (onglet Systeme). */
+export interface AdminSystemInfo {
+  pokemonCount: number;
+  withShinySprite: number;
+  withMega: number;
+  lastPokemonUpdate: string | null;
+  todayPicks: { game: string; scope: string; count: number }[];
+}
+
+/** Bornes de validation d'un parametre de configuration (garde-fous de l'editeur admin). */
+export interface AdminConfigBound {
+  path: string; // ex. "WHO_IS_IT.roundsCount"
+  min?: number;
+  max?: number;
 }
 
 /* ==========================================================================

@@ -35,8 +35,13 @@ export class AdminUsersController {
   async list(
     @Query('page') page = '1',
     @Query('q') q?: string,
+    @Query('sort') sort?: string,
   ): Promise<AdminPage<AdminUserSummary>> {
-    return this.adminUsers.list(Number(page) || 1, q);
+    const allowed = ['recent', 'games', 'time', 'name'] as const;
+    const safeSort = allowed.includes(sort as (typeof allowed)[number])
+      ? (sort as (typeof allowed)[number])
+      : 'recent';
+    return this.adminUsers.list(Number(page) || 1, q, safeSort);
   }
 
   @Get(':id')

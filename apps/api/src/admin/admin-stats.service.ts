@@ -1,6 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { AdminAnomaly, AdminGameStat, AdminStats } from '@pokegames/shared-types';
+import { createdAtFilter, dayKey, dayRange, pct, periodStart } from './admin-period';
+import type {
+  AdminAnomaly,
+  AdminGameShare,
+  AdminGameStat,
+  AdminOverview,
+  AdminStats,
+  AdminTimePoint,
+} from '@pokegames/shared-types';
 
 // Une manche resolue plus vite que ce seuil est suspecte (lecture de la reponse, script...).
 const FAST_SOLVE_SECONDS = 2;
@@ -83,6 +91,83 @@ export class AdminStatsService {
       newUsers7d,
       perGame,
     };
+  }
+
+  /**
+   * Vue d'ensemble sur une periode : compteurs, frise d'activite jour par jour, part de chaque jeu
+   * dans le volume, et progression moyenne du Pokedex.
+   */
+  async getOverview(days: number, now = new Date()): Promise<AdminOverview> {
+    const start = periodStart(days, now);
+    const [stats, logs, signups, totalSpecies, entries, collectors] = await Promise.all([
+      this.getStats(),
+      this.prisma.gameAuditLog.findMany({
+        where: createdAtFilter(days, now),
+        select: { gameType: true, userId: true, createdAt: true },
+      }),
+      this.prisma.user.findMany({
+        where: start ? { createdAt: { gte: start } } : {},
+        select: { createdAt: true },
+      }),
+      this.prisma.pokemon.count(),
+      this.prisma.userPokedexEntry.count(),
+      this.prisma.userPokedexEntry.findMany({ select: { userId: true }, distinct: ['userId'] }),
+    ]);
+
+    // Frise continue : un point par jour, meme sans activite, sinon la courbe ment sur les creux.
+    const span = days > 0 ? days : this.spanSince(logs, signups, now);
+    const byDay = new Map<string, { games: number; players: Set<string>; signups: number }>();
+    for (const key of dayRange(span, now)) {
+      byDay.set(key, { games: 0, players: new Set(), signups: 0 });
+    }
+    for (const row of logs) {
+      const slot = byDay.get(dayKey(row.createdAt));
+      if (!slot) continue;
+      slot.games += 1;
+      if (row.userId) slot.players.add(row.userId);
+    }
+    for (const row of signups) {
+      const slot = byDay.get(dayKey(row.createdAt));
+      if (slot) slot.signups += 1;
+    }
+    const timeline: AdminTimePoint[] = [...byDay.entries()].map(([date, v]) => ({
+      date,
+      games: v.games,
+      players: v.players.size,
+      signups: v.signups,
+    }));
+
+    // Part de chaque jeu dans le volume de la periode.
+    const counts = new Map<string, number>();
+    for (const row of logs) counts.set(row.gameType, (counts.get(row.gameType) ?? 0) + 1);
+    const shares: AdminGameShare[] = [...counts.entries()]
+      .map(([gameType, games]) => ({ gameType, games, pct: pct(games, logs.length) }))
+      .sort((a, b) => b.games - a.games);
+
+    const collectorCount = collectors.length;
+    const avgCollected = collectorCount > 0 ? entries / collectorCount : 0;
+
+    return {
+      stats,
+      timeline,
+      shares,
+      pokedexAvgCollected: Math.round(avgCollected * 10) / 10,
+      pokedexAvgPct: totalSpecies > 0 ? Math.round((avgCollected / totalSpecies) * 1000) / 10 : 0,
+      pokedexTotalSpecies: totalSpecies,
+    };
+  }
+
+  // Nombre de jours a afficher quand la periode est « depuis le debut » (borne a 180 pour rester lisible).
+  private spanSince(
+    logs: { createdAt: Date }[],
+    signups: { createdAt: Date }[],
+    now: Date,
+  ): number {
+    const dates = [...logs, ...signups].map((r) => r.createdAt.getTime());
+    if (dates.length === 0) return 30;
+    const oldest = Math.min(...dates);
+    const days = Math.ceil((now.getTime() - oldest) / (24 * 3600 * 1000)) + 1;
+    return Math.min(Math.max(days, 7), 180);
   }
 
   /** Comptes au comportement suspect : manches trop rapides, ou sans-faute anormalement long. */
