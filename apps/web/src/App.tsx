@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from '@/features/auth/login-page';
 import { RegisterPage } from '@/features/auth/register-page';
@@ -11,12 +12,29 @@ import { TrueShinyPage } from '@/features/game/true-shiny-page';
 import { HistoryPage } from '@/features/daily/history-page';
 import { LeaderboardPage } from '@/features/daily/leaderboard-page';
 import { QuestsPage } from '@/features/daily/quests-page';
-import { AdminPage } from '@/features/admin/admin-page';
 import { GuessWhoPage } from '@/features/guess-who/guess-who-page';
 import { HomePage } from '@/features/home/home-page';
 import { PokedexPage } from '@/features/pokedex/pokedex-page';
 import { EasterEggLayer } from '@/features/pokedex/easter-egg-layer';
+import { AppBackground } from '@/components/backgrounds/app-background';
+import { Spinner } from '@/components/ui/spinner';
 import { Seo } from '@/lib/seo/seo';
+
+// L'admin embarque Recharts et n'interesse qu'une poignee de comptes : chargement differe pour
+// que les joueurs ne telechargent jamais la librairie de graphiques.
+const AdminPage = lazy(() =>
+  import('@/features/admin/admin-page').then((m) => ({ default: m.AdminPage })),
+);
+
+function RouteFallback() {
+  return (
+    <AppBackground>
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner className="h-8 w-8 text-primary" />
+      </div>
+    </AppBackground>
+  );
+}
 
 export default function App() {
   return (
@@ -38,7 +56,14 @@ export default function App() {
         <Route path="/historique" element={<HistoryPage />} />
         <Route path="/classements" element={<LeaderboardPage />} />
         <Route path="/quetes" element={<QuestsPage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route
+          path="/admin"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <AdminPage />
+            </Suspense>
+          }
+        />
         <Route path="/qui-est-ce" element={<GuessWhoPage />} />
         <Route path="/pokedex" element={<PokedexPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

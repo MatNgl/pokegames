@@ -98,7 +98,7 @@ function FieldEditor({
   if (isPlainObject(value)) {
     return (
       <div className="flex flex-col gap-1 border-l-2 border-border-strong/40 pl-3">
-        <span className="font-display text-[10px] uppercase text-muted">{label}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wide text-muted">{label}</span>
         <ObjectEditor value={value} onChange={onChange} />
       </div>
     );
@@ -154,7 +154,7 @@ function ConfigEditor({ configKey, value }: { configKey: string; value: Json }) 
         onClick={() => setOpen((v) => !v)}
         className="flex items-center justify-between gap-2"
       >
-        <h3 className="font-display text-xs uppercase text-foreground">
+        <h3 className="text-sm font-extrabold uppercase tracking-wide text-foreground">
           {KEY_LABEL[configKey] ?? configKey}
         </h3>
         <span className="text-xs font-semibold text-muted">{open ? 'Replier' : 'Modifier'}</span>

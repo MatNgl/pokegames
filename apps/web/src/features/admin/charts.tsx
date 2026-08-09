@@ -1,18 +1,38 @@
-import { useId, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart as RcBarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart as RcLineChart,
+  Pie,
+  PieChart as RcPieChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
+  CHART_GRID,
+  CHART_INK,
+  CHART_MUTED,
+  CHART_SURFACE,
+  ChartContainer,
+  ChartTooltipContent,
+  axisProps,
+} from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 
 /**
- * Graphiques SVG ecrits a la main : aucune librairie ajoutee (le bundle est deja lourd et une lib
- * imposerait son esthetique). Quatre formes suffisent a tout l'admin : courbe, camembert, barres
- * horizontales et histogramme.
+ * Graphiques de l'admin, batis sur Recharts (la brique des Charts shadcn/ui). Recharts apporte
+ * axes, grille, infobulles et responsive ; on ne definit ici que les formes utiles a ce tableau
+ * de bord et l'habillage aux couleurs de la marque.
  *
- * Regles communes : marques fines, grille discrete, valeurs toujours lisibles en clair, et
- * infobulle au survol plutot qu'une etiquette sur chaque point.
+ * La route /admin est chargee en differe : cette dependance ne pese jamais sur le bundle des jeux.
  */
-
-const INK = '#2b2a24';
-const MUTED = '#6f6a52';
-const GRID = 'rgba(111,106,82,0.18)';
 
 /** Palette de l'admin : teintes franchement distinctes, une par jeu. */
 export const CHART_COLORS = [
@@ -31,17 +51,33 @@ export function chartColor(index: number): string {
   return CHART_COLORS[index % CHART_COLORS.length] ?? CHART_COLORS[0]!;
 }
 
+/** Date d'axe abregee : "4 juil." tient sous une graduation, pas "2026-07-04". */
+function shortDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
 /**
  * Etat vide explicite. Sans ce message, une periode sans activite est indiscernable d'un bug :
  * on dit donc ce qui manque, et quoi faire.
  */
-function EmptyState({ label, hint }: { label: string; hint?: string }) {
+export function EmptyState({
+  label,
+  hint,
+  action,
+}: {
+  label: string;
+  hint?: string;
+  action?: ReactNode;
+}) {
   return (
-    <div className="flex flex-col items-center gap-1 py-8 text-center">
+    <div className="flex flex-col items-center gap-1.5 py-8 text-center">
       <p className="text-sm font-semibold text-muted">{label}</p>
       <p className="text-xs font-semibold text-muted/70">
         {hint ?? 'Élargis la période en haut de page pour remonter plus loin.'}
       </p>
+      {action}
     </div>
   );
 }
@@ -55,132 +91,105 @@ export interface LineSeries {
 }
 
 /**
- * Courbe temporelle multi-series. L'axe X est categoriel (un pas par jour) : on n'affiche qu'une
- * poignee de dates, sinon les etiquettes se chevauchent.
+ * Courbe temporelle multi-series, en aires empilees visuellement (aire translucide sous la
+ * courbe) : le volume se lit d'un coup d'oeil, la valeur exacte au survol.
  */
-export function LineChart({
-  series,
-  height = 200,
-  formatValue = (v: number) => String(v),
-}: {
-  series: LineSeries[];
-  height?: number;
-  formatValue?: (v: number) => string;
-}) {
-  const [hover, setHover] = useState<number | null>(null);
-  const clipId = useId();
+export function LineChart({ series, height = 220 }: { series: LineSeries[]; height?: number }) {
   const first = series[0];
   if (!first || first.points.length === 0) return <EmptyState label="Pas encore de données." />;
-  // Une frise pleine de zeros trace une ligne plate au ras de l'axe : on le dit plutot que
-  // de laisser croire a un graphique casse.
-  if (series.every((s) => s.points.every((p) => p.y === 0))) {
+
+  const allZero = series.every((s) => s.points.every((p) => p.y === 0));
+  if (allZero) {
     return <EmptyState label="Aucune activité sur cette période." />;
   }
 
-  const n = first.points.length;
-  const w = 640;
-  const padL = 34;
-  const padR = 8;
-  const padT = 10;
-  const padB = 22;
-  const innerW = w - padL - padR;
-  const innerH = height - padT - padB;
+  // Recharts consomme une ligne par pas de temps : { x, "Parties": 3, "Joueurs": 1 }.
+  const data = first.points.map((p, i) => {
+    const row: Record<string, string | number> = { x: p.x, label: shortDate(p.x) };
+    for (const s of series) row[s.label] = s.points[i]?.y ?? 0;
+    return row;
+  });
 
-  const max = Math.max(1, ...series.flatMap((s) => s.points.map((p) => p.y)));
-  const xAt = (i: number) => padL + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
-  const yAt = (v: number) => padT + innerH - (v / max) * innerH;
-
-  // 4 graduations horizontales, valeurs entieres.
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((r) => Math.round(max * r));
-  const labelEvery = Math.max(1, Math.ceil(n / 6));
+  // Au-dela d'un mois, une graduation sur deux suffit : sinon les dates se chevauchent.
+  const interval = data.length > 60 ? 9 : data.length > 30 ? 4 : data.length > 14 ? 2 : 0;
 
   return (
-    <div className="w-full overflow-x-auto">
-      <svg
-        viewBox={`0 0 ${w} ${height}`}
-        className="w-full"
-        style={{ minWidth: 320 }}
-        role="img"
-        aria-label={`Courbe : ${series.map((s) => s.label).join(', ')}`}
-        onMouseLeave={() => setHover(null)}
-      >
+    <ChartContainer height={height}>
+      <AreaChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -20 }}>
         <defs>
-          <clipPath id={clipId}>
-            <rect x={padL} y={padT} width={innerW} height={innerH} />
-          </clipPath>
-        </defs>
-
-        {[...new Set(ticks)].map((t) => (
-          <g key={t}>
-            <line x1={padL} x2={w - padR} y1={yAt(t)} y2={yAt(t)} stroke={GRID} strokeWidth={1} />
-            <text x={padL - 6} y={yAt(t) + 4} textAnchor="end" fontSize={10} fill={MUTED}>
-              {t}
-            </text>
-          </g>
-        ))}
-
-        {first.points.map((p, i) =>
-          i % labelEvery === 0 ? (
-            <text key={p.x} x={xAt(i)} y={height - 6} textAnchor="middle" fontSize={10} fill={MUTED}>
-              {p.x.slice(5)}
-            </text>
-          ) : null,
-        )}
-
-        <g clipPath={`url(#${clipId})`}>
           {series.map((s) => (
-            <polyline
-              key={s.label}
-              points={s.points.map((p, i) => `${xAt(i)},${yAt(p.y)}`).join(' ')}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
+            <linearGradient key={s.label} id={`fill-${s.label}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={s.color} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={s.color} stopOpacity={0.02} />
+            </linearGradient>
           ))}
-        </g>
-
-        {hover !== null && (
-          <line x1={xAt(hover)} x2={xAt(hover)} y1={padT} y2={padT + innerH} stroke={MUTED} strokeWidth={1} />
+        </defs>
+        <CartesianGrid stroke={CHART_GRID} vertical={false} />
+        <XAxis dataKey="label" interval={interval} {...axisProps} />
+        <YAxis allowDecimals={false} width={40} {...axisProps} />
+        <Tooltip content={<ChartTooltipContent />} cursor={{ stroke: CHART_MUTED, strokeWidth: 1 }} />
+        {series.length > 1 && (
+          <Legend
+            verticalAlign="top"
+            align="right"
+            height={24}
+            iconType="circle"
+            iconSize={8}
+            wrapperStyle={{ fontSize: 11, fontWeight: 700, color: CHART_MUTED }}
+          />
         )}
-        {hover !== null &&
-          series.map((s) => {
-            const p = s.points[hover];
-            return p ? <circle key={s.label} cx={xAt(hover)} cy={yAt(p.y)} r={4} fill={s.color} stroke="#fff" strokeWidth={2} /> : null;
-          })}
-
-        {/* Zones de survol : plus larges que les points, pour viser facilement */}
-        {first.points.map((p, i) => (
-          <rect
-            key={p.x}
-            x={xAt(i) - innerW / n / 2}
-            y={padT}
-            width={innerW / n}
-            height={innerH}
-            fill="transparent"
-            onMouseEnter={() => setHover(i)}
+        {series.map((s) => (
+          <Area
+            key={s.label}
+            type="monotone"
+            dataKey={s.label}
+            stroke={s.color}
+            strokeWidth={2.5}
+            fill={`url(#fill-${s.label})`}
+            dot={false}
+            activeDot={{ r: 4, stroke: CHART_SURFACE, strokeWidth: 2 }}
           />
         ))}
-      </svg>
+      </AreaChart>
+    </ChartContainer>
+  );
+}
 
-      <div className="mt-1 flex flex-wrap items-center gap-3">
+/** Variante sans remplissage, pour une serie secondaire (inscriptions) posee dans une carte etroite. */
+export function SparkLine({ series, height = 160 }: { series: LineSeries[]; height?: number }) {
+  const first = series[0];
+  if (!first || first.points.length === 0) return <EmptyState label="Pas encore de données." />;
+  if (series.every((s) => s.points.every((p) => p.y === 0))) {
+    return <EmptyState label="Aucune inscription sur cette période." />;
+  }
+
+  const data = first.points.map((p, i) => {
+    const row: Record<string, string | number> = { label: shortDate(p.x) };
+    for (const s of series) row[s.label] = s.points[i]?.y ?? 0;
+    return row;
+  });
+  const interval = data.length > 60 ? 9 : data.length > 30 ? 4 : data.length > 14 ? 2 : 0;
+
+  return (
+    <ChartContainer height={height}>
+      <RcLineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -20 }}>
+        <CartesianGrid stroke={CHART_GRID} vertical={false} />
+        <XAxis dataKey="label" interval={interval} {...axisProps} />
+        <YAxis allowDecimals={false} width={40} {...axisProps} />
+        <Tooltip content={<ChartTooltipContent />} cursor={{ stroke: CHART_MUTED, strokeWidth: 1 }} />
         {series.map((s) => (
-          <span key={s.label} className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            <span className="h-2 w-4 rounded-full" style={{ background: s.color }} />
-            {s.label}
-            {hover !== null && (
-              <span className="font-bold text-foreground">
-                {formatValue(s.points[hover]?.y ?? 0)}
-              </span>
-            )}
-          </span>
+          <Line
+            key={s.label}
+            type="monotone"
+            dataKey={s.label}
+            stroke={s.color}
+            strokeWidth={2.5}
+            dot={{ r: 2.5, fill: s.color, strokeWidth: 0 }}
+            activeDot={{ r: 4, stroke: CHART_SURFACE, strokeWidth: 2 }}
+          />
         ))}
-        {hover !== null && (
-          <span className="text-xs font-semibold text-foreground">{first.points[hover]?.x}</span>
-        )}
-      </div>
-    </div>
+      </RcLineChart>
+    </ChartContainer>
   );
 }
 
@@ -193,75 +202,66 @@ export interface PieSlice {
   icon?: ReactNode;
 }
 
-/** Camembert avec legende chiffree : la part exacte est toujours ecrite, jamais devinee. */
-export function PieChart({ slices, size = 190 }: { slices: PieSlice[]; size?: number }) {
-  const [hover, setHover] = useState<string | null>(null);
+/**
+ * Camembert avec legende chiffree : la part exacte est toujours ecrite, jamais devinee a l'oeil.
+ * Anneau plutot que disque plein, le total au centre sert de repere.
+ */
+export function PieChart({ slices, height = 210 }: { slices: PieSlice[]; height?: number }) {
   const total = slices.reduce((s, x) => s + x.value, 0);
   if (total === 0) return <EmptyState label="Aucune partie sur cette période." />;
 
-  const r = size / 2 - 4;
-  const cx = size / 2;
-  const cy = size / 2;
-  let angle = -Math.PI / 2; // demarre en haut
-
-  const paths = slices.map((s) => {
-    const share = s.value / total;
-    const sweep = share * Math.PI * 2;
-    const x1 = cx + r * Math.cos(angle);
-    const y1 = cy + r * Math.sin(angle);
-    angle += sweep;
-    const x2 = cx + r * Math.cos(angle);
-    const y2 = cy + r * Math.sin(angle);
-    const large = sweep > Math.PI ? 1 : 0;
-    // Une part unique fait un cercle complet : l'arc degenere, on trace un disque.
-    const d =
-      share >= 0.999
-        ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
-        : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-    return { d, slice: s, pct: Math.round(share * 100) };
-  });
-
   return (
-    <div className="flex flex-wrap items-center justify-center gap-5">
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        role="img"
-        aria-label={`Répartition : ${slices.map((s) => `${s.label} ${Math.round((s.value / total) * 100)}%`).join(', ')}`}
-      >
-        {paths.map(({ d, slice }) => (
-          <path
-            key={slice.label}
-            d={d}
-            fill={slice.color}
-            stroke="#f7f3d7"
-            strokeWidth={2}
-            opacity={hover && hover !== slice.label ? 0.45 : 1}
-            onMouseEnter={() => setHover(slice.label)}
-            onMouseLeave={() => setHover(null)}
-          />
-        ))}
-      </svg>
+    <div className="flex flex-wrap items-center justify-center gap-4">
+      <div className="relative" style={{ width: height, height }}>
+        <ChartContainer height={height}>
+          <RcPieChart>
+            <Tooltip
+              content={
+                <ChartTooltipContent
+                  formatValue={(v) => `${v} · ${Math.round((v / total) * 100)}%`}
+                />
+              }
+            />
+            <Pie
+              data={slices}
+              dataKey="value"
+              nameKey="label"
+              innerRadius="58%"
+              outerRadius="92%"
+              paddingAngle={2}
+              stroke={CHART_SURFACE}
+              strokeWidth={2}
+              isAnimationActive={false}
+            >
+              {slices.map((s) => (
+                <Cell key={s.label} fill={s.color} />
+              ))}
+            </Pie>
+          </RcPieChart>
+        </ChartContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-extrabold leading-none text-foreground">{total}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-muted">parties</span>
+        </div>
+      </div>
 
-      <ul className="flex min-w-40 flex-col gap-1">
-        {paths.map(({ slice, pct }) => (
+      <ul className="flex min-w-40 flex-1 flex-col gap-0.5">
+        {slices.map((s) => (
           <li
-            key={slice.label}
-            onMouseEnter={() => setHover(slice.label)}
-            onMouseLeave={() => setHover(null)}
-            className={cn(
-              'flex items-center justify-between gap-3 rounded-control px-1.5 py-0.5 text-xs transition-colors',
-              hover === slice.label && 'bg-surface-2',
-            )}
+            key={s.label}
+            className="flex items-center justify-between gap-3 rounded-control px-1.5 py-1 text-xs hover:bg-surface-2"
           >
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: slice.color }} />
-              {slice.icon}
-              <span className="truncate font-semibold text-foreground">{slice.label}</span>
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ background: s.color }}
+              />
+              {s.icon}
+              <span className="truncate font-semibold text-foreground">{s.label}</span>
             </span>
             <span className="shrink-0 font-bold tabular-nums text-muted">
-              {slice.value} · {pct}%
+              {s.value} · {Math.round((s.value / total) * 100)}%
             </span>
           </li>
         ))}
@@ -281,7 +281,10 @@ export interface BarRow {
   hint?: ReactNode;
 }
 
-/** Barres horizontales : la forme la plus lisible pour comparer des categories nommees. */
+/**
+ * Barres horizontales en HTML (pas en SVG) : le libelle peut alors contenir une vignette de jeu
+ * et rester tronque proprement. Reserve aux listes courtes ; au-dela, un tableau est plus lisible.
+ */
 export function BarChart({
   rows,
   max,
@@ -322,46 +325,31 @@ export function BarChart({
 export function Histogram({
   buckets,
   xLabel,
-  height = 130,
+  height = 160,
+  color = '#3b4cca',
 }: {
   buckets: { label: string | number; count: number }[];
   xLabel?: string;
   height?: number;
+  color?: string;
 }) {
-  const [hover, setHover] = useState<number | null>(null);
   if (buckets.length === 0) return <EmptyState label="Pas encore de données." />;
-  const max = Math.max(1, ...buckets.map((b) => b.count));
+  const data = buckets.map((b) => ({ label: String(b.label), count: b.count }));
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-end gap-1" style={{ height }}>
-        {buckets.map((b, i) => (
-          <div
-            key={b.label}
-            className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
-            onMouseEnter={() => setHover(i)}
-            onMouseLeave={() => setHover(null)}
-          >
-            <span className="text-[10px] font-bold tabular-nums text-foreground">
-              {hover === i ? b.count : ''}
-            </span>
-            <span
-              className="w-full rounded-t-[4px] bg-primary transition-opacity"
-              style={{
-                height: `${Math.max(2, (b.count / max) * (height - 18))}px`,
-                opacity: hover === null || hover === i ? 1 : 0.5,
-              }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-1">
-        {buckets.map((b) => (
-          <span key={b.label} className="min-w-0 flex-1 text-center text-[10px] font-semibold text-muted">
-            {b.label}
-          </span>
-        ))}
-      </div>
+      <ChartContainer height={height}>
+        <RcBarChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -22 }}>
+          <CartesianGrid stroke={CHART_GRID} vertical={false} />
+          <XAxis dataKey="label" {...axisProps} />
+          <YAxis allowDecimals={false} width={40} {...axisProps} />
+          <Tooltip
+            content={<ChartTooltipContent formatValue={(v) => `${v} défi${v > 1 ? 's' : ''}`} />}
+            cursor={{ fill: 'rgba(59,76,202,0.08)' }}
+          />
+          <Bar dataKey="count" name="Défis" fill={color} radius={[4, 4, 0, 0]} maxBarSize={44} />
+        </RcBarChart>
+      </ChartContainer>
       {xLabel && <p className="text-center text-[10px] font-semibold text-muted/70">{xLabel}</p>}
     </div>
   );
@@ -379,25 +367,19 @@ export function CohortTable({
     return <EmptyState label="Pas encore de cohortes." hint="Il faut des inscriptions pour en calculer." />;
   }
   const weeks = cohorts[0]?.retentionPct.length ?? 0;
-  const dateCourte = (iso: string) => {
-    const d = new Date(`${iso}T00:00:00Z`);
-    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-  };
 
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs font-semibold text-muted">
         Chaque ligne suit un <span className="text-foreground">groupe d'inscrits</span> de la même
         semaine. <span className="text-foreground">S0</span> est leur semaine d'inscription,{' '}
-        <span className="text-foreground">S1</span> la suivante, etc. La case indique la part
+        <span className="text-foreground">S+1</span> la suivante, etc. La case indique la part
         d'entre eux qui a joué cette semaine-là : plus c'est foncé, plus ils reviennent.
       </p>
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[30rem] border-separate border-spacing-0.5 text-xs">
-          <caption className="sr-only">
-            Rétention par cohorte hebdomadaire d'inscription
-          </caption>
+          <caption className="sr-only">Rétention par cohorte hebdomadaire d'inscription</caption>
           <thead>
             <tr>
               <th scope="col" className="p-1 text-left font-semibold text-muted">
@@ -417,7 +399,7 @@ export function CohortTable({
             {cohorts.map((c) => (
               <tr key={c.week}>
                 <th scope="row" className="whitespace-nowrap p-1 text-left font-semibold text-foreground">
-                  {dateCourte(c.week)}
+                  {shortDate(c.week)}
                 </th>
                 <td className="p-1 text-right font-bold tabular-nums text-foreground">{c.size}</td>
                 {c.retentionPct.map((v, k) => (
@@ -431,10 +413,10 @@ export function CohortTable({
                     className="rounded p-1 text-center font-bold tabular-nums"
                     style={
                       v === null
-                        ? { color: MUTED }
+                        ? { color: CHART_MUTED }
                         : {
                             background: `rgba(59,76,202,${0.08 + (v / 100) * 0.6})`,
-                            color: v > 60 ? '#fff' : INK,
+                            color: v > 60 ? '#fff' : CHART_INK,
                           }
                     }
                   >
@@ -447,8 +429,8 @@ export function CohortTable({
         </table>
       </div>
 
-      <p className="text-[11px] font-semibold text-muted/70">
-        Un point (·) signale une semaine pas encore écoulée, donc pas encore mesurable.
+      <p className={cn('text-[11px] font-semibold text-muted/70')}>
+        « · » : semaine pas encore écoulée, la rétention n'est pas encore mesurable.
       </p>
     </div>
   );

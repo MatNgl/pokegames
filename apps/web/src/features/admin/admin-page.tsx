@@ -25,6 +25,15 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  CellMeter,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/lib/errors';
 import { useAuth } from '@/features/auth/auth-context';
@@ -85,7 +94,9 @@ function Shell({ children }: { children: React.ReactNode }) {
     <AppBackground>
       <div className="flex min-h-screen flex-col">
         <AppHeader />
-        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 py-8">{children}</main>
+        {/* Largeur de tableau de bord (et non de page de jeu) : les tableaux ont besoin de place
+            pour tenir leurs colonnes sans troncature sur un ecran large. */}
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-8">{children}</main>
       </div>
     </AppBackground>
   );
@@ -360,7 +371,7 @@ function DashboardTab() {
 
       {/* Anomalies : exploitation du journal d'audit (manches trop rapides, sans-faute anormal). */}
       <Card className="flex flex-col gap-2 p-4">
-        <h2 className="flex items-center gap-2 font-display text-xs uppercase text-foreground">
+        <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-wide text-foreground">
           <ShieldAlert className="h-4 w-4 text-danger" />
           Anomalies détectées
         </h2>
@@ -393,38 +404,57 @@ function DashboardTab() {
         )}
       </Card>
 
-      {/* Volumes par jeu : reperer un jeu delaisse ou anormalement facile/difficile. */}
-      {/* Une jauge par jeu au lieu d'une ligne de texte : le taux se compare d'un coup d'oeil.
-          Chiffres en tabular-nums car ils forment des colonnes qui doivent s'aligner. */}
+      {/* Volumes par jeu : reperer un jeu delaisse ou anormalement facile/difficile.
+          Tableau plutot que liste de jauges : trois chiffres par ligne, donc trois colonnes
+          alignees, comparables verticalement. */}
       {stats && stats.perGame.length > 0 && (
         <Card className="flex flex-col gap-3 p-4">
-          <div className="flex items-baseline justify-between gap-2">
-            <SectionTitle>Par jeu</SectionTitle>
-            <span className="text-[11px] font-semibold text-muted">
-              parties · réussite · durée médiane
-            </span>
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {stats.perGame.map((g) => (
-              <div key={g.gameType} className="flex flex-col gap-1.5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 truncate text-sm font-bold text-foreground">
-                    {gameLabel(g.gameType)}
-                  </span>
-                  <span className="shrink-0 text-xs font-semibold tabular-nums text-muted">
-                    {g.games} · <span className="text-foreground">{g.successRatePct}%</span> ·{' '}
+          <SectionTitle>Par jeu</SectionTitle>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Jeu</TableHead>
+                <TableHead className="text-right">Parties</TableHead>
+                <TableHead>Réussite</TableHead>
+                <TableHead className="text-right">Durée méd.</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stats.perGame.map((g) => (
+                <TableRow key={g.gameType}>
+                  <TableCell>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <GameIcon gameType={g.gameType} />
+                      <span className="truncate font-bold text-foreground">
+                        {gameLabel(g.gameType)}
+                      </span>
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right font-bold tabular-nums">{g.games}</TableCell>
+                  <TableCell className="text-xs font-bold">
+                    <CellMeter
+                      value={g.successRatePct}
+                      color={
+                        g.successRatePct >= 70
+                          ? '#5fb24a'
+                          : g.successRatePct >= 40
+                            ? '#e8730c'
+                            : '#ee1515'
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums text-muted">
                     {formatDuration(g.medianDurationSeconds)}
-                  </span>
-                </div>
-                <RateMeter pct={g.successRatePct} />
-              </div>
-            ))}
-          </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       )}
 
       <Card className="flex flex-col gap-3 p-4">
-        <h2 className="font-display text-xs uppercase text-foreground">Historique des parties</h2>
+        <h2 className="text-sm font-extrabold uppercase tracking-wide text-foreground">Historique des parties</h2>
 
         {/* Filtres : le back acceptait deja gameType, le front ne l'utilisait jamais. */}
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -549,7 +579,7 @@ function UsersTab() {
   return (
     <div className="flex flex-col gap-4">
       <Card className="flex flex-col gap-2 p-4">
-        <h2 className="font-display text-xs uppercase text-foreground">Utilisateurs</h2>
+        <h2 className="text-sm font-extrabold uppercase tracking-wide text-foreground">Utilisateurs</h2>
 
         {/* Tri : parties et temps joue sont agreges depuis le journal, pas triables en base. */}
         <div className="flex flex-wrap gap-1">
@@ -649,7 +679,7 @@ function UsersTab() {
 
       {selected && detail && (
         <Card className="flex flex-col gap-3 p-4">
-          <h2 className="font-display text-xs uppercase text-foreground">{detail.username}</h2>
+          <h2 className="text-sm font-extrabold uppercase tracking-wide text-foreground">{detail.username}</h2>
           <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
             <div>
               <p className="text-xs text-muted">Parties</p>
@@ -792,7 +822,7 @@ function UsersTab() {
 
           {detail.recentDailyResults.length > 0 && (
             <div className="flex flex-col gap-1">
-              <p className="font-display text-[10px] uppercase tracking-widest text-muted">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
                 Défis quotidiens récents
               </p>
               {detail.recentDailyResults.map((d) => (
@@ -823,7 +853,7 @@ function UsersTab() {
           )}
           {detail.recentGames.length > 0 && (
             <div className="flex flex-col gap-1">
-              <p className="font-display text-[10px] uppercase tracking-widest text-muted">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
                 Parties récentes
               </p>
               {detail.recentGames.map((g) => (
