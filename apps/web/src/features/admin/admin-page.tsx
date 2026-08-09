@@ -28,7 +28,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/lib/errors';
 import { useAuth } from '@/features/auth/auth-context';
-import { gameLabel } from '@/features/daily/daily-catalog';
+import { gameLabel, scopeLabel } from '@/features/daily/daily-catalog';
 import {
   deleteAdminUser,
   formatDuration,
@@ -50,6 +50,7 @@ import {
   SystemTab,
 } from './admin-tabs';
 import { BarChart, LineChart, chartColor } from './charts';
+import { GameIcon } from './game-icon';
 
 const TAB_BASE =
   'flex-1 rounded-control border-2 px-3 py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 sm:flex-none';
@@ -467,6 +468,7 @@ function DashboardTab() {
                   {/* Le joueur en premier : c'est la question qu'on se pose en lisant le journal. */}
                   <p className="flex items-center gap-1.5 truncate text-sm font-bold text-foreground">
                     <PlayerTag userId={log.userId} username={log.username} />
+                    <GameIcon gameType={log.gameType} className="h-5 w-5" />
                     <span className="truncate font-semibold text-muted">
                       {gameLabel(log.gameType)} · {log.targetNameFr}
                     </span>
@@ -796,18 +798,24 @@ function UsersTab() {
               {detail.recentDailyResults.map((d) => (
                 <div
                   key={`${d.gameType}-${d.scope}-${d.dayDate}`}
-                  className="flex items-center justify-between gap-2 text-xs"
+                  className="flex items-center justify-between gap-2 rounded-control px-1.5 py-1 text-xs odd:bg-surface-2/40"
                 >
-                  <span className="truncate font-semibold text-foreground">
-                    {d.dayDate} · {gameLabel(d.gameType)}
-                    {d.scope && <span className="text-muted"> · {d.scope}</span>}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <GameIcon gameType={d.gameType} className="h-5 w-5" />
+                    <span className="min-w-0 truncate font-semibold text-foreground">
+                      {gameLabel(d.gameType)}
+                      {d.scope && <span className="text-muted"> · {scopeLabel(d.scope)}</span>}
+                    </span>
                   </span>
-                  <span className={cn('shrink-0', d.won ? 'text-success' : 'text-muted')}>
-                    {d.correctCount != null && d.totalRounds != null
-                      ? `${d.correctCount}/${d.totalRounds}`
-                      : d.attempts != null
-                        ? `${d.attempts} essais`
-                        : (d.score ?? '—')}
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="tabular-nums text-muted">{d.dayDate}</span>
+                    <span className={cn('font-bold', d.won ? 'text-success' : 'text-muted')}>
+                      {d.correctCount != null && d.totalRounds != null
+                        ? `${d.correctCount}/${d.totalRounds}`
+                        : d.attempts != null
+                          ? `${d.attempts} essais`
+                          : (d.score ?? '—')}
+                    </span>
                   </span>
                 </div>
               ))}
@@ -819,11 +827,18 @@ function UsersTab() {
                 Parties récentes
               </p>
               {detail.recentGames.map((g) => (
-                <div key={g.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate font-semibold text-foreground">
-                    {gameLabel(g.gameType)} · {g.targetNameFr}
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between gap-2 rounded-control px-1.5 py-1 text-xs odd:bg-surface-2/40"
+                >
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <GameIcon gameType={g.gameType} className="h-5 w-5" />
+                    <span className="min-w-0 truncate font-semibold text-foreground">
+                      {gameLabel(g.gameType)}
+                      <span className="text-muted"> · {g.targetNameFr}</span>
+                    </span>
                   </span>
-                  <span className={cn('shrink-0', g.isSuccess ? 'text-success' : 'text-danger')}>
+                  <span className={cn('shrink-0 font-bold', g.isSuccess ? 'text-success' : 'text-danger')}>
                     {g.isSuccess ? 'Réussi' : 'Échoué'}
                   </span>
                 </div>

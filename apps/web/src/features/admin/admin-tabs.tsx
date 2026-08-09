@@ -12,6 +12,7 @@ import {
   PieChart,
   chartColor,
 } from './charts';
+import { GameIcon, GameTag } from './game-icon';
 import {
   formatDuration,
   getAdminGamesReport,
@@ -50,6 +51,22 @@ function levelName(gameType: string, scope: string): string {
   return s ? `${gameLabel(gameType)} · ${s}` : gameLabel(gameType);
 }
 
+/** Noms lisibles des zones d'apparition (le serveur renvoie des identifiants techniques). */
+const ZONE_LABEL: Record<string, string> = {
+  home: 'Accueil',
+  quests: 'Quêtes',
+  leaderboard: 'Classements',
+  history: 'Historique',
+  silhouette: 'Quel est ce Pokémon',
+  motus: 'Poké-Motus',
+  'plus-minus': 'Plus ou Moins',
+  intruder: "L'Intrus",
+  'just-stat': 'La Juste Stat',
+  'true-shiny': 'Le Bon Shiny',
+  shiny: 'Trouve le shiny',
+  'guess-who': 'Qui est-ce',
+};
+
 /* ------------------------------------------------------- Onglet Vue d'ensemble */
 
 export function OverviewCharts({ days }: { days: number }) {
@@ -78,6 +95,7 @@ export function OverviewCharts({ days }: { days: number }) {
               label: gameLabel(s.gameType),
               value: s.games,
               color: chartColor(i),
+              icon: <GameIcon gameType={s.gameType} className="h-4 w-4" />,
             }))}
           />
         </Panel>
@@ -127,7 +145,8 @@ export function GamesTab({ days }: { days: number }) {
         <BarChart
           max={100}
           rows={data.levels.map((l) => ({
-            label: levelName(l.gameType, l.scope),
+            key: `${l.gameType}-${l.scope}`,
+            label: <GameTag gameType={l.gameType} suffix={scopeLabel(l.scope)} />,
             value: l.successRatePct,
             hint: (
               <>
@@ -191,7 +210,7 @@ export function GamesTab({ days }: { days: number }) {
                 key={h.gameType}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-control border-2 border-border-strong bg-surface-2/50 px-3 py-2"
               >
-                <span className="text-sm font-bold text-foreground">{gameLabel(h.gameType)}</span>
+                <GameTag gameType={h.gameType} className="text-sm" />
                 <span className="text-xs font-semibold tabular-nums text-muted">
                   {h.avgHints} indice(s) en moyenne · réussite{' '}
                   <span className="text-foreground">{h.successWithHintsPct ?? '—'}%</span> avec /{' '}
@@ -206,9 +225,10 @@ export function GamesTab({ days }: { days: number }) {
       <Panel title="Défis terminés" hint="volume par jeu et niveau">
         <BarChart
           rows={data.completion.map((c) => ({
-            label: levelName(c.gameType, c.scope),
+            key: `${c.gameType}-${c.scope}`,
+            label: <GameTag gameType={c.gameType} suffix={scopeLabel(c.scope)} />,
             value: c.completed,
-            hint: `${c.completed} terminés · ${c.wonPct}% gagnés`,
+            hint: `${c.completed} terminé${c.completed > 1 ? 's' : ''} · ${c.wonPct}% gagnés`,
           }))}
         />
       </Panel>
@@ -291,22 +311,24 @@ export function PokedexTab() {
         </Card>
       </div>
 
-      <Panel
-        title="Taux de collecte par écran"
-        hint="les plus faibles en tête : silhouette peu vue ou mal placée"
-      >
+      <Panel title="Taux de collecte par écran">
+        <p className="text-xs font-semibold text-muted">
+          Part des silhouettes apparues sur un écran qui ont été ramassées. Les écrans les moins
+          performants sont en tête : un taux bas veut dire que la page est peu visitée, ou que la
+          silhouette y est difficile à repérer.
+        </p>
         <BarChart
           max={100}
           rows={data.zones.map((z) => ({
-            label: z.zone,
+            label: ZONE_LABEL[z.zone] ?? z.zone,
             value: z.ratePct,
             color: z.ratePct < 25 ? '#ee1515' : z.ratePct < 60 ? '#e8730c' : '#5fb24a',
-            hint: `${z.ratePct}% · ${z.collected}/${z.spawned}`,
+            hint: `${z.collected} ramassées sur ${z.spawned} · ${z.ratePct}%`,
           }))}
         />
-        <p className="flex items-start gap-1.5 text-[11px] font-semibold text-muted">
+        <p className="flex items-start gap-1.5 text-[11px] font-semibold text-muted/70">
           <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
-          Un écran sous 25 % signale une page peu visitée, ou une silhouette difficile à repérer.
+          Rouge sous 25 %, orange sous 60 %, vert au-delà.
         </p>
       </Panel>
     </div>

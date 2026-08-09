@@ -31,9 +31,18 @@ export function chartColor(index: number): string {
   return CHART_COLORS[index % CHART_COLORS.length] ?? CHART_COLORS[0]!;
 }
 
-function EmptyState({ label }: { label: string }) {
+/**
+ * Etat vide explicite. Sans ce message, une periode sans activite est indiscernable d'un bug :
+ * on dit donc ce qui manque, et quoi faire.
+ */
+function EmptyState({ label, hint }: { label: string; hint?: string }) {
   return (
-    <p className="py-8 text-center text-sm font-semibold text-muted">{label}</p>
+    <div className="flex flex-col items-center gap-1 py-8 text-center">
+      <p className="text-sm font-semibold text-muted">{label}</p>
+      <p className="text-xs font-semibold text-muted/70">
+        {hint ?? 'Élargis la période en haut de page pour remonter plus loin.'}
+      </p>
+    </div>
   );
 }
 
@@ -62,6 +71,11 @@ export function LineChart({
   const clipId = useId();
   const first = series[0];
   if (!first || first.points.length === 0) return <EmptyState label="Pas encore de données." />;
+  // Une frise pleine de zeros trace une ligne plate au ras de l'axe : on le dit plutot que
+  // de laisser croire a un graphique casse.
+  if (series.every((s) => s.points.every((p) => p.y === 0))) {
+    return <EmptyState label="Aucune activité sur cette période." />;
+  }
 
   const n = first.points.length;
   const w = 640;
@@ -176,13 +190,14 @@ export interface PieSlice {
   label: string;
   value: number;
   color: string;
+  icon?: ReactNode;
 }
 
 /** Camembert avec legende chiffree : la part exacte est toujours ecrite, jamais devinee. */
 export function PieChart({ slices, size = 190 }: { slices: PieSlice[]; size?: number }) {
   const [hover, setHover] = useState<string | null>(null);
   const total = slices.reduce((s, x) => s + x.value, 0);
-  if (total === 0) return <EmptyState label="Pas encore de parties." />;
+  if (total === 0) return <EmptyState label="Aucune partie sur cette période." />;
 
   const r = size / 2 - 4;
   const cx = size / 2;
@@ -242,6 +257,7 @@ export function PieChart({ slices, size = 190 }: { slices: PieSlice[]; size?: nu
           >
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: slice.color }} />
+              {slice.icon}
               <span className="truncate font-semibold text-foreground">{slice.label}</span>
             </span>
             <span className="shrink-0 font-bold tabular-nums text-muted">
@@ -257,7 +273,9 @@ export function PieChart({ slices, size = 190 }: { slices: PieSlice[]; size?: nu
 /* -------------------------------------------------------- Barres et jauges */
 
 export interface BarRow {
-  label: string;
+  /** Identifiant stable de la ligne (cle React) ; le libelle peut etre du contenu riche. */
+  key?: string;
+  label: ReactNode;
   value: number;
   color?: string;
   hint?: ReactNode;
@@ -278,9 +296,9 @@ export function BarChart({
 
   return (
     <div className="flex flex-col gap-2">
-      {rows.map((r) => (
-        <div key={r.label} className="flex flex-col gap-1">
-          <div className="flex items-baseline justify-between gap-3">
+      {rows.map((r, i) => (
+        <div key={r.key ?? i} className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-3">
             <span className="min-w-0 truncate text-sm font-bold text-foreground">{r.label}</span>
             <span className="shrink-0 text-xs font-semibold tabular-nums text-muted">
               {r.hint ?? formatValue(r.value)}
@@ -357,45 +375,81 @@ export function CohortTable({
 }: {
   cohorts: { week: string; size: number; retentionPct: (number | null)[] }[];
 }) {
-  if (cohorts.length === 0) return <EmptyState label="Pas encore de cohortes." />;
+  if (cohorts.length === 0) {
+    return <EmptyState label="Pas encore de cohortes." hint="Il faut des inscriptions pour en calculer." />;
+  }
   const weeks = cohorts[0]?.retentionPct.length ?? 0;
+  const dateCourte = (iso: string) => {
+    const d = new Date(`${iso}T00:00:00Z`);
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[28rem] border-separate border-spacing-0.5 text-xs">
-        <thead>
-          <tr>
-            <th className="p-1 text-left font-semibold text-muted">Semaine</th>
-            <th className="p-1 text-right font-semibold text-muted">Inscrits</th>
-            {Array.from({ length: weeks }, (_, k) => (
-              <th key={k} className="p-1 text-center font-semibold text-muted">
-                S{k}
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-semibold text-muted">
+        Chaque ligne suit un <span className="text-foreground">groupe d'inscrits</span> de la même
+        semaine. <span className="text-foreground">S0</span> est leur semaine d'inscription,{' '}
+        <span className="text-foreground">S1</span> la suivante, etc. La case indique la part
+        d'entre eux qui a joué cette semaine-là : plus c'est foncé, plus ils reviennent.
+      </p>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[30rem] border-separate border-spacing-0.5 text-xs">
+          <caption className="sr-only">
+            Rétention par cohorte hebdomadaire d'inscription
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" className="p-1 text-left font-semibold text-muted">
+                Inscrits la semaine du
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {cohorts.map((c) => (
-            <tr key={c.week}>
-              <td className="whitespace-nowrap p-1 font-semibold text-foreground">{c.week}</td>
-              <td className="p-1 text-right font-bold tabular-nums text-foreground">{c.size}</td>
-              {c.retentionPct.map((v, k) => (
-                <td
-                  key={k}
-                  className="rounded p-1 text-center font-bold tabular-nums"
-                  style={
-                    v === null
-                      ? { color: MUTED }
-                      : { background: `rgba(59,76,202,${0.08 + (v / 100) * 0.6})`, color: v > 60 ? '#fff' : INK }
-                  }
-                >
-                  {v === null ? '·' : `${v}%`}
-                </td>
+              <th scope="col" className="p-1 text-right font-semibold text-muted">
+                Nb
+              </th>
+              {Array.from({ length: weeks }, (_, k) => (
+                <th key={k} scope="col" className="p-1 text-center font-semibold text-muted">
+                  {k === 0 ? 'S0' : `S+${k}`}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {cohorts.map((c) => (
+              <tr key={c.week}>
+                <th scope="row" className="whitespace-nowrap p-1 text-left font-semibold text-foreground">
+                  {dateCourte(c.week)}
+                </th>
+                <td className="p-1 text-right font-bold tabular-nums text-foreground">{c.size}</td>
+                {c.retentionPct.map((v, k) => (
+                  <td
+                    key={k}
+                    title={
+                      v === null
+                        ? 'Semaine pas encore écoulée'
+                        : `${v}% des ${c.size} inscrit(s) ont joué`
+                    }
+                    className="rounded p-1 text-center font-bold tabular-nums"
+                    style={
+                      v === null
+                        ? { color: MUTED }
+                        : {
+                            background: `rgba(59,76,202,${0.08 + (v / 100) * 0.6})`,
+                            color: v > 60 ? '#fff' : INK,
+                          }
+                    }
+                  >
+                    {v === null ? '·' : `${v}%`}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] font-semibold text-muted/70">
+        Un point (·) signale une semaine pas encore écoulée, donc pas encore mesurable.
+      </p>
     </div>
   );
 }
