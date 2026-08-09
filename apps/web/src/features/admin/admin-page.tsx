@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   CalendarDays,
+  Flame,
   Gamepad2,
   RotateCcw,
   Search,
@@ -40,17 +41,43 @@ import {
   updateAdminUserRole,
 } from './admin-api';
 import { ConfigTab } from './config-tab';
+import {
+  GamesTab,
+  OverviewCharts,
+  PokedexTab,
+  RetentionTab,
+  SectionTitle,
+  SystemTab,
+} from './admin-tabs';
+import { BarChart, LineChart, chartColor } from './charts';
 
 const TAB_BASE =
   'flex-1 rounded-control border-2 px-3 py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 sm:flex-none';
 
 const TABS = [
-  { key: 'dashboard', label: 'Tableau de bord' },
-  { key: 'users', label: 'Utilisateurs' },
-  { key: 'config', label: 'Configuration' },
+  { key: 'dashboard', label: "Vue d'ensemble" },
+  { key: 'games', label: 'Jeux' },
+  { key: 'users', label: 'Joueurs' },
+  { key: 'pokedex', label: 'Pokédex' },
+  { key: 'system', label: 'Système' },
 ] as const;
 
 type AdminTab = (typeof TABS)[number]['key'];
+
+const SORTS = [
+  { key: 'recent', label: 'Récents' },
+  { key: 'games', label: 'Parties' },
+  { key: 'time', label: 'Temps joué' },
+  { key: 'name', label: 'Nom' },
+] as const;
+
+// Fenetre d'analyse partagee par les onglets qui exposent des series temporelles.
+const PERIODS = [
+  { days: 7, label: '7 j' },
+  { days: 30, label: '30 j' },
+  { days: 90, label: '90 j' },
+  { days: 0, label: 'Tout' },
+] as const;
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -71,6 +98,7 @@ export function AdminPage() {
   const navigate = useNavigate();
   const { user, initializing } = useAuth();
   const [tab, setTab] = useState<AdminTab>('dashboard');
+  const [days, setDays] = useState<number>(30);
 
   if (initializing) {
     return (
@@ -98,11 +126,34 @@ export function AdminPage() {
 
   return (
     <Shell>
-      {/* flex-wrap + onglets pleine largeur sous sm : sans ca la ligne reclame ~489px pour 343px
-          disponibles sur mobile, et l'onglet Configuration sort du viewport (overflow-x masque). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-sm text-foreground">Administration</h1>
-        <div className="flex w-full gap-1.5 sm:w-auto">
+        {/* Selecteur de periode : ne concerne que les onglets a series temporelles. */}
+        {(tab === 'dashboard' || tab === 'games') && (
+          <div className="flex gap-1" role="group" aria-label="Période d'analyse">
+            {PERIODS.map((p) => (
+              <button
+                key={p.days}
+                type="button"
+                aria-pressed={days === p.days}
+                onClick={() => setDays(p.days)}
+                className={cn(
+                  'min-h-9 rounded-control border-2 px-2.5 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                  days === p.days
+                    ? 'border-primary-shadow bg-primary text-primary-foreground'
+                    : 'border-border-strong bg-surface-2/60 text-muted',
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Onglets scrollables horizontalement : 5 entrees ne tiennent pas a 375px. */}
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="flex w-max gap-1.5 sm:w-full">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -122,7 +173,26 @@ export function AdminPage() {
         </div>
       </div>
 
-      {tab === 'dashboard' ? <DashboardTab /> : tab === 'users' ? <UsersTab /> : <ConfigTab />}
+      {tab === 'dashboard' && (
+        <>
+          <DashboardTab />
+          <OverviewCharts days={days} />
+        </>
+      )}
+      {tab === 'games' && <GamesTab days={days} />}
+      {tab === 'users' && (
+        <>
+          <UsersTab />
+          <RetentionTab />
+        </>
+      )}
+      {tab === 'pokedex' && <PokedexTab />}
+      {tab === 'system' && (
+        <SystemTab>
+          <ConfigTab />
+        </SystemTab>
+      )}
+
       <Button className="w-full" onClick={() => navigate('/')}>
         Retour à l'accueil
       </Button>
@@ -189,11 +259,6 @@ function PlayerTag({ userId, username }: { userId: string | null; username: stri
 }
 
 /** Intitule de section : c'est ici que la police pixel de la marque garde sa place. */
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="font-display text-[10px] uppercase tracking-widest text-muted">{children}</h2>
-  );
-}
 
 /**
  * Jauge d'un ratio (0 a 100). Teinte unique : le fond est une version claire de la meme couleur que
@@ -439,13 +504,14 @@ function UsersTab() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('recent');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionOk, setActionOk] = useState<string | null>(null);
 
   const { data: users, isLoading } = useQuery({
-    queryKey: ['admin-users', page, query],
-    queryFn: () => getAdminUsers(page, query || undefined),
+    queryKey: ['admin-users', page, query, sort],
+    queryFn: () => getAdminUsers(page, query || undefined, sort),
   });
   const { data: detail } = useQuery({
     queryKey: ['admin-user', selected],
@@ -482,6 +548,29 @@ function UsersTab() {
     <div className="flex flex-col gap-4">
       <Card className="flex flex-col gap-2 p-4">
         <h2 className="font-display text-xs uppercase text-foreground">Utilisateurs</h2>
+
+        {/* Tri : parties et temps joue sont agreges depuis le journal, pas triables en base. */}
+        <div className="flex flex-wrap gap-1">
+          {SORTS.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              aria-pressed={sort === s.key}
+              onClick={() => {
+                setSort(s.key);
+                setPage(1);
+              }}
+              className={cn(
+                'min-h-9 rounded-control border-2 px-2.5 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                sort === s.key
+                  ? 'border-primary-shadow bg-primary text-primary-foreground'
+                  : 'border-border-strong bg-surface-2/60 text-muted',
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
 
         <form onSubmit={submitSearch} className="flex gap-2">
           <Input
@@ -580,6 +669,78 @@ function UsersTab() {
           <p className="text-xs font-semibold text-muted">
             {detail.email} · inscrit le {formatDate(detail.createdAt)} · rôle {detail.role}
           </p>
+
+          {/* Assiduite : la serie en cours est l'indicateur qui donne envie de revenir chaque jour. */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-control border-2 border-go-shadow/40 bg-go/10 p-2.5">
+              <p className="flex items-baseline gap-1 text-xl font-extrabold leading-none text-foreground">
+                <Flame className="h-4 w-4 text-danger" />
+                {detail.currentStreakDays}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-muted">Série en cours (jours)</p>
+            </div>
+            <div className="rounded-control border-2 border-border-strong bg-surface-2/50 p-2.5">
+              <p className="text-xl font-extrabold leading-none text-foreground">
+                {detail.longestStreakDays}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-muted">Record de série</p>
+            </div>
+            <div className="rounded-control border-2 border-border-strong bg-surface-2/50 p-2.5">
+              <p className="text-xl font-extrabold leading-none text-foreground">{detail.activeDays}</p>
+              <p className="mt-1 text-[11px] font-semibold text-muted">Jours actifs</p>
+            </div>
+            <div className="rounded-control border-2 border-border-strong bg-surface-2/50 p-2.5">
+              <p className="text-xl font-extrabold leading-none text-foreground">
+                {detail.lastPlayedAt ? formatDate(detail.lastPlayedAt).split(' ')[0] : '—'}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-muted">Dernière partie</p>
+            </div>
+          </div>
+
+          <p className="text-[11px] font-semibold text-muted">
+            Devance {detail.percentileGames} % des joueurs en parties, {detail.percentilePokedex} % au
+            Pokédex.
+          </p>
+
+          {/* Progression du Pokedex : total, detail par generation, puis courbe des captures. */}
+          <div className="flex flex-col gap-2 border-t-2 border-border-strong/40 pt-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <SectionTitle>Pokédex</SectionTitle>
+              <span className="text-xs font-bold tabular-nums text-foreground">
+                {detail.pokedexCount} / {detail.pokedexTotalSpecies}
+              </span>
+            </div>
+            <span className="block h-2 w-full overflow-hidden rounded-full bg-primary/15">
+              <span
+                className="block h-full rounded-full bg-primary"
+                style={{
+                  width: `${detail.pokedexTotalSpecies ? (detail.pokedexCount / detail.pokedexTotalSpecies) * 100 : 0}%`,
+                }}
+              />
+            </span>
+            {detail.pokedexByGeneration.length > 0 && (
+              <BarChart
+                max={100}
+                rows={detail.pokedexByGeneration.map((g) => ({
+                  label: `Génération ${g.generation}`,
+                  value: g.total ? Math.round((g.collected / g.total) * 100) : 0,
+                  hint: `${g.collected}/${g.total}`,
+                }))}
+              />
+            )}
+            {detail.pokedexTimeline.length > 1 && (
+              <LineChart
+                height={120}
+                series={[
+                  {
+                    label: 'Captures cumulées',
+                    color: chartColor(0),
+                    points: detail.pokedexTimeline.map((p) => ({ x: p.date, y: p.total })),
+                  },
+                ]}
+              />
+            )}
+          </div>
 
           {/* Actions de moderation : evitent de passer par psql pour la moindre operation. */}
           <div className="flex flex-wrap gap-2 border-t-2 border-border-strong/40 pt-3">

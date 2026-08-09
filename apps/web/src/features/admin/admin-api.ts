@@ -3,8 +3,13 @@ import type {
   AdminAnomaly,
   AdminAuditLogEntry,
   AdminGameConfigEntry,
+  AdminGamesReport,
+  AdminOverview,
   AdminPage,
+  AdminPokedexReport,
+  AdminRetentionReport,
   AdminStats,
+  AdminSystemInfo,
   AdminUserDetail,
   AdminUserSummary,
 } from '@pokegames/shared-types';
@@ -39,10 +44,39 @@ export async function getAdminAnomalies(): Promise<AdminAnomaly[]> {
   return res.data;
 }
 
-export async function getAdminUsers(page = 1, q?: string): Promise<AdminPage<AdminUserSummary>> {
+export async function getAdminUsers(
+  page = 1,
+  q?: string,
+  sort?: string,
+): Promise<AdminPage<AdminUserSummary>> {
   const res = await api.get<AdminPage<AdminUserSummary>>('/admin/users', {
-    params: { page, ...(q ? { q } : {}) },
+    params: { page, ...(q ? { q } : {}), ...(sort ? { sort } : {}) },
   });
+  return res.data;
+}
+
+export async function getAdminOverview(days: number): Promise<AdminOverview> {
+  const res = await api.get<AdminOverview>('/admin/audit/overview', { params: { days } });
+  return res.data;
+}
+
+export async function getAdminGamesReport(days: number): Promise<AdminGamesReport> {
+  const res = await api.get<AdminGamesReport>('/admin/audit/games', { params: { days } });
+  return res.data;
+}
+
+export async function getAdminRetention(): Promise<AdminRetentionReport> {
+  const res = await api.get<AdminRetentionReport>('/admin/audit/retention');
+  return res.data;
+}
+
+export async function getAdminPokedexReport(): Promise<AdminPokedexReport> {
+  const res = await api.get<AdminPokedexReport>('/admin/audit/pokedex');
+  return res.data;
+}
+
+export async function getAdminSystemInfo(): Promise<AdminSystemInfo> {
+  const res = await api.get<AdminSystemInfo>('/admin/audit/system');
   return res.data;
 }
 

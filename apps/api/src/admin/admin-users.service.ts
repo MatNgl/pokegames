@@ -169,10 +169,10 @@ export class AdminUsersService {
 
     const streaks = this.streaks(activityDates.map((a) => a.createdAt));
     const pokedex = this.pokedexProgress(entries, species);
-    const pokedexCounts = await this.prisma.userPokedexEntry.groupBy({
-      by: ['userId'],
-      _count: { _all: true },
-    });
+    const [pokedexCounts, totalUsers] = await Promise.all([
+      this.prisma.userPokedexEntry.groupBy({ by: ['userId'], _count: { _all: true } }),
+      this.prisma.user.count(),
+    ]);
 
     return {
       id: user.id,
@@ -205,10 +205,12 @@ export class AdminUsersService {
       percentileGames: this.percentile(
         agg._count._all,
         allCounts.map((c) => c._count._all),
+        totalUsers,
       ),
       percentilePokedex: this.percentile(
         entries.length,
         pokedexCounts.map((c) => c._count._all),
+        totalUsers,
       ),
     };
   }
@@ -301,11 +303,20 @@ export class AdminUsersService {
     return { byGeneration, timeline };
   }
 
-  /** Centile du joueur dans la population (part des joueurs qu'il devance). */
-  private percentile(value: number, population: number[]): number {
-    if (population.length === 0) return 0;
-    const below = population.filter((v) => v < value).length;
-    return Math.round((below / population.length) * 100);
+  /**
+   * Centile du joueur : part des comptes qu'il devance.
+   *
+   * `population` ne contient que les joueurs ayant au moins une ligne (groupBy) : on complete avec
+   * des zeros pour les comptes inactifs, sinon un joueur seul a jouer serait donne a 0 % alors
+   * qu'il devance tout le monde.
+   */
+  private percentile(value: number, population: number[], totalUsers: number): number {
+    const zeros = Math.max(0, totalUsers - population.length);
+    const full = [...population, ...Array<number>(zeros).fill(0)];
+    if (full.length <= 1) return 0;
+    // On se compare aux autres, pas a soi-meme.
+    const below = full.filter((v) => v < value).length;
+    return Math.round((below / (full.length - 1)) * 100);
   }
 
   /**

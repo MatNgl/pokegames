@@ -158,16 +158,35 @@ describe('AdminUsersService', () => {
 
     it('situe le joueur en centile face aux autres', async () => {
       prisma.gameAuditLog.findMany.mockResolvedValue([]);
-      // Le joueur a 3 parties ; deux autres en ont moins, un en a plus.
+      prisma.user.count.mockResolvedValue(5);
+      // Le joueur a 3 parties ; deux autres en ont moins, un en a plus, un n'a jamais joue.
       prisma.gameAuditLog.groupBy.mockResolvedValue([
         { userId: 'u1', _count: { _all: 3 } },
         { userId: 'u2', _count: { _all: 1 } },
         { userId: 'u3', _count: { _all: 2 } },
         { userId: 'u4', _count: { _all: 9 } },
       ]);
+      prisma.gameAuditLog.aggregate.mockResolvedValue({
+        _count: { _all: 3 },
+        _sum: { durationSeconds: 0 },
+      });
 
       const d = await service.detail('u1');
-      expect(d.percentileGames).toBe(50); // devance 2 joueurs sur 4
+      // Devance u2, u3 et le compte inactif, soit 3 des 4 autres joueurs.
+      expect(d.percentileGames).toBe(75);
+    });
+
+    it('classe au sommet le seul joueur actif (les comptes inactifs comptent)', async () => {
+      prisma.gameAuditLog.findMany.mockResolvedValue([]);
+      prisma.user.count.mockResolvedValue(3);
+      prisma.gameAuditLog.groupBy.mockResolvedValue([{ userId: 'u1', _count: { _all: 13 } }]);
+      prisma.gameAuditLog.aggregate.mockResolvedValue({
+        _count: { _all: 13 },
+        _sum: { durationSeconds: 0 },
+      });
+
+      const d = await service.detail('u1');
+      expect(d.percentileGames).toBe(100);
     });
   });
 
