@@ -8,8 +8,11 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   // Derriere un reverse proxy TLS en prod : necessaire pour que req.secure soit correct
-  // et que les cookies secure/sameSite=none soient poses de facon fiable.
-  if (process.env.NODE_ENV === 'production') {
+  // et que les cookies secure/sameSite=none soient poses de facon fiable. Depuis l'ajout de la
+  // limite de debit, c'est aussi ce qui donne la vraie IP du client : sans cela toutes les requetes
+  // partagent l'IP du proxy et le quota de connexion devient commun a tout le site.
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd) {
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
   }
 
@@ -39,6 +42,9 @@ async function bootstrap(): Promise<void> {
   const port = process.env['PORT'] ?? 3001;
   await app.listen(port);
   logger.log(`Poké-Idle Backend en écoute sur le port ${port}`);
+  // Tracé au démarrage : ces deux réglages conditionnent les cookies de session et l'identification
+  // du client. Les voir dans les journaux évite d'avoir à les deviner quand une session saute.
+  logger.log(`Mode ${isProd ? 'production' : 'développement'}, trust proxy ${isProd ? 'actif' : 'inactif'}`);
 }
 
 void bootstrap();

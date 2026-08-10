@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Res, Req, HttpCode, HttpStatus, Get, UseGuards } from '@nestjs/common';
-import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -25,17 +25,23 @@ const REFRESH_COOKIE_OPTIONS = {
 const REFRESH_COOKIE_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 jours
 
 /**
- * Securite : sans limite de debit, /login accepte un nombre illimite d'essais de mot de passe et
- * /register permet de creer des comptes en masse. Dix requetes par minute et par IP laissent large
- * pour un humain qui se trompe, et rendent la force brute inoperante. `trust proxy` est actif en
- * production, l'IP vue est donc celle du client et non celle du reverse proxy.
+ * Limite de debit : posee route par route, et non sur le controleur. Seules `login`, `register` et
+ * `change-password` sont des cibles de force brute, ou le nombre d'essais est en soi l'attaque.
+ *
+ * `refresh` et `me` doivent rester libres : le client appelle /auth/refresh a CHAQUE chargement de
+ * page pour restaurer la session depuis le cookie httpOnly. Les brider revenait a deconnecter un
+ * utilisateur legitime des qu'il rechargeait plusieurs fois ou ouvrait quelques onglets, et pire
+ * encore derriere un reverse proxy mal configure, ou toutes les requetes partagent une seule IP.
+ * Ces deux routes portent deja leur propre preuve d'identite (cookie de refresh, jeton d'acces).
  */
-@UseGuards(ThrottlerGuard)
-@Throttle({ auth: { ttl: 60_000, limit: 10 } })
+const AUTH_THROTTLE = { auth: { ttl: 60_000, limit: 10 } };
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @UseGuards(ThrottlerGuard)
+  @Throttle(AUTH_THROTTLE)
   @Post('register')
   async register(@Body() body: RegisterRequest, @Req() req: Request & { user?: AuthUser }) {
     // L'identité invite arrive via l'en-tête X-Guest-Id (requête non authentifiée) : on rattache
@@ -45,6 +51,8 @@ export class AuthController {
     return this.authService.register(guestId ? { ...body, guestId } : body);
   }
 
+  @UseGuards(ThrottlerGuard)
+  @Throttle(AUTH_THROTTLE)
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
@@ -89,16 +97,15 @@ export class AuthController {
     return { success: true };
   }
 
-  // Lecture du profil : deja protegee par le JWT, et rappelee a chaque retour sur l'onglet.
-  // La limiter n'apporte rien et deconnecterait un utilisateur legitime qui navigue vite.
-  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getProfile(@Req() req: Request & { user?: unknown }) {
     return req.user;
   }
 
-  @UseGuards(JwtAuthGuard)
+  // Un seul @UseGuards : deux decorateurs successifs s'ecrasent, le second gagnerait seul.
+  @UseGuards(ThrottlerGuard, JwtAuthGuard)
+  @Throttle(AUTH_THROTTLE)
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   async changePassword(
