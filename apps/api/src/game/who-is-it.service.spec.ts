@@ -160,10 +160,14 @@ describe('WhoIsItService', () => {
       expect(state.rotationAngle).toBe(30);
     });
 
-    it('l’indice Taille affiche la hauteur en mètres (jamais divisée)', async () => {
+    it('l’indice Taille affiche la hauteur en mètres (jamais divisée) une fois révélé', async () => {
       const state = await service.startRound({ generations: [1], level: 'MOYEN' });
-      const heightHint = state.hints.find((h) => h.type === 'HEIGHT');
-      expect(heightHint?.value).toBe('0.4 m');
+      const session = JSON.parse(
+        mockRedisSet.mock.calls[mockRedisSet.mock.calls.length - 1]?.[1] as string,
+      ) as { hints: { type: string; value: unknown }[] };
+      // La valeur reste cote serveur, elle n'est envoyee qu'apres revelation (voir anti-triche).
+      expect(session.hints.find((h) => h.type === 'HEIGHT')?.value).toBe('0.4 m');
+      expect(state.hints.find((h) => h.type === 'HEIGHT')?.value).toBeNull();
     });
 
     it('rejette un niveau invalide', async () => {
@@ -379,6 +383,113 @@ describe('WhoIsItService', () => {
 
       expect(state.currentScore).toBe(75);
       expect(state.hints[0]?.isRevealed).toBe(true);
+      // Revele : la valeur est desormais transmise.
+      expect(state.hints[0]?.value).toBe('P...');
+    });
+  });
+
+  /**
+   * Regle 2 : la reponse reseau ne doit jamais porter de quoi identifier le Pokemon avant la fin de
+   * la manche. Les valeurs des indices partaient en clair des le demarrage, avec isRevealed a false.
+   */
+  describe('anti-triche des indices', () => {
+    it('ne transmet aucune valeur d’indice tant que rien n’est révélé', async () => {
+      const state = await service.startRound({ generations: [1], level: 'MOYEN' });
+      expect(state.hints).toHaveLength(4);
+      expect(state.hints.every((h) => h.value === null)).toBe(true);
+    });
+
+    it('ne transmet pas les valeurs via la relecture d’une manche', async () => {
+      const started = await service.startRound({ generations: [1], level: 'MOYEN' });
+      const stored = mockRedisSet.mock.calls[mockRedisSet.mock.calls.length - 1]?.[1] as string;
+      mockRedisGet.mockResolvedValue(stored);
+
+      const state = await service.getRoundState(started.roundId);
+      expect(state.hints.every((h) => h.value === null)).toBe(true);
+    });
+
+    it('ne transmet que la valeur révélée, pas celles des autres paliers', async () => {
+      const mockSession = {
+        roundId: 'r1',
+        sessionHash: 'h1',
+        targetPokemonId: 25,
+        targetNameFr: 'Pikachu',
+        targetNameEn: 'Pikachu',
+        status: 'PLAYING',
+        startTime: Date.now(),
+        currentScore: 100,
+        mistakesCount: 2,
+        hintsUsedCount: 0,
+        mode: 'CLASSIC',
+        level: 'MOYEN',
+        roundIndex: 1,
+        totalRounds: 5,
+        hints: [
+          { type: 'TYPE_1', label: 'Type 1', value: 'Électrik', cost: 0, unlockedAtMistakeCount: 1, isRevealed: false },
+          { type: 'HEIGHT', label: 'Taille', value: '0.4 m', cost: 0, unlockedAtMistakeCount: 2, isRevealed: false },
+        ],
+      };
+      mockRedisGet.mockResolvedValue(JSON.stringify(mockSession));
+
+      const state = await service.requestHint('r1', 'TYPE_1');
+      expect(state.hints.find((h) => h.type === 'TYPE_1')?.value).toBe('Électrik');
+      expect(state.hints.find((h) => h.type === 'HEIGHT')?.value).toBeNull();
+    });
+
+    it('cumule le total d’essais côté serveur, sans rien accepter du client', async () => {
+      // Regle 4 : le total du classement se construit dans Redis. Le client ne l'envoie plus, il ne
+      // peut donc plus se declarer a 0 essai sur la derniere manche.
+      const store = new Map<string, string>();
+      mockRedisSet.mockImplementation((k: string, v: string) => {
+        store.set(k, v);
+        return Promise.resolve();
+      });
+
+      const finalSession = (mistakes: number) => ({
+        roundId: 'r-final',
+        sessionHash: 'h-final',
+        targetPokemonId: 25,
+        targetNameFr: 'Pikachu',
+        targetNameEn: 'Pikachu',
+        status: 'PLAYING',
+        startTime: Date.now(),
+        currentScore: 100,
+        mistakesCount: mistakes,
+        hintsUsedCount: 0,
+        mode: 'DAILY',
+        level: 'FACILE',
+        roundIndex: 5,
+        totalRounds: 5,
+        hints: [],
+        guestId: 'g_cumul',
+        guestName: 'player_cumul',
+      });
+
+      // Une manche precedente a deja coute 4 essais.
+      store.set('whoisit_attempts:' + new Date().toISOString().slice(0, 10) + ':FACILE:g:g_cumul', '4');
+      mockRedisGet.mockImplementation((k: string) => Promise.resolve(store.get(k) ?? null));
+      mockRedisGet.mockImplementationOnce(() => Promise.resolve(JSON.stringify(finalSession(2))));
+
+      await service.submitGuess('r-final', 'Pikachu');
+
+      // 4 essais reportes + (2 erreurs + 1 bonne reponse) = 7, quoi qu'envoie le client.
+      expect(mockRecord).toHaveBeenCalledWith(
+        expect.objectContaining({ guestId: 'g_cumul' }),
+        'WHO_IS_IT',
+        'FACILE',
+        expect.any(Date),
+        expect.objectContaining({ attempts: 7 }),
+      );
+    });
+
+    it('ne renvoie pas de valeur d’indice après une mauvaise réponse', async () => {
+      const started = await service.startRound({ generations: [1], level: 'MOYEN' });
+      const stored = mockRedisSet.mock.calls[mockRedisSet.mock.calls.length - 1]?.[1] as string;
+      mockRedisGet.mockResolvedValue(stored);
+
+      const res = await service.submitGuess(started.roundId, 'Rattata');
+      expect(res.isCorrect).toBe(false);
+      expect(res.hints.every((h) => h.value === null)).toBe(true);
     });
   });
 });

@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Res, Req, HttpCode, HttpStatus, Get, UseGuards } from '@nestjs/common';
+import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -23,6 +24,14 @@ const REFRESH_COOKIE_OPTIONS = {
 
 const REFRESH_COOKIE_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 jours
 
+/**
+ * Securite : sans limite de debit, /login accepte un nombre illimite d'essais de mot de passe et
+ * /register permet de creer des comptes en masse. Dix requetes par minute et par IP laissent large
+ * pour un humain qui se trompe, et rendent la force brute inoperante. `trust proxy` est actif en
+ * production, l'IP vue est donc celle du client et non celle du reverse proxy.
+ */
+@UseGuards(ThrottlerGuard)
+@Throttle({ auth: { ttl: 60_000, limit: 10 } })
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -80,6 +89,9 @@ export class AuthController {
     return { success: true };
   }
 
+  // Lecture du profil : deja protegee par le JWT, et rappelee a chaque retour sur l'onglet.
+  // La limiter n'apporte rien et deconnecterait un utilisateur legitime qui navigue vite.
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getProfile(@Req() req: Request & { user?: unknown }) {

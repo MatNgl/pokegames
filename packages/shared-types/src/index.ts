@@ -443,7 +443,9 @@ export type WhoIsItHintType =
 export interface WhoIsItHint {
   type: WhoIsItHintType;
   label: string;
-  value: string | number;
+  // Anti-triche : null tant que l'indice n'est pas revele. Le serveur ne transmet la valeur qu'apres
+  // un appel a /hint valide, sinon la reponse de demarrage livrerait deja type, taille et generation.
+  value: string | number | null;
   cost: number;
   unlockedAtMistakeCount: number; // Palier d'erreur pour débloquer
   isRevealed: boolean;
@@ -470,7 +472,6 @@ export interface WhoIsItRoundState {
 export interface WhoIsItGuessRequest {
   roundId: string;
   guess: string;
-  carriedAttempts?: number; // total d'essais des manches precedentes (classement par essais)
 }
 
 export interface WhoIsItHintRequest {
@@ -480,7 +481,6 @@ export interface WhoIsItHintRequest {
 
 export interface WhoIsItSkipRequest {
   roundId: string;
-  carriedAttempts?: number; // total d'essais des manches precedentes (classement par essais)
 }
 
 export interface WhoIsItGuessResponse {

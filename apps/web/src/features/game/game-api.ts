@@ -19,27 +19,14 @@ export async function requestHint(
   return res.data;
 }
 
-export async function submitGuess(
-  roundId: string,
-  guess: string,
-  carriedAttempts?: number,
-): Promise<WhoIsItGuessResponse> {
-  const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/guess', {
-    roundId,
-    guess,
-    carriedAttempts,
-  });
+// Le total d'essais du defi n'est plus transmis : le serveur le cumule lui-meme (autorite serveur).
+export async function submitGuess(roundId: string, guess: string): Promise<WhoIsItGuessResponse> {
+  const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/guess', { roundId, guess });
   return res.data;
 }
 
-export async function skipRound(
-  roundId: string,
-  carriedAttempts?: number,
-): Promise<WhoIsItGuessResponse> {
-  const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/skip', {
-    roundId,
-    carriedAttempts,
-  });
+export async function skipRound(roundId: string): Promise<WhoIsItGuessResponse> {
+  const res = await api.post<WhoIsItGuessResponse>('/games/who-is-it/skip', { roundId });
   return res.data;
 }
 

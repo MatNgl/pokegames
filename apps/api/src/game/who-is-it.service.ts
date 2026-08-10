@@ -31,6 +31,17 @@ import { GameConfigService } from '../game-config/game-config.service';
 
 const WHO_IS_IT_LEVELS: WhoIsItLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
 
+/**
+ * Anti-triche (Regle 2) : la valeur d'un indice non revele ne quitte jamais le serveur. La session
+ * Redis porte les quatre valeurs des le tirage, mais les envoyer avec `isRevealed: false` revenait a
+ * livrer le type, la taille exacte et la generation dans la toute premiere reponse : un joueur avec
+ * l'onglet Reseau ouvert identifiait le Pokemon sans se tromper une seule fois, et l'endpoint
+ * /hint ne servait plus a rien.
+ */
+function publicHints(hints: WhoIsItHint[]): WhoIsItHint[] {
+  return hints.map((h) => (h.isRevealed ? h : { ...h, value: null }));
+}
+
 interface InternalRoundSession {
   roundId: string;
   sessionHash: string;
@@ -70,6 +81,33 @@ export class WhoIsItService {
   ) {}
 
   private readonly HISTORY_GAME = 'WHO_IS_IT';
+  private readonly ATTEMPTS_PREFIX = 'whoisit_attempts:';
+  private readonly ATTEMPTS_TTL_SECONDS = 172_800; // 2 jours : le defi du jour et son lendemain
+
+  /**
+   * Regle 4 (autorite du serveur) : le total d'essais du defi est cumule ici, et non transmis par le
+   * client. Chaque manche a sa propre session Redis, le total etait donc renvoye par le navigateur
+   * dans `carriedAttempts` : il suffisait de poster la derniere reponse avec 0 pour prendre la tete
+   * du classement du jour. Le compteur est porte par (joueur, niveau, jour), hors de portee du client.
+   */
+  private attemptsKey(player: PlayerIdentity, level: WhoIsItLevel, day: Date): string {
+    const who = player.userId ? `u:${player.userId}` : `g:${player.guestId ?? 'anon'}`;
+    const dayKey = day.toISOString().slice(0, 10);
+    return `${this.ATTEMPTS_PREFIX}${dayKey}:${level}:${who}`;
+  }
+
+  private async addAttempts(
+    player: PlayerIdentity,
+    level: WhoIsItLevel,
+    day: Date,
+    cost: number,
+  ): Promise<number> {
+    const key = this.attemptsKey(player, level, day);
+    const previous = Number((await this.redisService.get(key)) ?? 0);
+    const total = (Number.isFinite(previous) ? previous : 0) + cost;
+    await this.redisService.set(key, String(total), this.ATTEMPTS_TTL_SECONDS);
+    return total;
+  }
 
   // Zoom et rotation dependent du niveau et du nombre d'erreurs. Source unique : game-config.ts
   // (this.gameConfig.whoIsIt()). Le zoom se reduit et l'angle se redresse a chaque erreur.
@@ -160,6 +198,16 @@ export class WhoIsItService {
     const levelConfig = this.gameConfig.whoIsIt().levels[level];
     const totalRounds = config.roundsCount ?? this.gameConfig.whoIsIt().roundsCount;
     const startCapital = config.startCapital ?? this.gameConfig.whoIsIt().startCapital;
+
+    // Nouveau defi : le compteur d'essais du jour repart de zero. Sans cela, un joueur dont le defi
+    // a ete remis a zero par un administrateur reprendrait avec le total de sa tentative precedente.
+    if (mode === 'DAILY' && roundIndex <= 1 && (player.userId || player.guestId)) {
+      await this.redisService.set(
+        this.attemptsKey(player, level, new Date()),
+        '0',
+        this.ATTEMPTS_TTL_SECONDS,
+      );
+    }
 
     // Catalogue complet, ordre stable (indispensable au tirage deterministe du jour).
     const pokemons = await this.prisma.pokemon.findMany({
@@ -324,7 +372,7 @@ export class WhoIsItService {
       rotationAngle: session.rotationAngle,
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
-      hints: session.hints,
+      hints: publicHints(session.hints),
       ...(userId ? {} : { guestUsername: 'Dresseur Invité' }),
     };
   }
@@ -351,7 +399,7 @@ export class WhoIsItService {
       rotationAngle: visuals.rotationAngle,
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
-      hints: session.hints,
+      hints: publicHints(session.hints),
       ...(session.userId ? {} : { guestUsername: 'Dresseur Invité' }),
     };
   }
@@ -410,7 +458,7 @@ export class WhoIsItService {
       rotationAngle: visuals.rotationAngle,
       roundIndex: session.roundIndex,
       totalRounds: session.totalRounds,
-      hints: session.hints,
+      hints: publicHints(session.hints),
       ...(session.userId ? {} : { guestUsername: 'Dresseur Invité' }),
     };
   }
@@ -419,7 +467,6 @@ export class WhoIsItService {
     roundId: string,
     guess: string,
     userId?: string,
-    carriedAttempts?: number,
   ): Promise<WhoIsItGuessResponse> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
     if (!raw) {
@@ -459,7 +506,7 @@ export class WhoIsItService {
         level: session.level,
         zoomRatio: session.zoomRatio,
         rotationAngle: session.rotationAngle,
-        hints: session.hints,
+        hints: publicHints(session.hints),
         revealedPokemon: null,
         unmaskedSpriteUrl: null,
         ...(session.userId ? {} : { guestUsername: 'Dresseur Invité' }),
@@ -467,7 +514,7 @@ export class WhoIsItService {
     }
 
     // Victoire !
-    return this.finalizeRound(session, true, guess, carriedAttempts);
+    return this.finalizeRound(session, true, guess);
   }
 
   /**
@@ -477,7 +524,6 @@ export class WhoIsItService {
   async skipRound(
     roundId: string,
     userId?: string,
-    carriedAttempts?: number,
   ): Promise<WhoIsItGuessResponse> {
     const raw = await this.redisService.get(`${this.REDIS_PREFIX}${roundId}`);
     if (!raw) {
@@ -494,7 +540,7 @@ export class WhoIsItService {
       session.userId = userId;
     }
 
-    return this.finalizeRound(session, false, '(passé)', carriedAttempts);
+    return this.finalizeRound(session, false, '(passé)');
   }
 
   /** Cloture une manche (trouvee ou passee) : revele le sprite, journalise et renvoie l'etat final. */
@@ -502,7 +548,6 @@ export class WhoIsItService {
     session: InternalRoundSession,
     isCorrect: boolean,
     guess: string,
-    carriedAttempts?: number,
   ): Promise<WhoIsItGuessResponse> {
     session.status = 'SOLVED';
     session.zoomRatio = 1.0;
@@ -548,22 +593,23 @@ export class WhoIsItService {
     );
     this.eventEmitter.emit('game.round.completed', auditEvent);
 
-    // Defi quotidien termine (derniere manche resolue ou passee) : enregistrement du resultat du joueur.
     // Classement par nombre d'essais (plus de points) : une manche trouvee coute (erreurs + 1),
-    // une manche passee coute 3 essais. carriedAttempts porte le total des manches precedentes.
+    // une manche passee coute 3 essais. Le cumul des manches est tenu par le serveur (addAttempts).
     const player: PlayerIdentity = playerFromSession(session);
-    if (
-      session.mode === 'DAILY' &&
-      session.roundIndex >= session.totalRounds &&
-      (player.userId || player.guestId)
-    ) {
+    if (session.mode === 'DAILY' && (player.userId || player.guestId)) {
+      const day = new Date();
       const roundCost = session.mistakesCount + (isCorrect ? 1 : 3);
-      await this.dailyResult.record(player, this.HISTORY_GAME, session.level, new Date(), {
-        won: true,
-        attempts: (carriedAttempts ?? 0) + roundCost,
-        totalRounds: session.totalRounds,
-        durationSeconds,
-      });
+      const total = await this.addAttempts(player, session.level, day, roundCost);
+
+      // Defi quotidien termine (derniere manche resolue ou passee) : enregistrement du resultat.
+      if (session.roundIndex >= session.totalRounds) {
+        await this.dailyResult.record(player, this.HISTORY_GAME, session.level, day, {
+          won: true,
+          attempts: total,
+          totalRounds: session.totalRounds,
+          durationSeconds,
+        });
+      }
     }
 
     return {
@@ -577,7 +623,7 @@ export class WhoIsItService {
       level: session.level,
       zoomRatio: 1.0,
       rotationAngle: 0,
-      hints: session.hints,
+      hints: publicHints(session.hints),
       revealedPokemon: fullPokemon,
       unmaskedSpriteUrl: `/api/sprites/${session.sessionHash}`,
       durationSeconds,

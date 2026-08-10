@@ -260,7 +260,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
     setFeedback(null);
     try {
       const attempt = guess.trim();
-      const res = await submitGuess(round.roundId, attempt, totalAttempts);
+      const res = await submitGuess(round.roundId, attempt);
       if (res.isCorrect) {
         revealRound(res);
       } else {
@@ -300,7 +300,7 @@ function WhoIsItGame({ level, onBack }: { level: WhoIsItLevel; onBack: () => voi
     setError(null);
     setFeedback(null);
     try {
-      const res = await skipRound(round.roundId, totalAttempts);
+      const res = await skipRound(round.roundId);
       revealRound(res);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Impossible de passer cette manche'));

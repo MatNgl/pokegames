@@ -310,9 +310,13 @@ export class TrueShinyService {
     const original = await this.pokemonService.getShinySprite(round.pokemonId);
     // Toutes les vignettes (intacte comprise) passent par le meme encodeur sharp : ainsi la
     // vignette intacte n'est pas un outlier d'encodage repérable a la taille des octets.
-    const pipeline = sharp(original.buffer);
-    const processed = slotDef.hue === 0 ? pipeline : pipeline.modulate({ hue: slotDef.hue });
-    const buffer = await processed.png().toBuffer();
+    // La vignette intacte passe par exactement le meme traitement que les leurres (modulate avec une
+    // rotation nulle, et non un court-circuit) : sans cela elle evite l'aller-retour colorimetrique
+    // de libvips, et son encodage se distingue de celui des autres.
+    const buffer = await sharp(original.buffer)
+      .modulate({ hue: slotDef.hue })
+      .png()
+      .toBuffer();
 
     this.tileCache.set(cacheKey, buffer);
     if (this.tileCache.size > this.TILE_CACHE_MAX) {

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
@@ -18,6 +19,11 @@ if (process.env['NODE_ENV'] === 'production' && !jwtSecret) {
       secret: jwtSecret ?? 'pokegames-dev-secret-only',
       signOptions: { expiresIn: '15m' },
     }),
+    // Limitation de debit volontairement cantonnee a l'authentification : c'est la seule surface
+    // ou le nombre d'essais est en soi une attaque (force brute sur les mots de passe, creation de
+    // comptes en masse). Une limite globale casserait le jeu, ou une seule page du Pokedex charge
+    // plusieurs dizaines de sprites.
+    ThrottlerModule.forRoot([{ name: 'auth', ttl: 60_000, limit: 10 }]),
     DailyResultModule,
   ],
   controllers: [AuthController],
