@@ -38,32 +38,46 @@ export class AdminStatsService {
       : (sorted[mid] ?? 0);
   }
 
-  async getStats(): Promise<AdminStats> {
-    const now = new Date();
+  /**
+   * Statistiques du tableau de bord sur la fenetre demandee (`days`, 0 = depuis le debut). Elles
+   * etaient calculees sur toute l'histoire quelle que soit la periode choisie : l'ecran affichait
+   * exactement les memes chiffres en « 7 j » et en « Tout ».
+   */
+  async getStats(days = 0, now = new Date()): Promise<AdminStats> {
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+    const since = periodStart(days, now);
+    const inPeriod = createdAtFilter(days, now);
 
-    const [totalGames, successfulGames, totalUsers, gamesToday, newUsers7d, todayUsers, weekUsers, durations] =
-      await Promise.all([
-        this.prisma.gameAuditLog.count(),
-        this.prisma.gameAuditLog.count({ where: { isSuccess: true } }),
-        this.prisma.user.count(),
-        this.prisma.gameAuditLog.count({ where: { createdAt: { gte: startOfDay } } }),
-        this.prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
-        this.prisma.gameAuditLog.findMany({
-          where: { createdAt: { gte: startOfDay }, userId: { not: null } },
-          select: { userId: true },
-          distinct: ['userId'],
-        }),
-        this.prisma.gameAuditLog.findMany({
-          where: { createdAt: { gte: weekAgo }, userId: { not: null } },
-          select: { userId: true },
-          distinct: ['userId'],
-        }),
-        this.prisma.gameAuditLog.findMany({
-          select: { gameType: true, durationSeconds: true, isSuccess: true },
-        }),
-      ]);
+    const [
+      periodGames,
+      periodSuccessfulGames,
+      totalUsers,
+      gamesToday,
+      newUsersPeriod,
+      todayUsers,
+      periodUsers,
+      durations,
+    ] = await Promise.all([
+      this.prisma.gameAuditLog.count({ where: inPeriod }),
+      this.prisma.gameAuditLog.count({ where: { ...inPeriod, isSuccess: true } }),
+      this.prisma.user.count(),
+      this.prisma.gameAuditLog.count({ where: { createdAt: { gte: startOfDay } } }),
+      this.prisma.user.count(since ? { where: { createdAt: { gte: since } } } : undefined),
+      this.prisma.gameAuditLog.findMany({
+        where: { createdAt: { gte: startOfDay }, userId: { not: null } },
+        select: { userId: true },
+        distinct: ['userId'],
+      }),
+      this.prisma.gameAuditLog.findMany({
+        where: { ...inPeriod, userId: { not: null } },
+        select: { userId: true },
+        distinct: ['userId'],
+      }),
+      this.prisma.gameAuditLog.findMany({
+        where: inPeriod,
+        select: { gameType: true, durationSeconds: true, isSuccess: true },
+      }),
+    ]);
 
     const byGame = new Map<string, DurationRow[]>();
     for (const row of durations) {
@@ -82,13 +96,13 @@ export class AdminStatsService {
 
     return {
       totalUsers,
-      totalGames,
-      successfulGames,
-      successRatePct: totalGames > 0 ? Math.round((successfulGames / totalGames) * 100) : 0,
+      periodGames,
+      periodSuccessfulGames,
+      successRatePct: periodGames > 0 ? Math.round((periodSuccessfulGames / periodGames) * 100) : 0,
       activeUsersToday: todayUsers.length,
-      activeUsers7d: weekUsers.length,
       gamesToday,
-      newUsers7d,
+      activeUsersPeriod: periodUsers.length,
+      newUsersPeriod,
       perGame,
     };
   }
@@ -100,7 +114,7 @@ export class AdminStatsService {
   async getOverview(days: number, now = new Date()): Promise<AdminOverview> {
     const start = periodStart(days, now);
     const [stats, logs, signups, totalSpecies, entries, collectors] = await Promise.all([
-      this.getStats(),
+      this.getStats(days, now),
       this.prisma.gameAuditLog.findMany({
         where: createdAtFilter(days, now),
         select: { gameType: true, userId: true, createdAt: true },

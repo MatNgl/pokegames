@@ -89,6 +89,11 @@ const PERIODS = [
   { days: 0, label: 'Tout' },
 ] as const;
 
+/** Suffixe des libelles de tuiles, pour que le chiffre affiche dise sur quoi il porte. */
+function periodLabel(days: number): string {
+  return days === 0 ? 'depuis le début' : `sur ${days} jours`;
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <AppBackground>
@@ -187,7 +192,7 @@ export function AdminPage() {
 
       {tab === 'dashboard' && (
         <>
-          <DashboardTab />
+          <DashboardTab days={days} />
           <OverviewCharts days={days} />
         </>
       )}
@@ -321,11 +326,14 @@ function Pager({
   );
 }
 
-function DashboardTab() {
+function DashboardTab({ days }: { days: number }) {
   const [page, setPage] = useState(1);
   const [gameFilter, setGameFilter] = useState('');
   const [outcome, setOutcome] = useState('');
-  const { data: stats } = useQuery({ queryKey: ['admin-stats'], queryFn: getAdminStats });
+  const { data: stats } = useQuery({
+    queryKey: ['admin-stats', days],
+    queryFn: () => getAdminStats(days),
+  });
   const { data: anomalies } = useQuery({ queryKey: ['admin-anomalies'], queryFn: getAdminAnomalies });
   const { data: logs, isLoading } = useQuery({
     queryKey: ['admin-logs', page, gameFilter, outcome],
@@ -340,23 +348,25 @@ function DashboardTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Deux groupes nommes plutot que huit tuiles indifferenciees : on sait ce qu'on lit. */}
+      {/* Deux groupes nommes plutot que huit tuiles indifferenciees : on sait ce qu'on lit.
+          Les libelles portent la periode : sans cela, "Parties au total" affichait le meme nombre
+          en 7 j et en Tout, et on ne pouvait pas savoir si le filtre marchait. */}
       <section className="flex flex-col gap-2">
         <SectionTitle>Joueurs</SectionTitle>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard icon={Users} label="Comptes au total" value={stats?.totalUsers ?? '—'} />
           <StatCard icon={Activity} label="Actifs aujourd'hui" value={stats?.activeUsersToday ?? '—'} />
-          <StatCard icon={CalendarDays} label="Actifs sur 7 jours" value={stats?.activeUsers7d ?? '—'} />
-          <StatCard icon={UserPlus} label="Inscrits sur 7 jours" value={stats?.newUsers7d ?? '—'} />
+          <StatCard icon={CalendarDays} label={`Actifs ${periodLabel(days)}`} value={stats?.activeUsersPeriod ?? '—'} />
+          <StatCard icon={UserPlus} label={`Inscrits ${periodLabel(days)}`} value={stats?.newUsersPeriod ?? '—'} />
         </div>
       </section>
 
       <section className="flex flex-col gap-2">
         <SectionTitle>Parties</SectionTitle>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard icon={Gamepad2} label="Parties au total" value={stats?.totalGames ?? '—'} />
+          <StatCard icon={Gamepad2} label={`Parties ${periodLabel(days)}`} value={stats?.periodGames ?? '—'} />
           <StatCard icon={Zap} label="Parties aujourd'hui" value={stats?.gamesToday ?? '—'} />
-          <StatCard icon={Trophy} label="Parties réussies" value={stats?.successfulGames ?? '—'} />
+          <StatCard icon={Trophy} label="Réussies" value={stats?.periodSuccessfulGames ?? '—'} />
           <Card className="flex flex-col justify-center gap-2 p-3 sm:p-4">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[2rem] font-extrabold leading-none text-foreground">

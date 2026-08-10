@@ -86,8 +86,8 @@ export class AdminController {
   }
 
   @Get('stats')
-  async getGlobalStats(): Promise<AdminStats> {
-    return this.stats.getStats();
+  async getGlobalStats(@Query('days') days?: string): Promise<AdminStats> {
+    return this.stats.getStats(parsePeriod(days));
   }
 
   @Get('anomalies')

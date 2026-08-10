@@ -29,7 +29,7 @@ describe('AdminStatsService', () => {
     prisma.user.count.mockResolvedValue(2);
     prisma.gameAuditLog.findMany
       .mockResolvedValueOnce([{ userId: 'u1' }]) // actifs aujourd'hui
-      .mockResolvedValueOnce([{ userId: 'u1' }, { userId: 'u2' }]) // actifs 7j
+      .mockResolvedValueOnce([{ userId: 'u1' }, { userId: 'u2' }]) // actifs sur la periode
       .mockResolvedValueOnce([
         { gameType: 'MOTUS', durationSeconds: 10, isSuccess: true },
         { gameType: 'MOTUS', durationSeconds: 20, isSuccess: true },
@@ -40,13 +40,37 @@ describe('AdminStatsService', () => {
     const stats = await service.getStats();
 
     expect(stats.activeUsersToday).toBe(1);
-    expect(stats.activeUsers7d).toBe(2);
+    expect(stats.activeUsersPeriod).toBe(2);
     const motus = stats.perGame.find((g) => g.gameType === 'MOTUS');
     expect(motus?.games).toBe(3);
     expect(motus?.medianDurationSeconds).toBe(20);
     expect(motus?.successRatePct).toBe(67);
     // Trie par volume decroissant : MOTUS (3) avant WHO_IS_IT (1).
     expect(stats.perGame[0]?.gameType).toBe('MOTUS');
+  });
+
+  /**
+   * Le selecteur de periode ne changeait rien aux tuiles du tableau de bord : getStats ignorait la
+   * fenetre et comptait tout l'historique, donc « 7 j » et « Tout » affichaient les memes chiffres.
+   */
+  it('restreint les compteurs à la période demandée', async () => {
+    const now = new Date('2026-08-10T12:00:00Z');
+    await service.getStats(7, now);
+
+    // Les comptages de parties portent un filtre de date, sauf le total de comptes (un stock).
+    const gameCountArgs = prisma.gameAuditLog.count.mock.calls.map(([a]) => a);
+    expect(gameCountArgs[0]?.where?.createdAt?.gte).toBeInstanceOf(Date);
+    expect(prisma.user.count).toHaveBeenCalledWith();
+
+    const durationsCall = prisma.gameAuditLog.findMany.mock.calls[2]?.[0];
+    expect(durationsCall?.where?.createdAt?.gte).toBeInstanceOf(Date);
+  });
+
+  it('ne filtre rien quand la période couvre tout l’historique', async () => {
+    await service.getStats(0, new Date('2026-08-10T12:00:00Z'));
+
+    const durationsCall = prisma.gameAuditLog.findMany.mock.calls[2]?.[0];
+    expect(durationsCall?.where?.createdAt).toBeUndefined();
   });
 
   it('getAnomalies signale les manches résolues trop vite', async () => {

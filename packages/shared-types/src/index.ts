@@ -51,17 +51,21 @@ export interface LeaderboardResponse {
  * Admin (dashboard, gestion utilisateurs, configuration dynamique)
  * ========================================================================== */
 
+/**
+ * Statistiques du tableau de bord. Tout ce qui est prefixe `period` suit la fenetre choisie en haut
+ * de l'ecran : ces chiffres etaient calcules sur toute l'histoire, si bien que changer de periode ne
+ * modifiait rien a l'ecran. Seuls `totalUsers` (un stock) et les compteurs `Today` y echappent.
+ */
 export interface AdminStats {
-  totalUsers: number;
-  totalGames: number;
-  successfulGames: number;
-  successRatePct: number;
-  // Activite recente : joueurs distincts et parties sur les dernieres 24 h / 7 jours.
+  totalUsers: number; // comptes existants, toutes periodes confondues
+  periodGames: number;
+  periodSuccessfulGames: number;
+  successRatePct: number; // sur la periode
   activeUsersToday: number;
-  activeUsers7d: number;
   gamesToday: number;
-  newUsers7d: number;
-  perGame: AdminGameStat[];
+  activeUsersPeriod: number;
+  newUsersPeriod: number;
+  perGame: AdminGameStat[]; // sur la periode
 }
 
 export interface AdminGameStat {

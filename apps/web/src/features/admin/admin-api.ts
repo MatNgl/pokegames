@@ -50,8 +50,8 @@ export async function startEtl(): Promise<AdminEtlStatus> {
   return res.data;
 }
 
-export async function getAdminStats(): Promise<AdminStats> {
-  const res = await api.get<AdminStats>('/admin/audit/stats');
+export async function getAdminStats(days = 30): Promise<AdminStats> {
+  const res = await api.get<AdminStats>('/admin/audit/stats', { params: { days } });
   return res.data;
 }
 
