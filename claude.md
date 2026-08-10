@@ -174,7 +174,7 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * **Sprites obligatoirement chromatiques :** seuls les Pokémon dotés d'un sprite shiny sont éligibles (jamais un sprite normal montré comme shiny).
 * **Endpoints :** `POST /api/games/shiny/start` (avec `mode`), `GET /api/games/shiny/round/:roundId`, `POST /api/games/shiny/choice` (slot), proxy vignette `GET /api/games/shiny/tile/:roundId/:round/:slot`.
 * **Anti-Triche :** toutes les images passent par le **proxy opaque par slot** ; aucune mention « shiny » ou « regular » dans les URL ou le JSON. Les cartes étant des espèces différentes, la taille des octets ne trahit pas la réponse.
-* **Paramètres admin (`/admin/games/shiny`) :** `roundsCount`, `gridSizeByLevel`.
+* **Paramètres admin (`/admin/games/shiny`) :** `roundsCount`, `gridSizeByLevel`. Toute modification est validée contre des bornes et journalisée dans `AdminConfigLog` (auteur, avant/après), comme pour tous les jeux.
 
 ### 6. Trouve le bon shiny
 * **Concept :** toutes les cartes affichent **le même Pokémon shiny**. Toutes sauf une ont subi une **altération colorimétrique** (rotation de teinte). Le joueur repère l'unique sprite chromatique **officiel intact**. La couleur normale n'est **jamais** affichée.
@@ -292,9 +292,19 @@ En pratique, on livre désormais **chaque jeu de bout en bout** (backend puis fr
   * **Prérequis nginx :** `try_files $uri $uri/ /index.html` (l'étape `$uri/` sert `dist/motus/index.html`). Sans elle, toutes les routes renvoient l'accueil et le prerendu ne sert à rien. Documenté dans `DEPLOIEMENT.md`.
 * **Reste à construire :** **2e Pokédex secret** (Shiny / Méga / Dynamax) déverrouillé à 1025/1025 ; le champ `source` de `UserPokedexEntry` est prêt à l'accueillir (nouvelles sources/variantes).
 * **Écarts doc/code repérés (non traités) :** `isLegendary` est spécifié en section 8.1 mais **absent du schéma et du code** (la question « Est-ce un Pokémon légendaire ? » de Qui est-ce en dépend) ; **aucun cron ETL** (seul le lancement manuel `npm run etl` existe, et le script ne s'appelle pas `etl:pokemon`) ; **aucun test Vitest côté front** alors que la Règle du §4 l'impose ; **pas de Dockerfile applicatif** (le `docker-compose.yml` ne contient que Postgres et Redis).
+* **Tableau de bord admin (livré) :** l'admin empilait des barres HTML sans axes ni colonnes alignées.
+  * **Recharts** (la base des Charts shadcn/ui) pour l'activité (aires + axes + légende + infobulle), la répartition par jeu (anneau avec total au centre), les inscriptions et les histogrammes d'essais. Wrapper aux tokens du projet dans `components/ui/chart.tsx`.
+  * **Primitives `Table` shadcn** (`components/ui/table.tsx`, avec `SortableHead` et `CellMeter`). Tout panneau portant plus de deux chiffres par ligne est un tableau : difficulté par niveau (triable), classements Pokémon, indices (colonne « Écart » = réussite avec moins réussite sans), défis terminés, zones du Pokédex, joueurs qui décrochent, « Par jeu ».
+  * Titres de section en **Nunito** et non en Press Start 2P : la police pixel n'a pas de capitales accentuées (« DIFFICULTÉ » s'affichait « DIFFICULTé »). Largeur portée à `max-w-6xl`.
+  * **Vignette du jeu** (`features/admin/game-icon.tsx`) dans toutes les listes ; états vides explicites qui invitent à élargir la période.
+  * **Route `/admin` en `React.lazy`** : le bundle principal perd 18 kB (792 → 774 kB) et Recharts part dans un chunk admin que les joueurs ne téléchargent jamais.
+* **Garde-fous de la configuration (livré) :** `GameConfigService.update` ne vérifiait que le nom de la clé, donc `roundsCount: -5` ou une chaîne à la place d'un entier partaient en base et cassaient un jeu en production sans erreur.
+  * **Validation zod** par clé avec bornes explicites (`game-config.schema.ts`), schémas `.strict()` (un champ inconnu est refusé, pas persisté), contraintes croisées (`minWordLength <= maxWordLength`, `minDiff <= maxDiff`, `hueMin <= hueMax`). Message français avec le chemin complet du champ fautif, que le front met en évidence dans le formulaire.
+  * **Remise aux défauts** par clé (`POST /admin/games/config/:key/reset`), avec confirmation. Le front affiche `défaut : X` sous chaque champ qui s'en écarte et un badge « Personnalisé » (comparaison à clés triées : l'ordre JSON change quand le serveur complète les valeurs stockées).
+  * **Journalisation** dans `AdminConfigLog` (auteur, action UPDATE/RESET, avant/après), résumée en `chemin : avant -> après` et affichée dans l'onglet Configuration. L'écriture du journal est non bloquante : sa panne n'empêche pas de corriger un réglage qui casse un jeu.
+* **Outils de données (livré) :** `POST /etl/sync` était **ouvert à tous** (aspiration complète du catalogue et 1025 upserts déclenchables depuis l'extérieur), désormais sous `AdminGuard`. Import déclenchable depuis l'onglet Système via `AdminEtlService` : exécution en tâche de fond, état interrogeable (`GET/POST /admin/system/etl`), un seul import à la fois, sondage toutes les 3 s pendant l'exécution seulement. État en mémoire (mono-instance, à passer sur Redis pour scaler).
 * **À faire prochaine session (backlog priorisé) :**
   1. **Accessibilité, reste de la passe :** contrastes AA, ordre de tabulation, `aria-live` sur les retours de manche, états désactivés.
-  2. **Garde-fous de la config admin :** validation zod côté serveur (bornes min/max), bouton « réinitialiser aux défauts », et **journalisation des modifications** (promise en §5 « Toute modification sera journalisée », jamais implémentée).
 
 ---
 

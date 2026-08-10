@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Database, MapPin, TrendingDown } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, Database, MapPin, RefreshCw, TrendingDown } from 'lucide-react';
 import type { AdminLevelDifficulty, AdminPokemonDifficulty } from '@pokegames/shared-types';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -34,7 +35,10 @@ import {
   getAdminPokedexReport,
   getAdminRetention,
   getAdminSystemInfo,
+  getEtlStatus,
+  startEtl,
 } from './admin-api';
+import { getApiErrorMessage } from '@/lib/errors';
 
 /**
  * Titre de section de l'admin. Volontairement en Nunito et non en Press Start 2P : la police pixel
@@ -575,10 +579,7 @@ export function SystemTab({ children }: { children: React.ReactNode }) {
             ))}
           </div>
         )}
-        <p className="flex items-start gap-1.5 text-[11px] font-semibold text-muted">
-          <Database className="mt-0.5 h-3 w-3 shrink-0" />
-          Le catalogue se rafraîchit avec <code className="font-mono">npm run etl</code> côté serveur.
-        </p>
+        <EtlRunner />
       </Panel>
 
       <Panel title="Tirages du jour" hint="ce que les jeux ont pioché aujourd'hui">
@@ -604,6 +605,97 @@ export function SystemTab({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+/**
+ * Lancement de l'import Tyradex depuis l'admin. L'import tourne en tache de fond cote serveur :
+ * l'interface interroge l'etat toutes les 3 secondes pendant qu'il tourne, et se tait le reste du
+ * temps (pas de sondage inutile).
+ */
+function EtlRunner() {
+  const queryClient = useQueryClient();
+  const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: status } = useQuery({
+    queryKey: ['admin-etl'],
+    queryFn: getEtlStatus,
+    refetchInterval: (query) => (query.state.data?.running ? 3000 : false),
+  });
+
+  const run = useMutation({
+    mutationFn: startEtl,
+    onSuccess: (s) => {
+      setConfirm(false);
+      setError(null);
+      queryClient.setQueryData(['admin-etl'], s);
+    },
+    onError: (err) => setError(getApiErrorMessage(err, "Échec du lancement de l'import")),
+  });
+
+  // L'import est termine : on rafraichit les compteurs du catalogue affiches au-dessus.
+  useEffect(() => {
+    if (status && !status.running && status.finishedAt) {
+      void queryClient.invalidateQueries({ queryKey: ['admin-system'] });
+    }
+  }, [status, queryClient]);
+
+  const running = status?.running ?? false;
+
+  return (
+    <div className="flex flex-col gap-2 border-t-2 border-border-strong/40 pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-start gap-1.5 text-[11px] font-semibold text-muted">
+          <Database className="mt-0.5 h-3 w-3 shrink-0" />
+          Réimporte le catalogue complet depuis Tyradex (noms, types, statistiques, sprites).
+        </p>
+        <Button size="sm" onClick={() => setConfirm(true)} disabled={running || run.isPending}>
+          {running ? (
+            <>
+              <Spinner className="mr-1.5 h-4 w-4" />
+              Import en cours
+            </>
+          ) : (
+            <>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              Lancer l'import
+            </>
+          )}
+        </Button>
+      </div>
+
+      {confirm && (
+        <div className="flex flex-wrap items-center gap-2 rounded-control border-2 border-accent-shadow/50 bg-accent/10 px-3 py-2">
+          <span className="text-xs font-semibold text-foreground">
+            L'import dure environ une minute et sollicite la base. Lancer maintenant ?
+          </span>
+          <Button size="sm" onClick={() => run.mutate()} disabled={run.isPending}>
+            Confirmer
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>
+            Annuler
+          </Button>
+        </div>
+      )}
+
+      {error && <p className="text-xs font-semibold text-danger">{error}</p>}
+
+      {status?.startedAt && (
+        <p className="text-[11px] font-semibold text-muted">
+          {running
+            ? `Démarré à ${formatTime(status.startedAt)} par ${status.triggeredBy ?? 'inconnu'}.`
+            : status.error
+              ? `Dernier import en échec (${formatTime(status.finishedAt)}) : ${status.error}`
+              : `Dernier import réussi à ${formatTime(status.finishedAt)} : ${status.importedCount ?? 0} Pokémon.`}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function formatTime(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
 /** Bandeau d'avertissement reutilisable (config, actions sensibles). */

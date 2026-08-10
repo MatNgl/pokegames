@@ -148,6 +148,33 @@ export interface AdminGameConfigEntry {
   updatedAt: string;
 }
 
+/** Un champ modifie dans une configuration : chemin complet, valeur avant et apres (JSON). */
+export interface AdminConfigChange {
+  path: string; // ex. "levels.FACILE.gridSize"
+  before: string;
+  after: string;
+}
+
+/** Entree du journal des modifications de configuration. */
+export interface AdminConfigLogEntry {
+  id: string;
+  key: string;
+  action: 'UPDATE' | 'RESET';
+  adminName: string;
+  changes: AdminConfigChange[];
+  createdAt: string;
+}
+
+/** Etat de la derniere synchronisation ETL declenchee depuis l'admin. */
+export interface AdminEtlStatus {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  importedCount: number | null;
+  error: string | null;
+  triggeredBy: string | null;
+}
+
 export interface AdminPage<T> {
   items: T[];
   total: number;

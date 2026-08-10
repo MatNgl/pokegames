@@ -141,6 +141,23 @@ model GameConfig {
   updatedAt DateTime @updatedAt @default(now())
 }
 
+/// Journal des modifications de configuration : qui a change quoi, quand, et avec quelle valeur
+/// avant/apres. La config pilote l'equilibrage des jeux a chaud, une modification malheureuse doit
+/// pouvoir etre retracee et annulee.
+model AdminConfigLog {
+  id        String   @id @default(uuid())
+  key       String // cle de GameConfig modifiee
+  action    String   @default("UPDATE") // "UPDATE" (edition) ou "RESET" (retour aux defauts)
+  adminId   String? // compte auteur ; null si le compte a ete supprime depuis
+  adminName String // pseudo fige a l'instant du changement (survit a la suppression du compte)
+  before    Json
+  after     Json
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@index([createdAt])
+}
+
 model DailyResult {
   id String @id @default(uuid())
   // Un resultat appartient soit a un compte (userId), soit a un invite (guestId + guestName).

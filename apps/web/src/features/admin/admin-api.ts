@@ -2,6 +2,8 @@ import { api } from '@/lib/api';
 import type {
   AdminAnomaly,
   AdminAuditLogEntry,
+  AdminConfigLogEntry,
+  AdminEtlStatus,
   AdminGameConfigEntry,
   AdminGamesReport,
   AdminOverview,
@@ -21,6 +23,31 @@ export async function getGameConfigs(): Promise<AdminGameConfigEntry[]> {
 
 export async function updateGameConfig(key: string, value: unknown): Promise<void> {
   await api.put(`/admin/games/config/${key}`, { value });
+}
+
+export async function getGameConfigDefaults(): Promise<AdminGameConfigEntry[]> {
+  const res = await api.get<AdminGameConfigEntry[]>('/admin/games/config/defaults');
+  return res.data;
+}
+
+export async function resetGameConfig(key: string): Promise<unknown> {
+  const res = await api.post<{ value: unknown }>(`/admin/games/config/${key}/reset`);
+  return res.data.value;
+}
+
+export async function getGameConfigLogs(): Promise<AdminConfigLogEntry[]> {
+  const res = await api.get<AdminConfigLogEntry[]>('/admin/games/config/logs');
+  return res.data;
+}
+
+export async function getEtlStatus(): Promise<AdminEtlStatus> {
+  const res = await api.get<AdminEtlStatus>('/admin/system/etl');
+  return res.data;
+}
+
+export async function startEtl(): Promise<AdminEtlStatus> {
+  const res = await api.post<AdminEtlStatus>('/admin/system/etl');
+  return res.data;
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
