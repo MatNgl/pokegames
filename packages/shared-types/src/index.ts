@@ -847,8 +847,8 @@ export interface PokedexAnswer {
 
 export interface PokedexRoundState {
   roundId: string;
-  status: 'PLAYING' | 'WON' | 'LOST';
-  maxAttempts: number;
+  // Essais illimites : on ne peut que trouver, jamais perdre.
+  status: 'PLAYING' | 'WON';
   attemptsUsed: number;
   // De la proposition la plus recente a la plus ancienne : la derniere jouee est en tete de tableau.
   guesses: PokedexGuessRow[];

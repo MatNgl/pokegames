@@ -201,10 +201,10 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
   * **Stade d'évolution :** vert si identique, jaune à un stade d'écart, rouge à deux.
   * **Taille / Poids :** vert si la valeur est identique, jaune si l'écart tient dans la tolérance, rouge au-delà. La tolérance est un pourcentage de la valeur cible avec un plancher absolu : un écart purement relatif est trop sévère sur les petites valeurs (0,3 m contre 0,4 m fait déjà 33 %).
 * **Flèches :** toute case non verte des colonnes ordonnées (génération, stade, taille, poids) porte une flèche haut ou bas indiquant de quel côté chercher. Elle est indispensable au jeu, et elle porte l'information que le vert/jaune/rouge ne transmet pas à un joueur daltonien.
-* **Format :** défi quotidien, mode unique, 8 essais (réglable). Une proposition inconnue ou déjà jouée est refusée sans consommer d'essai. Classement par nombre d'essais.
+* **Format :** défi quotidien, mode unique, **essais illimités** : on ne peut que trouver, jamais perdre. Une proposition inconnue ou déjà jouée est refusée sans consommer d'essai. Classement par nombre d'essais, le plus faible gagne.
 * **Endpoints :** `POST /api/games/pokedex/start`, `GET /api/games/pokedex/round/:roundId`, `POST /api/games/pokedex/guess`. L'autocomplétion réutilise `GET /api/pokemon/names`.
 * **Anti-Triche :** la cible reste **exclusivement en Redis** jusqu'à la fin de la partie. Chaque ligne du tableau ne porte que les valeurs du Pokémon **proposé** (publiques par nature, le joueur l'a choisi) plus un verdict et une direction. Les valeurs de la cible ne sont jamais transmises : deux essais suffiraient sinon à la reconstituer. La réponse n'apparaît qu'une fois la partie gagnée ou perdue.
-* **Paramètres admin (clé `POKEDEX`) :** `maxAttempts`, `heightTolerancePct`, `heightToleranceMinM`, `weightTolerancePct`, `weightToleranceMinKg`.
+* **Paramètres admin (clé `POKEDEX`) :** `heightTolerancePct`, `heightToleranceMinM`, `weightTolerancePct`, `weightToleranceMinKg`.
 * **Note de nommage :** la route est `/le-pokedex`. `/pokedex` reste la collection personnelle issue des easter eggs, qui est un écran différent.
 
 ### 9. Qui est-ce ? (*Poké-Guess / 20 Questions*)

@@ -227,8 +227,6 @@ const antiRepeat = z
 
 const pokedexGame = z
   .object({
-    // Sous 3 essais le jeu est infaisable, au-dela de 15 il n'a plus d'enjeu.
-    maxAttempts: int(3, 15),
     // Tolerance du verdict "partiel" : un ecart relatif seul est trop severe sur les petites
     // valeurs, d'ou le plancher absolu qui l'accompagne.
     heightTolerancePct: int(0, 100),

@@ -40,6 +40,7 @@ const POKEDEX_RULES = [
   'Vert : la caractéristique correspond. Jaune : elle est proche, ou le type figure dans l’autre emplacement.',
   'Rouge : aucune correspondance.',
   'Une flèche indique de quel côté chercher : vers le haut si le Pokémon mystère a une valeur plus grande.',
+  'Essais illimités : cherche à trouver en le moins de propositions possible.',
 ];
 
 // Colonnes du tableau, dans l'ordre d'affichage. La cle sert a lire la case dans la ligne.
@@ -266,7 +267,7 @@ export function PokedexGamePage() {
       } else {
         setGuess('');
         if (res.state.status !== 'PLAYING') {
-          savePokedexGameDone(res.state.status === 'WON', res.state.attemptsUsed);
+          savePokedexGameDone(true, res.state.attemptsUsed);
         }
       }
     } catch (err) {
@@ -278,7 +279,6 @@ export function PokedexGamePage() {
 
   const finished = state != null && state.status !== 'PLAYING';
   const triedNames = (state?.guesses ?? []).map((g) => g.nameFr);
-  const remaining = state ? Math.max(0, state.maxAttempts - state.attemptsUsed) : 0;
 
   return (
     <AppBackground>
@@ -304,7 +304,7 @@ export function PokedexGamePage() {
                 <h1 className="font-display text-sm leading-relaxed text-foreground">Le Pokédex</h1>
                 <div className="flex items-center gap-2">
                   <Badge className="border-primary bg-primary text-primary-foreground">
-                    {state.attemptsUsed}/{state.maxAttempts}
+                    {state.attemptsUsed} essai{state.attemptsUsed > 1 ? 's' : ''}
                   </Badge>
                   <HelpPopover title="Le Pokédex" rules={POKEDEX_RULES} />
                 </div>
@@ -318,6 +318,7 @@ export function PokedexGamePage() {
                       names={names}
                       excluded={triedNames}
                       disabled={busy}
+                      placement="bottom"
                       onChange={setGuess}
                     />
                     <Button type="submit" disabled={busy || !guess.trim()}>
@@ -331,11 +332,6 @@ export function PokedexGamePage() {
                   >
                     {feedback ?? error ?? ''}
                   </p>
-                  <p className="text-center text-xs font-semibold text-muted">
-                    {remaining > 1
-                      ? `${remaining} essais restants`
-                      : `${remaining} essai restant`}
-                  </p>
                 </form>
               )}
 
@@ -345,13 +341,8 @@ export function PokedexGamePage() {
                   animate={{ opacity: 1, scale: 1 }}
                   className="flex flex-col items-center gap-3 rounded-card border-2 border-border-strong bg-surface-2/50 p-4 text-center"
                 >
-                  <span
-                    className={cn(
-                      'font-display text-[10px] uppercase tracking-widest',
-                      state.status === 'WON' ? 'text-success' : 'text-danger',
-                    )}
-                  >
-                    {state.status === 'WON' ? 'Trouvé' : 'Perdu'}
+                  <span className="font-display text-[10px] uppercase tracking-widest text-success">
+                    Trouvé
                   </span>
                   {state.answer && (
                     <>
@@ -365,9 +356,8 @@ export function PokedexGamePage() {
                     </>
                   )}
                   <p className="text-sm font-semibold text-muted">
-                    {state.status === 'WON'
-                      ? `Trouvé en ${state.attemptsUsed} essai${state.attemptsUsed > 1 ? 's' : ''}.`
-                      : 'Reviens demain pour un nouveau Pokémon.'}
+                    Trouvé en {state.attemptsUsed} essai{state.attemptsUsed > 1 ? 's' : ''}. Reviens
+                    demain pour un nouveau Pokémon.
                   </p>
                   <Button className="w-full" onClick={() => navigate('/')}>
                     Retour à l&apos;accueil

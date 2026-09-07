@@ -42,7 +42,7 @@ interface PokedexSession {
   roundId: string;
   targetId: number;
   guessedIds: number[];
-  status: 'PLAYING' | 'WON' | 'LOST';
+  status: 'PLAYING' | 'WON';
   startTime: number;
   userId?: string;
   guestId?: string;
@@ -304,7 +304,6 @@ export class PokedexGameService {
     return {
       roundId: session.roundId,
       status: session.status,
-      maxAttempts: this.gameConfig.pokedex().maxAttempts,
       attemptsUsed: session.guessedIds.length,
       guesses,
       answer: finished
@@ -393,13 +392,10 @@ export class PokedexGameService {
       };
     }
 
+    // Essais illimites : on ne clot la partie que sur une trouvaille.
     session.guessedIds.push(guess.id);
-    const won = guess.id === session.targetId;
-    const outOfAttempts = session.guessedIds.length >= this.gameConfig.pokedex().maxAttempts;
-    if (won) {
+    if (guess.id === session.targetId) {
       session.status = 'WON';
-    } else if (outOfAttempts) {
-      session.status = 'LOST';
     }
 
     await this.persist(session);
@@ -418,7 +414,6 @@ export class PokedexGameService {
     if (!target) return;
 
     const durationSeconds = Math.round((Date.now() - session.startTime) / 1000);
-    const won = session.status === 'WON';
 
     this.eventEmitter.emit(
       'game.round.completed',
@@ -427,7 +422,7 @@ export class PokedexGameService {
         'POKEDEX',
         target.id,
         target.nameFr,
-        won,
+        true,
         durationSeconds,
         0,
         0,
@@ -439,7 +434,7 @@ export class PokedexGameService {
     const player: PlayerIdentity = playerFromSession(session);
     if (player.userId || player.guestId) {
       await this.dailyResult.record(player, this.HISTORY_GAME, this.RESULT_SCOPE, new Date(), {
-        won,
+        won: true,
         attempts: session.guessedIds.length,
         durationSeconds,
       });

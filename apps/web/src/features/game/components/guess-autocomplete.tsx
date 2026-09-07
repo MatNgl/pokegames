@@ -13,6 +13,12 @@ interface GuessAutocompleteProps {
   names: string[];
   disabled?: boolean;
   excluded?: string[];
+  /**
+   * Cote d'ouverture de la liste. Par defaut vers le haut : dans la Silhouette le champ est en bas
+   * de l'arene, une liste descendante sortirait de l'ecran. Les ecrans ou le champ est en tete
+   * passent 'bottom'.
+   */
+  placement?: 'top' | 'bottom';
   onChange: (value: string) => void;
 }
 
@@ -21,6 +27,7 @@ export function GuessAutocomplete({
   names,
   disabled,
   excluded,
+  placement = 'top',
   onChange,
 }: GuessAutocompleteProps) {
   const [open, setOpen] = useState(false);
@@ -123,7 +130,9 @@ export function GuessAutocomplete({
           ref={listRef}
           id={listId}
           role="listbox"
-          className="absolute bottom-full z-20 mb-1 max-h-56 w-full overflow-auto rounded-control border-2 border-border-strong bg-surface py-1 shadow-lg"
+          className={`absolute z-20 max-h-56 w-full overflow-auto rounded-control border-2 border-border-strong bg-surface py-1 shadow-lg ${
+            placement === 'bottom' ? 'top-full mt-1' : 'bottom-full mb-1'
+          }`}
         >
           {suggestions.map((name, index) => (
             <li key={name} id={`${listId}-opt-${index}`} role="option" aria-selected={index === highlight}>

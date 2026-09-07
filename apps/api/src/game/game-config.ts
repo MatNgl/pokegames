@@ -236,7 +236,6 @@ export const JUST_STAT_DESCRIPTORS: Record<JustStatKey, StatDescriptor> = {
 };
 
 export interface PokedexGameConfig {
-  maxAttempts: number;
   // Tolerance du verdict "partiel" sur la taille et le poids : un ecart relatif seul se comporte mal
   // sur les petites valeurs (0,3 m contre 0,4 m fait deja 33 %), d'ou un plancher absolu.
   heightTolerancePct: number;
@@ -246,7 +245,6 @@ export interface PokedexGameConfig {
 }
 
 export const POKEDEX_GAME_CONFIG: PokedexGameConfig = {
-  maxAttempts: 8,
   heightTolerancePct: 10,
   heightToleranceMinM: 0.1,
   weightTolerancePct: 10,

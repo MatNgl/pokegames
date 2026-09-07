@@ -32,10 +32,6 @@ const pool = [
   row(4, 'Salameche', 'Feu', null, 1, 1, 0.6, 8.5),
   row(5, 'Poisson', 'Eau', 'Plante', 4, 1, 0.7, 7.0),
   row(6, 'Grosminet', 'Poison', 'Plante', 9, 2, 5.0, 300.0),
-  // Remplissage : maxAttempts vaut 8, il faut assez de propositions distinctes pour perdre.
-  ...Array.from({ length: 6 }, (_, i) =>
-    row(7 + i, `Figurant${i + 1}`, 'Normal', null, 2, 1, 1.2 + i, 20 + i),
-  ),
 ];
 
 describe('PokedexGameService', () => {
@@ -231,17 +227,21 @@ describe('PokedexGameService', () => {
       ]);
     });
 
-    it('révèle la cible seulement une fois la partie perdue', async () => {
+    it('ne révèle jamais la cible tant que le joueur n’a pas trouvé', async () => {
       const roundId = await startWithTarget(6);
       let res = await service.guess(roundId, 'Bulbizarre');
       expect(res.state.answer).toBeNull();
 
-      // maxAttempts = 8 par defaut : on epuise les essais avec des propositions distinctes.
-      const wrong = ['Herbizarre', 'Florizarre', 'Salameche', 'Poisson', 'Figurant1', 'Figurant2', 'Figurant3'];
-      for (const name of wrong) {
+      // Essais illimites : enchainer les mauvaises reponses ne termine pas la partie.
+      for (const name of ['Herbizarre', 'Florizarre', 'Salameche', 'Poisson']) {
         res = await service.guess(roundId, name);
       }
-      expect(res.state.status).toBe('LOST');
+      expect(res.state.status).toBe('PLAYING');
+      expect(res.state.attemptsUsed).toBe(5);
+      expect(res.state.answer).toBeNull();
+
+      res = await service.guess(roundId, 'Grosminet');
+      expect(res.state.status).toBe('WON');
       expect(res.state.answer?.nameFr).toBe('Grosminet');
     });
   });
