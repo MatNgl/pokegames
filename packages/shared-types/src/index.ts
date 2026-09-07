@@ -413,7 +413,8 @@ export type GameType =
   | 'SHINY'
   | 'TRUE_SHINY'
   | 'JUST_STAT'
-  | 'GUESS_WHO';
+  | 'GUESS_WHO'
+  | 'POKEDEX';
 
 export type GameStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
@@ -801,6 +802,69 @@ export interface JustStatGuessResponse {
 
 export interface JustStatTimeoutRequest {
   roundId: string;
+}
+
+/* ==========================================================================
+ * JEU 8 : LE POKEDEX (DEDUCTION PAR CRITERES)
+ * ========================================================================== */
+
+/** Verdict d'une case du tableau. Le PARTIEL n'existe pas sur toutes les colonnes. */
+export type PokedexVerdict = 'CORRECT' | 'PARTIAL' | 'INCORRECT';
+
+/** Sens de recherche sur les colonnes ordonnees : la cible est au-dessus ou en dessous. */
+export type PokedexDirection = 'HIGHER' | 'LOWER';
+
+/**
+ * Une case du tableau de comparaison. `label` est la valeur du Pokemon PROPOSE, publique par nature
+ * (le joueur l'a choisi et peut la lire dans n'importe quel Pokedex). La valeur de la cible n'est
+ * jamais transmise : seuls le verdict et, sur les colonnes ordonnees, la direction sortent du serveur.
+ */
+export interface PokedexCell {
+  label: string;
+  verdict: PokedexVerdict;
+  direction: PokedexDirection | null;
+}
+
+/** Une ligne du tableau : le Pokemon propose et le verdict de chacun de ses criteres. */
+export interface PokedexGuessRow {
+  pokemonId: number;
+  nameFr: string;
+  spriteUrl: string;
+  type1: PokedexCell;
+  type2: PokedexCell;
+  generation: PokedexCell;
+  evolutionStage: PokedexCell;
+  height: PokedexCell;
+  weight: PokedexCell;
+}
+
+/** Pokemon cible, renseigne uniquement quand la partie est terminee. */
+export interface PokedexAnswer {
+  pokemonId: number;
+  nameFr: string;
+  spriteUrl: string;
+}
+
+export interface PokedexRoundState {
+  roundId: string;
+  status: 'PLAYING' | 'WON' | 'LOST';
+  maxAttempts: number;
+  attemptsUsed: number;
+  // De la proposition la plus recente a la plus ancienne : la derniere jouee est en tete de tableau.
+  guesses: PokedexGuessRow[];
+  answer: PokedexAnswer | null;
+}
+
+export interface PokedexGuessRequest {
+  roundId: string;
+  name: string;
+}
+
+export interface PokedexGuessResponse {
+  // false si le nom n'est pas un Pokemon connu ou a deja ete propose : aucun essai n'est consomme.
+  accepted: boolean;
+  message?: string;
+  state: PokedexRoundState;
 }
 
 /* ==========================================================================

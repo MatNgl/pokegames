@@ -6,6 +6,7 @@ import quiEstCeImg from '@/assets/games/quiestce.png';
 import findShinyImg from '@/assets/games/find_shiny.png';
 import justPriceImg from '@/assets/games/just_price.png';
 import leBonShinyImg from '@/assets/games/le_bon_shiny.png';
+import lePokedexImg from '@/assets/games/le-pokedex.png';
 import { gameLabel } from '@/features/daily/daily-catalog';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,7 @@ const ICON_BY_GAME: Record<string, string> = {
   TRUE_SHINY: leBonShinyImg,
   SHINY: findShinyImg,
   GUESS_WHO: quiEstCeImg,
+  POKEDEX: lePokedexImg,
 };
 
 /** Vignette du jeu : repere visuel immediat dans les listes, qui evitent de lire chaque libelle. */

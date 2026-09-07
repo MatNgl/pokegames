@@ -50,8 +50,8 @@ describe('GameConfigService', () => {
 
   it('seed les clés manquantes au démarrage et expose les défauts', async () => {
     await service.onModuleInit();
-    // 9 clés seedees (aucune en base au depart).
-    expect(create).toHaveBeenCalledTimes(9);
+    // 10 clés seedees (aucune en base au depart).
+    expect(create).toHaveBeenCalledTimes(10);
     expect(service.plusMinus().roundsCount).toBe(10);
     expect(service.antiRepeatWindow('PLUS_MINUS')).toBe(5);
     expect(service.antiRepeatDetailWindow()).toBe(1);

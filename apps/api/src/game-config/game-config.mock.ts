@@ -7,6 +7,7 @@ import {
   JUST_STAT_CONFIG,
   MOTUS_ADMIN_CONFIG,
   PLUS_MINUS_CONFIG,
+  POKEDEX_GAME_CONFIG,
   SHINY_CONFIG,
   TRUE_SHINY_CONFIG,
   WHO_IS_IT_ADMIN_CONFIG,
@@ -23,6 +24,7 @@ export function gameConfigMock(): Partial<GameConfigService> {
     trueShiny: () => TRUE_SHINY_CONFIG,
     justStat: () => JUST_STAT_CONFIG,
     guessWho: () => GUESS_WHO_CONFIG,
+    pokedex: () => POKEDEX_GAME_CONFIG,
     antiRepeatWindow: (game: string) =>
       (ANTI_REPEAT_WINDOW_DAYS as Record<string, number>)[game] ?? 30,
     antiRepeatDetailWindow: () => ANTI_REPEAT_DETAIL_WINDOW_DAYS,

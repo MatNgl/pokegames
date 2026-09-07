@@ -12,6 +12,7 @@ import { TrueShinyPage } from '@/features/game/true-shiny-page';
 import { HistoryPage } from '@/features/daily/history-page';
 import { LeaderboardPage } from '@/features/daily/leaderboard-page';
 import { QuestsPage } from '@/features/daily/quests-page';
+import { PokedexGamePage } from '@/features/game/pokedex-game-page';
 import { GuessWhoPage } from '@/features/guess-who/guess-who-page';
 import { HomePage } from '@/features/home/home-page';
 import { PokedexPage } from '@/features/pokedex/pokedex-page';
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="/non-shiny" element={<ShinyPage mode="FIND_NON_SHINY" />} />
         <Route path="/juste-stat" element={<JustStatPage />} />
         <Route path="/bon-shiny" element={<TrueShinyPage />} />
+        <Route path="/le-pokedex" element={<PokedexGamePage />} />
         <Route path="/historique" element={<HistoryPage />} />
         <Route path="/classements" element={<LeaderboardPage />} />
         <Route path="/quetes" element={<QuestsPage />} />

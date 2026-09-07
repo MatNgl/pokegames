@@ -18,6 +18,8 @@ import { JustStatService } from './just-stat.service';
 import { JustStatController } from './just-stat.controller';
 import { TrueShinyService } from './true-shiny.service';
 import { TrueShinyController } from './true-shiny.controller';
+import { PokedexGameService } from './pokedex-game.service';
+import { PokedexGameController } from './pokedex-game.controller';
 
 @Module({
   imports: [PokemonModule, HistoryModule, DailyResultModule],
@@ -30,6 +32,7 @@ import { TrueShinyController } from './true-shiny.controller';
     ShinyController,
     JustStatController,
     TrueShinyController,
+    PokedexGameController,
   ],
   providers: [
     SpriteProxyService,
@@ -40,6 +43,7 @@ import { TrueShinyController } from './true-shiny.controller';
     ShinyService,
     JustStatService,
     TrueShinyService,
+    PokedexGameService,
   ],
   exports: [
     SpriteProxyService,
@@ -50,6 +54,7 @@ import { TrueShinyController } from './true-shiny.controller';
     ShinyService,
     JustStatService,
     TrueShinyService,
+    PokedexGameService,
   ],
 })
 export class GameModule {}

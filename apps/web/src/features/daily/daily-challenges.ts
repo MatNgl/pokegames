@@ -5,6 +5,7 @@ import { intruderDailyStatus } from '@/features/game/intruder-storage';
 import { shinyDailyStatus } from '@/features/game/shiny-storage';
 import { trueShinyDailyStatus } from '@/features/game/true-shiny-storage';
 import { justStatDailyStatus } from '@/features/game/just-stat-storage';
+import { pokedexGameDailyStatus } from '@/features/game/pokedex-game-storage';
 
 import whoIsItImg from '@/assets/games/who-is-it.png';
 import pokeMotusImg from '@/assets/games/poke-motus.png';
@@ -14,6 +15,7 @@ import findShinyImg from '@/assets/games/find_shiny.png';
 import findNotShinyImg from '@/assets/games/find_not_shiny.png';
 import justPriceImg from '@/assets/games/just_price.png';
 import leBonShinyImg from '@/assets/games/le_bon_shiny.png';
+import lePokedexImg from '@/assets/games/le-pokedex.png';
 
 export type LocalStatus = 'idle' | 'in-progress' | 'done';
 
@@ -158,6 +160,22 @@ export const DAILY_GAME_GROUPS: DailyGameGroup[] = [
         label: 'Défi du jour',
         route: '/juste-stat',
         localStatus: () => justStatDailyStatus(),
+      },
+    ],
+  },
+  {
+    key: 'POKEDEX',
+    label: 'Le Pokédex',
+    gameType: 'POKEDEX',
+    route: '/le-pokedex',
+    iconImg: lePokedexImg,
+    challenges: [
+      {
+        gameType: 'POKEDEX',
+        scope: '',
+        label: 'Défi du jour',
+        route: '/le-pokedex',
+        localStatus: () => pokedexGameDailyStatus(),
       },
     ],
   },

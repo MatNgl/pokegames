@@ -192,7 +192,22 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 * **Anti-Triche :** la valeur exacte est conservée **en Redis** ; le client ne reçoit que le libellé de la stat, des bornes indicatives, la direction et le nombre d'essais restants. La valeur n'est révélée qu'à la fin de la manche.
 * **Paramètres admin (`/admin/games/just-stat`) :** `roundsCount` (défaut 3), `timeLimitSecondsByLevel`, `allowedStatsByLevel`. Centralisés dans `game-config.ts` (`JUST_STAT_CONFIG`).
 
-### 8. Qui est-ce ? (*Poké-Guess / 20 Questions*)
+### 8. Le Pokédex (*déduction par critères*)
+* **Concept :** un Pokémon mystère est tiré chaque jour, le même pour tous. Le joueur propose des Pokémon ; pour chacun, un tableau compare six caractéristiques avec celles de la cible et colore chaque case.
+* **Colonnes comparées :** Type 1, Type 2, Génération, Stade d'évolution, Taille, Poids. Toutes viennent de données déjà en base (aucune source externe ajoutée). L'habitat et la couleur du jeu de référence sont écartés : Tyradex ne les expose pas, et PokéAPI ne renseigne l'habitat que pour la première génération.
+* **Code couleur :** vert (correct), jaune (proche), rouge (incorrect).
+  * **Type 1 / Type 2 :** vert si le type occupe le même emplacement chez la cible, jaune s'il figure dans l'autre emplacement, rouge s'il en est absent. « Aucun » des deux côtés est un vert : 500 Pokémon sur 1025 sont mono-type, l'information est réelle.
+  * **Génération :** binaire, vert ou rouge.
+  * **Stade d'évolution :** vert si identique, jaune à un stade d'écart, rouge à deux.
+  * **Taille / Poids :** vert si la valeur est identique, jaune si l'écart tient dans la tolérance, rouge au-delà. La tolérance est un pourcentage de la valeur cible avec un plancher absolu : un écart purement relatif est trop sévère sur les petites valeurs (0,3 m contre 0,4 m fait déjà 33 %).
+* **Flèches :** toute case non verte des colonnes ordonnées (génération, stade, taille, poids) porte une flèche haut ou bas indiquant de quel côté chercher. Elle est indispensable au jeu, et elle porte l'information que le vert/jaune/rouge ne transmet pas à un joueur daltonien.
+* **Format :** défi quotidien, mode unique, 8 essais (réglable). Une proposition inconnue ou déjà jouée est refusée sans consommer d'essai. Classement par nombre d'essais.
+* **Endpoints :** `POST /api/games/pokedex/start`, `GET /api/games/pokedex/round/:roundId`, `POST /api/games/pokedex/guess`. L'autocomplétion réutilise `GET /api/pokemon/names`.
+* **Anti-Triche :** la cible reste **exclusivement en Redis** jusqu'à la fin de la partie. Chaque ligne du tableau ne porte que les valeurs du Pokémon **proposé** (publiques par nature, le joueur l'a choisi) plus un verdict et une direction. Les valeurs de la cible ne sont jamais transmises : deux essais suffiraient sinon à la reconstituer. La réponse n'apparaît qu'une fois la partie gagnée ou perdue.
+* **Paramètres admin (clé `POKEDEX`) :** `maxAttempts`, `heightTolerancePct`, `heightToleranceMinM`, `weightTolerancePct`, `weightToleranceMinKg`.
+* **Note de nommage :** la route est `/le-pokedex`. `/pokedex` reste la collection personnelle issue des easter eggs, qui est un écran différent.
+
+### 9. Qui est-ce ? (*Poké-Guess / 20 Questions*)
 * **Concept :** Jeu de déduction tactique en solo (contre une IA de filtrage) ou en multijoueur (1v1).
 * **Mécanique :**
   * Chaque joueur dispose d'une grille de 24 Pokémon. Le serveur assigne secrètement un Pokémon cible à chaque joueur.
@@ -253,7 +268,7 @@ Ce document est le **référentiel unique et impératif** pour toute IA (Claude,
 En pratique, on livre désormais **chaque jeu de bout en bout** (backend puis front) plutôt que tous les backends d'abord, chaque jeu étant validé par `npm run verify`, puis commité et poussé.
 
 ### État d'avancement
-* **Jeux livrés (back + front, testés) :** Quel est ce Pokémon (silhouette), Poké-Motus, Plus ou Moins, L'Intrus, Trouve le shiny / non-shiny, Le Bon Shiny, La Juste Stat. Chacun : état serveur en Redis, anti-triche, événement d'audit `game.round.completed`, tests Jest.
+* **Jeux livrés (back + front, testés) :** Quel est ce Pokémon (silhouette), Poké-Motus, Plus ou Moins, L'Intrus, Trouve le shiny / non-shiny, Le Bon Shiny, La Juste Stat, Le Pokédex. Chacun : état serveur en Redis, anti-triche, événement d'audit `game.round.completed`, tests Jest.
 * **Accueil (page de référence, route `/`, livré) :** `HomePage` (`apps/web/src/features/home/home-page.tsx`) = jeu vedette du jour (rotation déterministe par date, identique pour tous), panneau de quêtes simplifié à gauche (`SimpleQuestsPanel`), sections Défis solo et Multijoueur, cartes avec icônes PNG. Badge vert de validation dans le coin haut-droite d'une case quand le jeu est terminé à 100 % dans la journée (`useCompletedGames`). Les anciennes variantes d'accueil (carrousel, niveau, libre) et l'ancienne `games-page` ont été supprimées. Liste des jeux dans `features/home/games-list.ts` (`HOME_GAMES`, avec `gameType` liant au catalogue de défis).
 * **Redirection après connexion (livré) :** la connexion et l'inscription renvoient vers la page d'origine via `state.from` (repli `/jouer` si accès direct). Le `from` est capturé par les liens du header, `RequireAuth`, et les boutons Se connecter des pages Historique et Qui est-ce, puis propagé entre connexion et inscription.
 * **Données enrichies (ETL) :** colonnes ajoutées sur `Pokemon` pour L'Intrus et Le Bon Shiny (`evolutionStage`, `isFinalEvolution`, `hasMega`, sprites de méga) ; sprite shiny requis pour les jeux chromatiques.

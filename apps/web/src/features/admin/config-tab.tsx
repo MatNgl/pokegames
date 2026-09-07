@@ -25,6 +25,7 @@ const KEY_LABEL: Record<string, string> = {
   TRUE_SHINY: 'Le Bon Shiny',
   JUST_STAT: 'La Juste Stat',
   GUESS_WHO: 'Qui est-ce',
+  POKEDEX: 'Le Pokédex',
   ANTI_REPEAT: 'Anti-répétition',
 };
 

@@ -19,6 +19,7 @@ export const GAME_LABELS: Record<string, string> = {
   SHINY: 'Trouve le shiny',
   TRUE_SHINY: 'Le Bon Shiny',
   JUST_STAT: 'La Juste Stat',
+  POKEDEX: 'Le Pokédex',
 };
 
 const LEVEL_LABELS: Record<string, string> = {

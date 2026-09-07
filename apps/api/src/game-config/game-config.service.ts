@@ -11,6 +11,7 @@ import {
   JUST_STAT_CONFIG,
   MOTUS_ADMIN_CONFIG,
   PLUS_MINUS_CONFIG,
+  POKEDEX_GAME_CONFIG,
   SHINY_CONFIG,
   TRUE_SHINY_CONFIG,
   WHO_IS_IT_ADMIN_CONFIG,
@@ -19,6 +20,7 @@ import {
   type JustStatConfig,
   type MotusAdminConfig,
   type PlusMinusConfig,
+  type PokedexGameConfig,
   type ShinyConfig,
   type TrueShinyConfig,
   type WhoIsItAdminConfig,
@@ -44,6 +46,7 @@ export type GameConfigKey =
   | 'TRUE_SHINY'
   | 'JUST_STAT'
   | 'GUESS_WHO'
+  | 'POKEDEX'
   | 'ANTI_REPEAT';
 
 // Valeurs par defaut : ne servent qu'au seed initial. Apres seed, la base est la source de verite.
@@ -56,6 +59,7 @@ const DEFAULTS: Record<GameConfigKey, unknown> = {
   TRUE_SHINY: TRUE_SHINY_CONFIG,
   JUST_STAT: JUST_STAT_CONFIG,
   GUESS_WHO: GUESS_WHO_CONFIG,
+  POKEDEX: POKEDEX_GAME_CONFIG,
   ANTI_REPEAT: { windows: ANTI_REPEAT_WINDOW_DAYS, detailWindow: ANTI_REPEAT_DETAIL_WINDOW_DAYS },
 };
 
@@ -158,6 +162,9 @@ export class GameConfigService implements OnModuleInit {
   }
   guessWho(): GuessWhoConfig {
     return this.get<GuessWhoConfig>('GUESS_WHO');
+  }
+  pokedex(): PokedexGameConfig {
+    return this.get<PokedexGameConfig>('POKEDEX');
   }
   antiRepeatWindow(game: string): number {
     return this.get<AntiRepeatConfig>('ANTI_REPEAT').windows[game] ?? 30;

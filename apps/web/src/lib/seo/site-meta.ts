@@ -117,6 +117,22 @@ export const ROUTES_META: RouteMeta[] = [
     indexable: true,
   },
   {
+    path: '/le-pokedex',
+    title: `Le Pokédex, déduis le Pokémon mystère du jour | ${SITE_NAME}`,
+    description:
+      'Propose des Pokémon et compare leurs types, génération, stade d’évolution, taille et poids avec ceux du Pokémon mystère du jour.',
+    h1: 'Le Pokédex',
+    intro:
+      'Un Pokémon mystère est tiré chaque jour, le même pour tout le monde. Propose un Pokémon : le tableau colore chacune de ses six caractéristiques selon qu’elle correspond, s’en approche, ou pas du tout. Les flèches indiquent de quel côté chercher.',
+    rules: [
+      'Six critères comparés : type 1, type 2, génération, stade d’évolution, taille et poids.',
+      'Vert quand la caractéristique correspond, jaune quand elle est proche, rouge sinon.',
+      'Une flèche indique si le Pokémon mystère a une valeur plus grande ou plus petite.',
+      'Huit essais par jour, un seul défi quotidien.',
+    ],
+    indexable: true,
+  },
+  {
     path: '/bon-shiny',
     title: `Le Bon Shiny, repère la couleur chromatique authentique | ${SITE_NAME}`,
     description:

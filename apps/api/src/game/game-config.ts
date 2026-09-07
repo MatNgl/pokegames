@@ -218,6 +218,7 @@ export const ANTI_REPEAT_WINDOW_DAYS = {
   TRUE_SHINY: 30,
   JUST_STAT: 30,
   MOTUS: 30,
+  POKEDEX: 30,
 } as const;
 
 // Dimensions secondaires (stat, critere) : rarefiees sur une fenetre courte.
@@ -232,4 +233,22 @@ export const JUST_STAT_DESCRIPTORS: Record<JustStatKey, StatDescriptor> = {
   SPEED: { label: 'Vitesse', unit: '', min: 1, max: 255 },
   HEIGHT_CM: { label: 'Taille', unit: 'cm', min: 10, max: 2000 },
   WEIGHT_KG: { label: 'Poids', unit: 'kg', min: 0, max: 1000 },
+};
+
+export interface PokedexGameConfig {
+  maxAttempts: number;
+  // Tolerance du verdict "partiel" sur la taille et le poids : un ecart relatif seul se comporte mal
+  // sur les petites valeurs (0,3 m contre 0,4 m fait deja 33 %), d'ou un plancher absolu.
+  heightTolerancePct: number;
+  heightToleranceMinM: number;
+  weightTolerancePct: number;
+  weightToleranceMinKg: number;
+}
+
+export const POKEDEX_GAME_CONFIG: PokedexGameConfig = {
+  maxAttempts: 8,
+  heightTolerancePct: 10,
+  heightToleranceMinM: 0.1,
+  weightTolerancePct: 10,
+  weightToleranceMinKg: 1,
 };

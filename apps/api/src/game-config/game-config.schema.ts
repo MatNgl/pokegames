@@ -222,6 +222,22 @@ const antiRepeat = z
   })
   .strict();
 
+
+/* ------------------------------------------------------------- Le Pokedex */
+
+const pokedexGame = z
+  .object({
+    // Sous 3 essais le jeu est infaisable, au-dela de 15 il n'a plus d'enjeu.
+    maxAttempts: int(3, 15),
+    // Tolerance du verdict "partiel" : un ecart relatif seul est trop severe sur les petites
+    // valeurs, d'ou le plancher absolu qui l'accompagne.
+    heightTolerancePct: int(0, 100),
+    heightToleranceMinM: num(0, 10),
+    weightTolerancePct: int(0, 100),
+    weightToleranceMinKg: num(0, 100),
+  })
+  .strict();
+
 export const CONFIG_SCHEMAS = {
   WHO_IS_IT: whoIsIt,
   MOTUS: motus,
@@ -231,6 +247,7 @@ export const CONFIG_SCHEMAS = {
   TRUE_SHINY: trueShiny,
   JUST_STAT: justStat,
   GUESS_WHO: guessWho,
+  POKEDEX: pokedexGame,
   ANTI_REPEAT: antiRepeat,
 } as const;
 

@@ -7,6 +7,7 @@ import findShinyImg from '@/assets/games/find_shiny.png';
 import findNotShinyImg from '@/assets/games/find_not_shiny.png';
 import justPriceImg from '@/assets/games/just_price.png';
 import leBonShinyImg from '@/assets/games/le_bon_shiny.png';
+import lePokedexImg from '@/assets/games/le-pokedex.png';
 
 export interface HomeGame {
   title: string;
@@ -27,5 +28,6 @@ export const HOME_GAMES: HomeGame[] = [
   { title: 'Le Bon Shiny', description: 'Repère le shiny authentique', to: '/bon-shiny', iconImg: leBonShinyImg, completionKey: 'TRUE_SHINY' },
   { title: 'Trouve le shiny', description: 'Repère le Pokémon shiny', to: '/shiny', iconImg: findShinyImg, completionKey: 'SHINY_FIND_SHINY' },
   { title: 'Trouve le non-shiny', description: "Repère celui qui n'est pas shiny", to: '/non-shiny', iconImg: findNotShinyImg, completionKey: 'SHINY_FIND_NON_SHINY' },
+  { title: 'Le Pokédex', description: 'Déduis le Pokémon du jour', to: '/le-pokedex', iconImg: lePokedexImg, completionKey: 'POKEDEX' },
   { title: 'Qui est-ce', description: 'Duel 1 contre 1 en temps réel', to: '/qui-est-ce', iconImg: quiEstCeImg },
 ];
