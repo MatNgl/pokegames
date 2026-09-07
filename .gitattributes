@@ -1,0 +1,9 @@
+# Le depot est en LF. Sans cette regle, un outil qui reecrit un fichier sous Windows le repasse en
+# CRLF et le diff affiche la totalite du fichier comme modifiee, ce qui rend une revue impossible.
+* text=auto eol=lf
+
+# Binaires : jamais de conversion de fins de ligne.
+*.png binary
+*.jpg binary
+*.woff2 binary
+*.ico binary
