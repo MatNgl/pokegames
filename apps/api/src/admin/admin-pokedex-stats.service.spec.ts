@@ -9,6 +9,7 @@ describe('AdminPokedexStatsService', () => {
     pokemon: { count: jest.Mock; findFirst: jest.Mock };
     userPokedexEntry: { count: jest.Mock; findMany: jest.Mock };
     dailyPick: { groupBy: jest.Mock };
+    user: { count: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -17,6 +18,7 @@ describe('AdminPokedexStatsService', () => {
       pokemon: { count: jest.fn().mockResolvedValue(1025), findFirst: jest.fn().mockResolvedValue(null) },
       userPokedexEntry: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       dailyPick: { groupBy: jest.fn().mockResolvedValue([]) },
+      user: { count: jest.fn().mockResolvedValue(0) },
     };
     const module: TestingModule = await Test.createTestingModule({
       providers: [AdminPokedexStatsService, { provide: PrismaService, useValue: prisma }],
@@ -47,13 +49,29 @@ describe('AdminPokedexStatsService', () => {
 
   it('calcule la progression moyenne du Pokédex sur les seuls collectionneurs', async () => {
     prisma.userPokedexEntry.count.mockResolvedValue(30);
-    prisma.userPokedexEntry.findMany.mockResolvedValue([{ userId: 'u1' }, { userId: 'u2' }]);
+    prisma.userPokedexEntry.findMany.mockResolvedValue([
+      { userId: 'u1' },
+      { userId: 'u2' },
+      { userId: 'u3' },
+    ]);
     prisma.pokemon.count.mockResolvedValue(1000);
+    prisma.user.count.mockResolvedValue(10);
 
     const r = await service.getReport();
-    expect(r.collectors).toBe(2);
-    expect(r.avgCollected).toBe(15);
-    expect(r.avgPct).toBe(1.5);
+    expect(r.collectors).toBe(3);
+    expect(r.avgCollected).toBe(10);
+    expect(r.avgPct).toBe(1);
+    // 3 collectionneurs sur 10 comptes enregistres.
+    expect(r.collectorsPct).toBe(30);
+  });
+
+  it('renvoie un taux de collectionneurs nul quand aucun compte n’est enregistré', async () => {
+    prisma.userPokedexEntry.findMany.mockResolvedValue([]);
+    prisma.user.count.mockResolvedValue(0);
+
+    const r = await service.getReport();
+    expect(r.collectors).toBe(0);
+    expect(r.collectorsPct).toBe(0);
   });
 
   it('renvoie l’état du catalogue et les tirages du jour', async () => {

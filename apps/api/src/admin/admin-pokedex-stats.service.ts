@@ -14,7 +14,7 @@ export class AdminPokedexStatsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getReport(): Promise<AdminPokedexReport> {
-    const [spawns, totalSpecies, entries, collectors] = await Promise.all([
+    const [spawns, totalSpecies, entries, collectors, totalUsers] = await Promise.all([
       this.prisma.pokedexSpawn.groupBy({
         by: ['zone', 'collected'],
         _count: { _all: true },
@@ -22,6 +22,7 @@ export class AdminPokedexStatsService {
       this.prisma.pokemon.count(),
       this.prisma.userPokedexEntry.count(),
       this.prisma.userPokedexEntry.findMany({ select: { userId: true }, distinct: ['userId'] }),
+      this.prisma.user.count(),
     ]);
 
     const byZone = new Map<string, { spawned: number; collected: number }>();
@@ -49,6 +50,7 @@ export class AdminPokedexStatsService {
       avgPct: totalSpecies > 0 ? Math.round((avgCollected / totalSpecies) * 1000) / 10 : 0,
       totalSpecies,
       collectors: collectorCount,
+      collectorsPct: pct(collectorCount, totalUsers),
     };
   }
 

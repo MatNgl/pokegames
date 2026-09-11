@@ -298,6 +298,7 @@ export interface AdminPokedexReport {
   avgPct: number;
   totalSpecies: number;
   collectors: number; // joueurs ayant au moins une capture
+  collectorsPct: number; // part des comptes ayant au moins une capture
 }
 
 /** Etat des donnees et du catalogue (onglet Systeme). */
