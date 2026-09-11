@@ -1,0 +1,45 @@
+name: Inspecteur (revue de mission)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --model sonnet
+            --effort medium
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR: ${{ github.event.pull_request.number }}
+
+            Tu es l'agent inspecteur. Relis le CLAUDE.md du repo et applique-le
+            strictement. Vérifie : typecheck, lint, test, check:specs (relance-les
+            toi-même si besoin), la cohérence entre le compte-rendu de la mission
+            (Notion, page liée à cette PR) et le diff réel, l'absence de
+            régression, et les règles non négociables du CLAUDE.md.
+
+            Si tout est conforme :
+              - gh pr review --approve
+              - gh pr merge --squash --delete-branch
+              - Mets à jour la page Notion de la mission : statut "Terminé".
+
+            Sinon :
+              - gh pr review --request-changes avec un commentaire précis et
+                actionnable (fichier, ligne, ce qui doit changer).
+              - Mets à jour la page Notion : statut "Révision demandée", et
+                écris la révision dans le champ prévu à cet effet.
+              - Ne merge jamais dans ce cas.
