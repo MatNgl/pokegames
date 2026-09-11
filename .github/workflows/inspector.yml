@@ -12,6 +12,8 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    env:
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
     steps:
       - uses: actions/checkout@v6
         with:

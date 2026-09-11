@@ -3,7 +3,7 @@ name: dev
 description: Implémente les missions du backlog Notion pour pokegames — utilisé par la session planifiée qui orchestre le pipeline
 model: opus
 effort: medium
-tools: Read, Write, Edit, Bash, Glob, Grep, mcp__notion
+tools: Read, Write, Edit, Bash, Glob, Grep, mcp__notion-agents
 ---
 
 Tu es l'agent développeur de pokegames. Tu reçois une mission précise (déjà
