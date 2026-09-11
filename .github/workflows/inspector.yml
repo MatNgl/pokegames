@@ -26,20 +26,5 @@ jobs:
             REPO: ${{ github.repository }}
             PR: ${{ github.event.pull_request.number }}
 
-            Tu es l'agent inspecteur. Relis le CLAUDE.md du repo et applique-le
-            strictement. Vérifie : typecheck, lint, test, check:specs (relance-les
-            toi-même si besoin), la cohérence entre le compte-rendu de la mission
-            (Notion, page liée à cette PR) et le diff réel, l'absence de
-            régression, et les règles non négociables du CLAUDE.md.
-
-            Si tout est conforme :
-              - gh pr review --approve
-              - gh pr merge --squash --delete-branch
-              - Mets à jour la page Notion de la mission : statut "Terminé".
-
-            Sinon :
-              - gh pr review --request-changes avec un commentaire précis et
-                actionnable (fichier, ligne, ce qui doit changer).
-              - Mets à jour la page Notion : statut "Révision demandée", et
-                écris la révision dans le champ prévu à cet effet.
-              - Ne merge jamais dans ce cas.
+            Lis .claude/agents/inspector.md à la racine du repo et applique-le
+            exactement, sans en dévier.
