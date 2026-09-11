@@ -25,6 +25,7 @@ jobs:
             --model sonnet
             --effort medium
             --disallowedTools Task
+            --dangerously-skip-permissions
           show_full_output: true
           prompt: |
             REPO: ${{ github.repository }}
