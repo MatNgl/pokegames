@@ -3,10 +3,19 @@ import { useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
-import type { PokedexCollectResponse, PokedexSpawnDTO } from '@pokegames/shared-types';
+import type { PokedexCollectResponse, PokedexCorner, PokedexSpawnDTO } from '@pokegames/shared-types';
 import { API_ORIGIN } from '@/lib/env';
 import { useAuth } from '@/features/auth/auth-context';
 import { collectSpawn, getSpawns, ROUTE_ZONE } from './pokedex-api';
+
+// Placement par coin. Le coin est choisi par le serveur (stable pour la journée). En haut, on
+// descend sous le header (h-16, z-50) sinon la silhouette passerait dessous et resterait invisible.
+const CORNER_CLASS: Record<PokedexCorner, string> = {
+  'top-left': 'top-20 left-4',
+  'top-right': 'top-20 right-4',
+  'bottom-left': 'bottom-4 left-4',
+  'bottom-right': 'bottom-4 right-4',
+};
 
 // Couche globale des easter eggs : une petite silhouette cachée par zone (écran), fixe pour la
 // journée. Réservée aux utilisateurs connectés : cliquer la collecte et l'ajoute à leur Pokédex.
@@ -62,7 +71,7 @@ export function EasterEggLayer() {
               ? undefined
               : { y: { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }, scale: { duration: 0.3 } }
           }
-          className="fixed bottom-4 left-4 z-40 flex h-16 w-16 items-center justify-center rounded-full border-2 border-border-strong bg-surface/80 p-1.5 shadow-lg backdrop-blur transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50"
+          className={`fixed ${CORNER_CLASS[spawn.corner]} z-40 flex h-16 w-16 items-center justify-center rounded-full border-2 border-border-strong bg-surface/80 p-1.5 shadow-lg backdrop-blur transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50`}
         >
           <img
             src={`${API_ORIGIN}${spawn.spriteProxyUrl}`}

@@ -5,8 +5,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SpriteProxyService } from '../game/sprite-proxy.service';
 import {
+  POKEDEX_CORNERS,
   POKEDEX_ZONES,
   type PokedexCatalogEntry,
+  type PokedexCorner,
   type PokedexCollectResponse,
   type PokedexCollectionDTO,
   type PokedexDetailDTO,
@@ -108,6 +110,24 @@ export class PokedexService {
     return createHmac('sha256', this.GUEST_SECRET).update(`sh:${token}`).digest('hex').slice(0, 16);
   }
 
+  // Avalanche 32 bits : hashSeed seul garde des bits de poids faible corrélés entre chaînes
+  // voisines, ce qui collerait plusieurs apparitions dans le même coin.
+  private mix32(value: number): number {
+    let x = value >>> 0;
+    x = (x ^ (x >>> 16)) >>> 0;
+    x = Math.imul(x, 0x7feb352d) >>> 0;
+    x = (x ^ (x >>> 15)) >>> 0;
+    x = Math.imul(x, 0x846ca68b) >>> 0;
+    return (x ^ (x >>> 16)) >>> 0;
+  }
+
+  // Coin d'apparition dérivé du jeton : réparti sur les 4 coins, stable tant que le jeton l'est
+  // (donc identique après un rafraîchissement, comme la zone et le Pokémon du jour).
+  private cornerFor(token: string): PokedexCorner {
+    const index = this.mix32(this.hashSeed(`corner:${token}`)) % POKEDEX_CORNERS.length;
+    return POKEDEX_CORNERS[index]!;
+  }
+
   private revealed(p: PoolPokemon): PokedexRevealedPokemon {
     return {
       id: p.id,
@@ -140,7 +160,12 @@ export class PokedexService {
         const token = this.guestToken(p.id, dayStr);
         const sessionHash = this.guestSessionHash(token);
         await this.spriteProxy.registerSpriteSession(sessionHash, p.id, p.spriteRegular, this.SPRITE_TTL_SECONDS);
-        out.push({ token, zone: zones[i]!, spriteProxyUrl: `/api/sprites/${sessionHash}` });
+        out.push({
+          token,
+          zone: zones[i]!,
+          corner: this.cornerFor(token),
+          spriteProxyUrl: `/api/sprites/${sessionHash}`,
+        });
       }
       return out;
     }
@@ -154,7 +179,12 @@ export class PokedexService {
       const p = byId.get(s.pokemonId);
       if (!p) continue;
       await this.spriteProxy.registerSpriteSession(s.sessionHash, p.id, p.spriteRegular, this.SPRITE_TTL_SECONDS);
-      out.push({ token: s.token, zone: s.zone, spriteProxyUrl: `/api/sprites/${s.sessionHash}` });
+      out.push({
+        token: s.token,
+        zone: s.zone,
+        corner: this.cornerFor(s.token),
+        spriteProxyUrl: `/api/sprites/${s.sessionHash}`,
+      });
     }
     return out;
   }

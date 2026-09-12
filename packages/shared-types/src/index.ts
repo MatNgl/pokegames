@@ -934,10 +934,15 @@ export const POKEDEX_ZONES = [
 ] as const;
 export type PokedexZone = (typeof POKEDEX_ZONES)[number];
 
+// Coin de l'écran où la silhouette se pose. Tiré côté serveur, stable pour la journée.
+export const POKEDEX_CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const;
+export type PokedexCorner = (typeof POKEDEX_CORNERS)[number];
+
 // Apparition masquée : le client ne connaît ni le nom ni le pokedexId avant la collecte.
 export interface PokedexSpawnDTO {
   token: string;
   zone: string;
+  corner: PokedexCorner; // coin d'apparition dans la zone
   spriteProxyUrl: string; // silhouette noire (proxy masqué)
 }
 
