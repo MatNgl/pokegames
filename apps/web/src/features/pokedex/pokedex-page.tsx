@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TriangleAlert } from 'lucide-react';
 import type { PokedexCatalogEntry } from '@pokegames/shared-types';
 import { AppBackground } from '@/components/backgrounds/app-background';
 import { AppHeader } from '@/components/layout/app-header';
@@ -17,6 +17,12 @@ import {
   getPokedexDetail,
   markPokedexSeen,
 } from './pokedex-api';
+import {
+  guestCollectedIds,
+  guestTokenFor,
+  loadGuestCollection,
+  type GuestPokedexEntry,
+} from './guest-collection';
 
 const PAGE_SIZE = 60;
 const GENERATIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -25,10 +31,11 @@ function padId(n: number): string {
   return `N°${String(n).padStart(4, '0')}`;
 }
 
-function DetailPanel({ id }: { id: number }) {
+// `guestToken` : preuve de collecte des invités (le serveur la vérifie avant de servir la fiche).
+function DetailPanel({ id, guestToken }: { id: number; guestToken?: string }) {
   const { data, isLoading } = useQuery({
-    queryKey: ['pokedex-detail', id],
-    queryFn: () => getPokedexDetail(id),
+    queryKey: ['pokedex-detail', id, guestToken ?? 'compte'],
+    queryFn: () => getPokedexDetail(id, guestToken),
     staleTime: 5 * 60_000,
   });
 
@@ -103,6 +110,10 @@ export function PokedexPage() {
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
+  // Invité : la collection n'existe que dans ce navigateur, elle est relue au montage.
+  const [guestEntries] = useState<GuestPokedexEntry[]>(() =>
+    typeof window === 'undefined' ? [] : loadGuestCollection(),
+  );
 
   const { data: catalog = [], isLoading: catalogLoading } = useQuery({
     queryKey: ['pokedex-catalog'],
@@ -123,7 +134,12 @@ export function PokedexPage() {
     void markPokedexSeen();
   }, [user]);
 
-  const collectedIds = useMemo(() => new Set(collection?.collectedIds ?? []), [collection]);
+  const collectedIds = useMemo(
+    () => (user ? new Set(collection?.collectedIds ?? []) : guestCollectedIds(guestEntries)),
+    [user, collection, guestEntries],
+  );
+  const collectedCount = user ? (collection?.collectedCount ?? 0) : guestEntries.length;
+  const totalCount = (user ? collection?.total : undefined) ?? catalog.length;
 
   const filtered = useMemo(() => {
     let list = gen === 'all' ? catalog : catalog.filter((p) => p.generation === gen);
@@ -164,35 +180,48 @@ export function PokedexPage() {
     );
   }
 
-  if (!user) {
-    return (
-      <AppBackground>
-        <div className="flex min-h-screen flex-col">
-          <AppHeader />
-          <main className="flex flex-1 items-center justify-center px-4 py-8">
-            <Card className="flex w-full max-w-md flex-col items-center gap-4 p-8 text-center">
-              <h1 className="font-display text-sm text-foreground">Pokédex</h1>
-              <p className="text-sm font-semibold text-muted">
-                Connecte-toi pour collectionner les Pokémon cachés sur le site et suivre ta collection.
-              </p>
-              <Button className="w-full" onClick={() => navigate('/connexion', { state: { from: '/pokedex' } })}>
-                Se connecter
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
-                Retour à l'accueil
-              </Button>
-            </Card>
-          </main>
-        </div>
-      </AppBackground>
-    );
-  }
-
   return (
     <AppBackground>
       <div className="flex min-h-screen flex-col">
         <AppHeader />
         <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 py-6">
+          {!user && (
+            // Avertissement invité : la collection n'existe que dans ce navigateur.
+            <Card className="flex flex-col gap-3 border-4 border-accent-shadow bg-accent/15 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex gap-3">
+                <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-accent-shadow" aria-hidden="true" />
+                <div className="flex flex-col gap-1">
+                  <p className="font-display text-[10px] uppercase tracking-widest text-foreground">
+                    Pokédex invité
+                  </p>
+                  <p className="text-sm font-semibold text-muted">
+                    Tes captures sont enregistrées uniquement sur ce navigateur. Elles peuvent
+                    disparaître (autre appareil, navigation privée, nettoyage de l'historique). Crée
+                    un compte pour les conserver et les retrouver partout.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col gap-2 sm:w-44">
+                <Button
+                  variant="go"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => navigate('/inscription', { state: { from: '/pokedex' } })}
+                >
+                  Créer un compte
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => navigate('/connexion', { state: { from: '/pokedex' } })}
+                >
+                  Se connecter
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {/* En-tete facon centre de donnees */}
           <Card className="flex flex-wrap items-center justify-between gap-3 border-4 border-border-strong p-4">
             <div className="flex items-center gap-3">
@@ -200,7 +229,7 @@ export function PokedexPage() {
               <div>
                 <h1 className="font-display text-sm text-foreground">Pokédex</h1>
                 <p className="text-xs font-semibold text-muted">
-                  {collection?.collectedCount ?? 0} / {collection?.total ?? catalog.length} capturés
+                  {collectedCount} / {totalCount} capturés
                 </p>
               </div>
             </div>
@@ -307,7 +336,10 @@ export function PokedexPage() {
             {/* Panneau de detail */}
             <Card className="border-4 border-border-strong p-4 lg:w-72 lg:shrink-0">
               {selected ? (
-                <DetailPanel id={selected} />
+                <DetailPanel
+                  id={selected}
+                  guestToken={user ? undefined : guestTokenFor(guestEntries, selected)}
+                />
               ) : (
                 <p className="flex h-full min-h-52 items-center justify-center text-center text-sm font-semibold text-muted">
                   Sélectionne un Pokémon capturé pour voir sa fiche.

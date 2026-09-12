@@ -1,12 +1,14 @@
-import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 import type { PokedexCollectResponse, PokedexCorner, PokedexSpawnDTO } from '@pokegames/shared-types';
 import { API_ORIGIN } from '@/lib/env';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-context';
 import { collectSpawn, getSpawns, ROUTE_ZONE } from './pokedex-api';
+import { addGuestEntry, guestCollectedTokens, loadGuestCollection } from './guest-collection';
 
 // Placement par coin. Le coin est choisi par le serveur (stable pour la journée). En haut, on
 // descend sous le header (h-16, z-50) sinon la silhouette passerait dessous et resterait invisible.
@@ -18,21 +20,22 @@ const CORNER_CLASS: Record<PokedexCorner, string> = {
 };
 
 // Couche globale des easter eggs : une petite silhouette cachée par zone (écran), fixe pour la
-// journée. Réservée aux utilisateurs connectés : cliquer la collecte et l'ajoute à leur Pokédex.
+// journée. Les invités y ont accès aussi : leurs captures sont gardées dans le navigateur
+// (localStorage), le temps qu'ils se créent un compte.
 export function EasterEggLayer() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const reduce = useReducedMotion();
   const { user } = useAuth();
   const [collected, setCollected] = useState<Set<string>>(new Set());
+  const [guestEntries, setGuestEntries] = useState(() => (typeof window === 'undefined' ? [] : loadGuestCollection()));
   const [reveal, setReveal] = useState<PokedexCollectResponse | null>(null);
 
   const zone = ROUTE_ZONE[location.pathname];
 
   const { data: spawns = [] } = useQuery({
-    queryKey: ['pokedex-spawns'],
+    queryKey: ['pokedex-spawns', user?.id ?? 'invite'],
     queryFn: getSpawns,
-    enabled: Boolean(user),
     staleTime: 60_000,
   });
 
@@ -40,15 +43,32 @@ export function EasterEggLayer() {
     mutationFn: (token: string) => collectSpawn(token),
     onSuccess: (res, token) => {
       setCollected((prev) => new Set(prev).add(token));
+      // Invité : le serveur révèle sans rien enregistrer, on garde la capture côté navigateur.
+      if (!user && res.pokemon) {
+        setGuestEntries(
+          addGuestEntry({
+            id: res.pokemon.id,
+            pokedexId: res.pokemon.pokedexId,
+            nameFr: res.pokemon.nameFr,
+            generation: res.pokemon.generation,
+            token,
+            collectedAt: new Date().toISOString(),
+          }),
+        );
+      }
       setReveal(res);
       void queryClient.invalidateQueries({ queryKey: ['pokedex-spawns'] });
       void queryClient.invalidateQueries({ queryKey: ['pokedex-collection'] });
     },
   });
 
-  // Apparition de la zone courante, non encore collectée localement (connecté uniquement).
-  const spawn: PokedexSpawnDTO | undefined =
-    user && zone ? spawns.find((s) => s.zone === zone && !collected.has(s.token)) : undefined;
+  // Jetons déjà capturés par l'invité : le serveur ne peut pas les filtrer, il ne le connaît pas.
+  const guestTokens = useMemo(() => guestCollectedTokens(guestEntries), [guestEntries]);
+
+  // Apparition de la zone courante, non encore collectée (localement, ou lors d'une visite passée).
+  const spawn: PokedexSpawnDTO | undefined = zone
+    ? spawns.find((s) => s.zone === zone && !collected.has(s.token) && !guestTokens.has(s.token))
+    : undefined;
 
   return (
     <>
@@ -123,6 +143,26 @@ export function EasterEggLayer() {
                 </p>
                 {reveal.collected ? (
                   <p className="text-sm font-bold text-go-shadow">Ajouté à ton Pokédex.</p>
+                ) : reveal.requiresLogin ? (
+                  <>
+                    <p className="text-sm font-bold text-go-shadow">
+                      Ajouté à ton Pokédex sur ce navigateur.
+                    </p>
+                    <p className="text-xs font-semibold text-muted">
+                      En mode invité, ta collection peut être perdue (autre appareil, navigation
+                      privée, nettoyage du navigateur). Crée un compte pour la garder.
+                    </p>
+                    <Link
+                      to="/inscription"
+                      state={{ from: location.pathname + location.search }}
+                      onClick={() => setReveal(null)}
+                      className="w-full"
+                    >
+                      <Button variant="go" size="sm" className="w-full">
+                        Créer un compte
+                      </Button>
+                    </Link>
+                  </>
                 ) : (
                   <p className="text-sm font-semibold text-muted">Tu l'avais déjà.</p>
                 )}

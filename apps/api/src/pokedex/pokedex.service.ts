@@ -228,7 +228,9 @@ export class PokedexService {
     if (guest) {
       const p = byId.get(guest.pokemonId);
       if (!p) return { collected: false, requiresLogin: !userId, pokemon: null };
-      await this.spriteProxy.revealSpriteSession(this.guestSessionHash(token));
+      // Pas de revealSpriteSession ici : la série du jour est commune à tous les invités, donc le
+      // sessionHash l'est aussi. Démasquer priverait les autres de leur silhouette. La révélation
+      // passe par le sprite public renvoyé dans la réponse, qui ne concerne que ce joueur.
       return { collected: false, requiresLogin: !userId, pokemon: this.revealed(p) };
     }
 
@@ -291,10 +293,19 @@ export class PokedexService {
     }));
   }
 
-  /** Fiche détaillée, réservée aux Pokémon collectés (les autres restent un mystère). */
-  async getDetail(pokemonId: number, userId: string): Promise<PokedexDetailDTO> {
-    const owned = await this.prisma.userPokedexEntry.findFirst({ where: { userId, pokemonId } });
-    if (!owned) throw new NotFoundException('Pokémon non collecté');
+  /**
+   * Fiche détaillée, réservée aux Pokémon collectés (les autres restent un mystère).
+   * Invité : la preuve de collecte est le jeton signé remis à l'apparition, que le navigateur
+   * conserve. Il est vérifié côté serveur, le client ne peut donc pas réclamer une fiche au hasard.
+   */
+  async getDetail(pokemonId: number, userId?: string, guestToken?: string): Promise<PokedexDetailDTO> {
+    if (userId) {
+      const owned = await this.prisma.userPokedexEntry.findFirst({ where: { userId, pokemonId } });
+      if (!owned) throw new NotFoundException('Pokémon non collecté');
+    } else {
+      const guest = guestToken ? this.parseGuestToken(guestToken) : null;
+      if (!guest || guest.pokemonId !== pokemonId) throw new NotFoundException('Pokémon non collecté');
+    }
     const p = await this.prisma.pokemon.findUnique({
       where: { id: pokemonId },
       include: { types: { include: { type: true }, orderBy: { slot: 'asc' } } },

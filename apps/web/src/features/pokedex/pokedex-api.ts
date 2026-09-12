@@ -31,8 +31,11 @@ export async function markPokedexSeen(): Promise<void> {
   await api.post('/pokedex/seen', {});
 }
 
-export async function getPokedexDetail(id: number): Promise<PokedexDetailDTO> {
-  const res = await api.get<PokedexDetailDTO>(`/pokedex/detail/${id}`);
+// `token` : preuve de collecte des invites (jeton signe par le serveur, garde en localStorage).
+export async function getPokedexDetail(id: number, token?: string): Promise<PokedexDetailDTO> {
+  const res = await api.get<PokedexDetailDTO>(`/pokedex/detail/${id}`, {
+    params: token ? { token } : undefined,
+  });
   return res.data;
 }
 
