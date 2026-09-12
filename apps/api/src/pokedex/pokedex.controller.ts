@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { PokedexService } from './pokedex.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -55,12 +66,14 @@ export class PokedexController {
     return { success: true };
   }
 
-  @UseGuards(JwtAuthGuard)
+  // Invité : le jeton signé de l'apparition sert de preuve de collecte (il est vérifié côté serveur).
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('detail/:id')
   detail(
     @Req() req: Request & { user?: AuthUser },
     @Param('id') id: string,
+    @Query('token') token?: string,
   ): Promise<PokedexDetailDTO> {
-    return this.pokedex.getDetail(Number(id), req.user!.id);
+    return this.pokedex.getDetail(Number(id), req.user?.id, token);
   }
 }

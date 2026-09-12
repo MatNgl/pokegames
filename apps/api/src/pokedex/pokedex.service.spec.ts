@@ -173,6 +173,12 @@ describe('PokedexService', () => {
       expect(prisma.userPokedexEntry.create).not.toHaveBeenCalled();
     });
 
+    it('jeton invité : ne démasque pas la session de sprite (partagée par tous les invités)', async () => {
+      const spawns = await service.getSpawns();
+      await service.collect(spawns[0]!.token);
+      expect(reveal).not.toHaveBeenCalled();
+    });
+
     it('jeton inconnu : rien à collecter', async () => {
       prisma.pokedexSpawn.findUnique.mockResolvedValue(null);
       const res = await service.collect('inconnu', 'u1');
@@ -192,9 +198,59 @@ describe('PokedexService', () => {
   });
 
   describe('getDetail', () => {
+    const DETAIL_ROW = {
+      id: 3,
+      pokedexId: 3,
+      nameFr: 'P3',
+      nameEn: 'P3',
+      category: null,
+      generation: 1,
+      height: 1,
+      weight: 1,
+      statsHp: 1,
+      statsAtk: 1,
+      statsDef: 1,
+      statsSpeAtk: 1,
+      statsSpeDef: 1,
+      statsSpeed: 1,
+      types: [],
+    };
+
     it('refuse le détail d’un Pokémon non collecté', async () => {
       prisma.userPokedexEntry.findFirst.mockResolvedValue(null);
       await expect(service.getDetail(3, 'u1')).rejects.toThrow();
+    });
+
+    it('invité sans jeton : refuse le détail', async () => {
+      await expect(service.getDetail(3)).rejects.toThrow();
+    });
+
+    it('invité : accepte le jeton signé de l’apparition collectée', async () => {
+      const spawns = await service.getSpawns();
+      const collected = await service.collect(spawns[0]!.token);
+      const pokemonId = collected.pokemon!.id;
+      prisma.pokemon.findUnique.mockResolvedValue({ ...DETAIL_ROW, id: pokemonId, pokedexId: pokemonId });
+
+      const detail = await service.getDetail(pokemonId, undefined, spawns[0]!.token);
+      expect(detail.id).toBe(pokemonId);
+      expect(prisma.userPokedexEntry.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('invité : refuse un jeton qui ne correspond pas au Pokémon demandé', async () => {
+      const spawns = await service.getSpawns();
+      const collected = await service.collect(spawns[0]!.token);
+      const otherId = collected.pokemon!.id + 1;
+      await expect(service.getDetail(otherId, undefined, spawns[0]!.token)).rejects.toThrow();
+    });
+
+    it('invité : refuse un jeton dont la signature est falsifiée', async () => {
+      const spawns = await service.getSpawns();
+      const parts = spawns[0]!.token.split('.');
+      const forged = `${parts[0]}.${parts[1]}.deadbeef`;
+      const collected = await service.collect(spawns[0]!.token);
+      await expect(
+        service.getDetail(collected.pokemon!.id, undefined, forged),
+      ).rejects.toThrow();
     });
   });
 });
