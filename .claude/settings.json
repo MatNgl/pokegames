@@ -20,5 +20,19 @@
       "Bash(npx prisma:*)",
       "Bash(docker compose:*)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-start.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
   }
 }
