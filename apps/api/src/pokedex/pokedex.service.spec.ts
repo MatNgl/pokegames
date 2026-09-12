@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { POKEDEX_CORNERS } from '@pokegames/shared-types';
 import { PokedexService } from './pokedex.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SpriteProxyService } from '../game/sprite-proxy.service';
@@ -97,6 +98,37 @@ describe('PokedexService', () => {
       expect(res[0]?.spriteProxyUrl).toBe('/api/sprites/h3');
       expect(res[0]?.token).toBe('tok3');
       expect(register).toHaveBeenCalled();
+    });
+
+    it('assigne un coin valide, stable d’un appel à l’autre pour un même jeton', async () => {
+      prisma.pokedexSpawn.findMany.mockResolvedValue([
+        { pokemonId: 3, zone: 'home', sessionHash: 'h3', token: 'tok3', collected: false },
+      ]);
+      const first = await service.getSpawns('u1');
+      const second = await service.getSpawns('u1');
+      expect(POKEDEX_CORNERS).toContain(first[0]?.corner);
+      expect(second[0]?.corner).toBe(first[0]?.corner);
+    });
+
+    it('répartit les apparitions sur les quatre coins', async () => {
+      prisma.pokedexSpawn.findMany.mockResolvedValue(
+        CATALOG.map((p) => ({
+          pokemonId: p.id,
+          zone: 'home',
+          sessionHash: `h${p.id}`,
+          token: `11111111-2222-3333-4444-00000000000${p.id.toString(16)}`,
+          collected: false,
+        })),
+      );
+      const res = await service.getSpawns('u1');
+      const corners = new Set(res.map((s) => s.corner));
+      expect(corners.size).toBe(POKEDEX_CORNERS.length);
+    });
+
+    it('invité : chaque apparition porte un coin valide', async () => {
+      const res = await service.getSpawns();
+      expect(res.length).toBeGreaterThan(0);
+      for (const spawn of res) expect(POKEDEX_CORNERS).toContain(spawn.corner);
     });
 
     it('exclut les Pokémon déjà possédés du tirage', async () => {
