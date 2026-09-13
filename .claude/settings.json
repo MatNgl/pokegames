@@ -1,6 +1,7 @@
 {
   "enableAllProjectMcpServers": true,
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(gh pr view:*)",
       "Bash(gh pr review:*)",
