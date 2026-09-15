@@ -1,0 +1,72 @@
+name: Agent développeur (poll missions)
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pokegames
+          POSTGRES_PASSWORD: pokegames_secret_password
+          POSTGRES_DB: pokegames_db
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U pokegames"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://pokegames:pokegames_secret_password@localhost:5434/pokegames_db?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: 6380
+      PORT: 3001
+      CORS_ORIGIN: http://localhost:5173
+      JWT_SECRET: pokegames_secret_jwt
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --model opus
+            --effort medium
+            --disallowedTools Task
+            --dangerously-skip-permissions
+          prompt: |
+            Tu ES toi-même l'agent développeur de pokegames, dans cette
+            session, maintenant. N'utilise JAMAIS l'outil Task/Agent pour
+            déléguer ce travail à un sous-agent en arrière-plan : cette
+            session s'arrête dès que ton tour se termine.
+
+            1. Utilise l'outil MCP Notion pour interroger la base
+               "Missions".
+            2. Sélectionne la mission à traiter : d'abord toute mission
+               "Révision demandée" (Urgent avant Normal, la plus ancienne
+               d'abord) ; sinon une mission "À faire"/"En cours" (même
+               ordre de priorité). Une mission "Normal" n'est éligible que
+               si son "Heure souhaitée" est vide ou déjà passée. S'il
+               existe au moins une mission Urgent, traite-la puis enchaîne
+               sur la suivante du même statut tant qu'il en reste. Sinon,
+               traite au maximum UNE mission Normal.
+            3. Si aucune mission n'est éligible, termine sans rien faire.
+            4. Pour la mission retenue, lis .claude/agents/dev.md à la
+               racine du repo et applique exactement sa procédure,
+               toi-même, sans en dévier — y compris pour npm run verify,
+               le compte-rendu Notion et l'ouverture de la PR.
