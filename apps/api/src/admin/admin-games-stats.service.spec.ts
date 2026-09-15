@@ -80,8 +80,20 @@ describe('AdminGamesStatsService', () => {
       { attempts: 3, count: 2 },
       { attempts: 5, count: 1 },
     ]);
+    expect(motus?.medianAttempts).toBe(3);
     // SHINY n'a pas d'essais : absent de l'histogramme
     expect(r.attempts.find((a) => a.gameType === 'SHINY')).toBeUndefined();
+  });
+
+  it('calcule la médiane des essais sur un nombre pair de valeurs', async () => {
+    prisma.dailyResult.findMany.mockResolvedValue([
+      { gameType: 'WHO_IS_IT', scope: '', won: true, attempts: 2, correctCount: null, totalRounds: null, durationSeconds: 10 },
+      { gameType: 'WHO_IS_IT', scope: '', won: true, attempts: 4, correctCount: null, totalRounds: null, durationSeconds: 10 },
+    ]);
+
+    const r = await service.getReport(30);
+    // Moyenne arrondie des deux valeurs centrales, comme le helper median
+    expect(r.attempts.find((a) => a.gameType === 'WHO_IS_IT')?.medianAttempts).toBe(3);
   });
 
   it('mesure l’usage des indices et son effet sur la réussite', async () => {

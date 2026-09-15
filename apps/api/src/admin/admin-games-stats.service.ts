@@ -164,6 +164,7 @@ export class AdminGamesStatsService {
       for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
       return {
         gameType,
+        medianAttempts: median(values),
         buckets: [...counts.entries()]
           .map(([attempts, count]) => ({ attempts, count }))
           .sort((a, b) => a.attempts - b.attempts),
