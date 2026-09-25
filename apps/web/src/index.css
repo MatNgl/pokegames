@@ -38,8 +38,10 @@
 }
 
 @layer base {
+  /* body pas en hauteur 100% : sinon il devient son propre conteneur de defilement des que le
+     contenu depasse un ecran, avec une barre de defilement qui retrecit sa largeur de contenu
+     (le calque de fond en position fixed, lui, reste cale sur la vraie largeur de la fenetre). */
   html,
-  body,
   #root {
     height: 100%;
   }
