@@ -235,6 +235,7 @@ export interface AdminPokemonDifficulty {
 /** Histogramme du nombre d'essais (Silhouette, Motus). */
 export interface AdminAttemptsDistribution {
   gameType: string;
+  medianAttempts: number; // mediane des essais, calculee sur les memes valeurs que buckets
   buckets: { attempts: number; count: number }[];
 }
 
