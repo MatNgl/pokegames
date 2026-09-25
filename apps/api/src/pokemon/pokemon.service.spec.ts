@@ -29,14 +29,20 @@ describe('PokemonService', () => {
     expect(service).toBeDefined();
   });
 
-  it('retourne la liste des noms français triés', async () => {
-    mockFindMany.mockResolvedValue([{ nameFr: 'Bulbizarre' }, { nameFr: 'Salamèche' }]);
+  it('retourne la liste des noms français triés, avec leur id', async () => {
+    mockFindMany.mockResolvedValue([
+      { id: 1, nameFr: 'Bulbizarre' },
+      { id: 4, nameFr: 'Salamèche' },
+    ]);
 
     const names = await service.getNames();
 
-    expect(names).toEqual(['Bulbizarre', 'Salamèche']);
+    expect(names).toEqual([
+      { id: 1, nameFr: 'Bulbizarre' },
+      { id: 4, nameFr: 'Salamèche' },
+    ]);
     expect(mockFindMany).toHaveBeenCalledWith({
-      select: { nameFr: true },
+      select: { id: true, nameFr: true },
       orderBy: { nameFr: 'asc' },
     });
   });

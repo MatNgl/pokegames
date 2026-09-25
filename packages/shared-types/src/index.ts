@@ -10,6 +10,12 @@ export interface PokemonTypeInfo {
   image: string;
 }
 
+/* Autocompletion des noms de Pokemon (Silhouette, Le Pokedex) : id pour construire l'URL du sprite public. */
+export interface PokemonNameOption {
+  id: number;
+  nameFr: string;
+}
+
 /* Resultats quotidiens (joueurs connectes) : verrou serveur, historique, classements. */
 export interface DailyResultDTO {
   gameType: string;
