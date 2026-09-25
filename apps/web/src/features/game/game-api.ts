@@ -1,5 +1,6 @@
 import { api } from '@/lib/api';
 import type {
+  PokemonNameOption,
   WhoIsItConfig,
   WhoIsItGuessResponse,
   WhoIsItHintType,
@@ -35,7 +36,7 @@ export async function getRoundState(roundId: string): Promise<WhoIsItRoundState>
   return res.data;
 }
 
-export async function getPokemonNames(): Promise<string[]> {
-  const res = await api.get<string[]>('/pokemon/names');
+export async function getPokemonNames(): Promise<PokemonNameOption[]> {
+  const res = await api.get<PokemonNameOption[]>('/pokemon/names');
   return res.data;
 }

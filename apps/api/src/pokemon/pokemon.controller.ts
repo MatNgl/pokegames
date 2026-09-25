@@ -7,6 +7,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
+import type { PokemonNameOption } from '@pokegames/shared-types';
 import { PokemonService } from './pokemon.service';
 
 @Controller('pokemon')
@@ -14,7 +15,7 @@ export class PokemonController {
   constructor(private readonly pokemonService: PokemonService) {}
 
   @Get('names')
-  async getNames(): Promise<string[]> {
+  async getNames(): Promise<PokemonNameOption[]> {
     return this.pokemonService.getNames();
   }
 

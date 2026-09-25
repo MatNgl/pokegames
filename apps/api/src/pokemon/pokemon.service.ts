@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import axios from 'axios';
+import type { PokemonNameOption } from '@pokegames/shared-types';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -11,15 +12,16 @@ export class PokemonService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Liste des noms francais, triee, pour l'autocompletion cote client.
-   * Les noms sont publics : les exposer n'aide pas a identifier la cible masquee d'une manche.
+   * Liste des noms francais (avec id, pour la vignette de sprite), triee, pour l'autocompletion
+   * cote client. Ces donnees sont publiques : les exposer n'aide pas a identifier la cible
+   * masquee d'une manche.
    */
-  async getNames(): Promise<string[]> {
+  async getNames(): Promise<PokemonNameOption[]> {
     const rows = await this.prisma.pokemon.findMany({
-      select: { nameFr: true },
+      select: { id: true, nameFr: true },
       orderBy: { nameFr: 'asc' },
     });
-    return rows.map((row) => row.nameFr);
+    return rows;
   }
 
   /**

@@ -1,5 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import type { PokemonNameOption } from '@pokegames/shared-types';
 import { Input } from '@/components/ui/input';
+import { API_ORIGIN } from '@/lib/env';
 
 function normalize(value: string): string {
   return value
@@ -10,7 +12,7 @@ function normalize(value: string): string {
 
 interface GuessAutocompleteProps {
   value: string;
-  names: string[];
+  names: PokemonNameOption[];
   disabled?: boolean;
   excluded?: string[];
   /**
@@ -42,7 +44,7 @@ export function GuessAutocomplete({
     const query = normalize(value.trim());
     if (!query) return [];
     const matches = names
-      .map((name) => ({ name, norm: normalize(name) }))
+      .map((option) => ({ option, norm: normalize(option.nameFr) }))
       .filter((entry) => entry.norm.includes(query) && !excludedSet.has(entry.norm));
     // Les noms qui commencent par la recherche d'abord, puis les autres, chacun en ordre alphabetique.
     matches.sort((a, b) => {
@@ -51,7 +53,7 @@ export function GuessAutocomplete({
       if (aStarts !== bStarts) return aStarts - bStarts;
       return a.norm.localeCompare(b.norm);
     });
-    return matches.map((entry) => entry.name);
+    return matches.map((entry) => entry.option);
   }, [value, names, excludedSet]);
 
   useEffect(() => {
@@ -89,7 +91,7 @@ export function GuessAutocomplete({
       // Entree sur une suggestion surlignee : on la choisit sans soumettre le formulaire.
       event.preventDefault();
       const picked = suggestions[highlight];
-      if (picked) select(picked);
+      if (picked) select(picked.nameFr);
     } else if (event.key === 'Escape') {
       event.preventDefault();
       setOpen(false);
@@ -134,18 +136,29 @@ export function GuessAutocomplete({
             placement === 'bottom' ? 'top-full mt-1' : 'bottom-full mb-1'
           }`}
         >
-          {suggestions.map((name, index) => (
-            <li key={name} id={`${listId}-opt-${index}`} role="option" aria-selected={index === highlight}>
+          {suggestions.map((option, index) => (
+            <li
+              key={option.id}
+              id={`${listId}-opt-${index}`}
+              role="option"
+              aria-selected={index === highlight}
+            >
               <button
                 type="button"
                 tabIndex={-1}
-                className={`flex w-full cursor-pointer items-center px-3 py-2 text-left text-sm text-foreground transition-colors duration-150 ${
+                className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm text-foreground transition-colors duration-150 ${
                   index === highlight ? 'bg-surface-2' : 'hover:bg-surface-2'
                 }`}
                 onMouseEnter={() => setHighlight(index)}
-                onClick={() => select(name)}
+                onClick={() => select(option.nameFr)}
               >
-                {name}
+                <img
+                  src={`${API_ORIGIN}/api/pokemon/${option.id}/sprite`}
+                  alt=""
+                  loading="lazy"
+                  className="h-8 w-8 shrink-0 object-contain"
+                />
+                {option.nameFr}
               </button>
             </li>
           ))}
