@@ -18,6 +18,7 @@ import {
   type PlayerIdentity,
 } from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
+import { seededRng, todayUtcDate } from '../common/daily-rng';
 import type {
   ShinyChoiceResponse,
   ShinyLevel,
@@ -96,23 +97,6 @@ export class ShinyService {
     return this.poolCache;
   }
 
-  private makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
-  }
-
-  private dailySeed(mode: ShinyMode): number {
-    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    let seed = mode === 'FIND_SHINY' ? 17 : 43;
-    for (let i = 0; i < todayStr.length; i++) {
-      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
-    }
-    return seed || 1;
-  }
-
   private prompt(mode: ShinyMode): string {
     return mode === 'FIND_SHINY' ? 'Trouve le shiny' : 'Trouve celui qui n’est pas shiny';
   }
@@ -174,7 +158,7 @@ export class ShinyService {
     pool: PoolPokemon[],
     initialUsed: Set<number>,
   ): Record<ShinyLevel, RoundDef[]> {
-    const rng = this.makeRng(this.dailySeed(mode));
+    const rng = seededRng(`shiny:${mode}:${todayUtcDate()}`);
     const used = new Set<number>(initialUsed);
     const plan = {} as Record<ShinyLevel, RoundDef[]>;
     for (const level of SHINY_LEVELS) {

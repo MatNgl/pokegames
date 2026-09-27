@@ -13,6 +13,7 @@ import {
   type PlayerIdentity,
 } from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
+import { seededRng, todayUtcDate } from '../common/daily-rng';
 import { JUST_STAT_DESCRIPTORS } from './game-config';
 import type {
   JustStatDirection,
@@ -145,23 +146,6 @@ export class JustStatService {
     }
   }
 
-  private makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
-  }
-
-  private dailySeed(): number {
-    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    let seed = 91;
-    for (let i = 0; i < todayStr.length; i++) {
-      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
-    }
-    return seed || 1;
-  }
-
   private shuffle<T>(items: T[], rng: () => number): T[] {
     const copy = [...items];
     for (let i = copy.length - 1; i > 0; i--) {
@@ -223,7 +207,7 @@ export class JustStatService {
    * (repli sans historique si le pool devient insuffisant). Tirage enregistre une fois par jour.
    */
   private async getDailyRounds(pool: PoolPokemon[]): Promise<RoundDef[]> {
-    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    const today = todayUtcDate();
     if (this.planCache && this.planCache.date === today) {
       return this.planCache.rounds;
     }
@@ -240,9 +224,9 @@ export class JustStatService {
       now,
       this.gameConfig.antiRepeatDetailWindow(),
     );
-    let rounds = this.buildRounds(pool, this.makeRng(this.dailySeed()), recentIds, recentStats);
+    let rounds = this.buildRounds(pool, seededRng(`just-stat:${today}`), recentIds, recentStats);
     if (rounds.length < this.gameConfig.justStat().roundsCount) {
-      rounds = this.buildRounds(pool, this.makeRng(this.dailySeed()), new Set<number>(), new Set<string>());
+      rounds = this.buildRounds(pool, seededRng(`just-stat:${today}`), new Set<number>(), new Set<string>());
     }
 
     if (!(await this.history.hasPicksFor(this.HISTORY_GAME, '', now))) {

@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SpriteProxyService } from '../game/sprite-proxy.service';
+import { seededRng } from '../common/daily-rng';
 import {
   POKEDEX_CORNERS,
   POKEDEX_ZONES,
@@ -59,14 +60,6 @@ export class PokedexService {
     });
     this.catalogCache = rows;
     return rows;
-  }
-
-  private makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
   }
 
   private hashSeed(str: string): number {
@@ -146,7 +139,7 @@ export class PokedexService {
 
     if (!userId) {
       const dayStr = this.dayStr(now);
-      const rng = this.makeRng(this.hashSeed(`guest:${dayStr}`));
+      const rng = seededRng(`pokedex-eggs:guest:${dayStr}`);
       const picks = this.pickDistinct(
         catalog.map((p) => p.id),
         this.DAILY_COUNT,
@@ -203,7 +196,7 @@ export class PokedexService {
     const pool = catalog.map((p) => p.id).filter((id) => !ownedSet.has(id));
     if (pool.length === 0) return; // collection complète
 
-    const rng = this.makeRng(this.hashSeed(`${userId}:${this.dayStr(now)}`));
+    const rng = seededRng(`pokedex-eggs:${userId}:${this.dayStr(now)}`);
     const picks = this.pickDistinct(pool, this.DAILY_COUNT, rng);
     const zones = this.pickDistinct([...POKEDEX_ZONES], picks.length, rng);
     const data = picks.map((pokemonId, i) => ({
