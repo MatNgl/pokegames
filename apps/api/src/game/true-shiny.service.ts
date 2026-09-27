@@ -19,6 +19,7 @@ import {
   type PlayerIdentity,
 } from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
+import { seededRng, todayUtcDate } from '../common/daily-rng';
 import type {
   TrueShinyChoiceResponse,
   TrueShinyLevel,
@@ -96,23 +97,6 @@ export class TrueShinyService {
     return this.poolCache;
   }
 
-  private makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
-  }
-
-  private dailySeed(level: TrueShinyLevel): number {
-    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    let seed = 23 + TRUE_SHINY_LEVELS.indexOf(level) * 7;
-    for (let i = 0; i < todayStr.length; i++) {
-      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
-    }
-    return seed || 1;
-  }
-
   private shuffle<T>(items: T[], rng: () => number): T[] {
     const copy = [...items];
     for (let i = copy.length - 1; i > 0; i--) {
@@ -161,7 +145,7 @@ export class TrueShinyService {
     pool: PoolPokemon[],
     initialUsed: Set<number>,
   ): Record<TrueShinyLevel, RoundDef[]> {
-    const rng = this.makeRng(this.dailySeed('FACILE'));
+    const rng = seededRng(`true-shiny:FACILE:${todayUtcDate()}`);
     const used = new Set<number>(initialUsed);
     const plan = {} as Record<TrueShinyLevel, RoundDef[]>;
     for (const level of TRUE_SHINY_LEVELS) {

@@ -17,6 +17,7 @@ import {
   type PlayerIdentity,
 } from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
+import { seededRng, todayUtcDate } from '../common/daily-rng';
 import type {
   PokedexCell,
   PokedexDirection,
@@ -118,26 +119,9 @@ export class PokedexGameService {
     return this.poolCache;
   }
 
-  private makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
-  }
-
-  private dailySeed(): number {
-    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    let seed = 137;
-    for (let i = 0; i < todayStr.length; i++) {
-      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
-    }
-    return seed || 1;
-  }
-
   /** Cible du jour : identique pour tous, en evitant celles des jours precedents. */
   private async getDailyTarget(pool: PokedexEntry[]): Promise<PokedexEntry> {
-    const today = new Date().toISOString().split('T')[0] ?? '2026-01-01';
+    const today = todayUtcDate();
     const cached = this.planCache;
     if (cached && cached.date === today) {
       const hit = pool.find((p) => p.id === cached.targetId);
@@ -151,7 +135,7 @@ export class PokedexGameService {
       now,
       this.gameConfig.antiRepeatWindow(this.HISTORY_GAME),
     );
-    const rng = this.makeRng(this.dailySeed());
+    const rng = seededRng(`pokedex-game:${today}`);
     // Repli sur le catalogue complet si l'historique a tout exclu (pool devenu trop etroit).
     const eligible = pool.filter((p) => !recentIds.has(p.id));
     const source = eligible.length > 0 ? eligible : pool;

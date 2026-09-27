@@ -17,6 +17,7 @@ import {
   type PlayerIdentity,
 } from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
+import { seededRng, todayUtcDate } from '../common/daily-rng';
 import { type IntruderHintMode } from './game-config';
 import type {
   IntruderChoiceResponse,
@@ -160,24 +161,6 @@ export class IntruderService {
       };
     });
     return this.poolCache;
-  }
-
-  /** Generateur pseudo-aleatoire deterministe (meme partie pour tous un jour donne). */
-  private makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
-  }
-
-  private dailySeed(): number {
-    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    let seed = 0;
-    for (let i = 0; i < todayStr.length; i++) {
-      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
-    }
-    return seed || 1;
   }
 
   private statValue(p: PoolPokemon, key: StatDescriptor['key']): number {
@@ -502,7 +485,7 @@ export class IntruderService {
   }
 
   private buildPlan(pool: PoolPokemon[], initialUsed: Set<number>): Record<IntruderLevel, RoundDef[]> {
-    const rng = this.makeRng(this.dailySeed());
+    const rng = seededRng(`intruder:${todayUtcDate()}`);
     const used = new Set<number>(initialUsed);
     const plan = {} as Record<IntruderLevel, RoundDef[]>;
     for (const level of INTRUDER_LEVELS) {

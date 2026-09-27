@@ -28,6 +28,7 @@ import {
   type PlayerIdentity,
 } from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
+import { seededRng, todayUtcDate } from '../common/daily-rng';
 
 const WHO_IS_IT_LEVELS: WhoIsItLevel[] = ['FACILE', 'MOYEN', 'DIFFICILE', 'EXTREME'];
 
@@ -121,25 +122,6 @@ export class WhoIsItService {
     return { zoomRatio: Number(zoom.toFixed(2)), rotationAngle: Math.round(angle) };
   }
 
-  private makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
-  }
-
-  // Graine du jour (date UTC seule) : la permutation est identique pour tous les niveaux, ce qui
-  // rend le decoupage en tranches disjointes coherent quel que soit le niveau demande.
-  private dailyShuffleSeed(): number {
-    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    let seed = 7;
-    for (let i = 0; i < todayStr.length; i++) {
-      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
-    }
-    return seed || 1;
-  }
-
   /**
    * Serie deterministe du jour pour un niveau. Melange le catalogue (graine du jour) puis attribue a
    * chaque niveau, dans l'ordre, des Pokemon non encore utilises et compatibles avec ses generations.
@@ -150,7 +132,7 @@ export class WhoIsItService {
     roundsCount: number,
     recentByLevel: Map<WhoIsItLevel, Set<number>>,
   ): Map<WhoIsItLevel, T[]> {
-    const rng = this.makeRng(this.dailyShuffleSeed());
+    const rng = seededRng(`who-is-it:${todayUtcDate()}`);
     const perm = [...all];
     for (let i = perm.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));

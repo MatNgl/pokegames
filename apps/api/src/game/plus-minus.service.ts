@@ -17,6 +17,7 @@ import {
   type PlayerIdentity,
 } from '../daily-result/daily-result.service';
 import { GameConfigService } from '../game-config/game-config.service';
+import { seededRng, todayUtcDate } from '../common/daily-rng';
 import type {
   PlusMinusChoiceResponse,
   PlusMinusContestant,
@@ -181,24 +182,6 @@ export class PlusMinusService {
     }
   }
 
-  /** Generateur pseudo-aleatoire deterministe (meme partie pour tous un jour donne). */
-  private makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-      state = (state * 1664525 + 1013904223) >>> 0;
-      return state / 4294967296;
-    };
-  }
-
-  private dailySeed(): number {
-    const todayStr = new Date().toISOString().split('T')[0] ?? '2026-01-01';
-    let seed = 0;
-    for (let i = 0; i < todayStr.length; i++) {
-      seed = (seed * 31 + todayStr.charCodeAt(i)) >>> 0;
-    }
-    return seed || 1;
-  }
-
   // Ramene l'ecart brut d'une dimension a des "points" comparables aux seuils de niveau.
   // La taille est en metres : on la ramene en centimetres (x100). Le reste est deja en points.
   private dimensionScale(criterion: PlusMinusCriterion): number {
@@ -290,7 +273,7 @@ export class PlusMinusService {
 
   // Construit tous les niveaux avec un meme RNG et une exclusion partagee (dedup intra-jour + historique).
   private buildPlan(pool: PoolPokemon[], initialUsed: Set<number>): Record<PlusMinusLevel, Duel[]> {
-    const rng = this.makeRng(this.dailySeed());
+    const rng = seededRng(`plus-minus:${todayUtcDate()}`);
     const used = new Set<number>(initialUsed);
     const plan = {} as Record<PlusMinusLevel, Duel[]>;
     for (const level of PLUS_MINUS_LEVELS) {
